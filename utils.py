@@ -2,7 +2,6 @@ import sqlite3
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-import numpy as np
 import pandas as pd
 import requests
 
@@ -59,6 +58,23 @@ def connect_db(db_name):
     """)
 
     conn.commit()
+
+    # 古いDB対策：predictions に attraction 列が無い場合は追加
+    cursor.execute("PRAGMA table_info(predictions)")
+    columns = [row[1] for row in cursor.fetchall()]
+
+    if "attraction" not in columns:
+        cursor.execute(
+            "ALTER TABLE predictions ADD COLUMN attraction TEXT"
+        )
+
+        cursor.execute("""
+        UPDATE predictions
+        SET attraction = ?
+        WHERE attraction IS NULL
+        """, (GLOBAL_PREDICTION_NAME,))
+
+        conn.commit()
 
     return conn, cursor
 
@@ -122,6 +138,13 @@ def load_prediction_history(conn):
         conn
     )
 
+    # 万が一 attraction 列が無いDBでも落ちないようにする
+    if "attraction" not in prediction_df.columns:
+        prediction_df["attraction"] = GLOBAL_PREDICTION_NAME
+
+    if "error" not in prediction_df.columns:
+        prediction_df["error"] = None
+
     return prediction_df
 
 
@@ -156,6 +179,14 @@ def save_prediction_rows(
 
         cursor.execute("""
         INSERT INTO predictions
+        (
+            created_at,
+            attraction,
+            target_hour,
+            predicted_wait,
+            actual_wait,
+            error
+        )
         VALUES (?, ?, ?, ?, NULL, NULL)
         """, (
             now,
@@ -203,6 +234,12 @@ def get_feedback_error(
 ):
 
     if len(prediction_history) == 0:
+        return 0
+
+    if "attraction" not in prediction_history.columns:
+        return 0
+
+    if "error" not in prediction_history.columns:
         return 0
 
     one_df = prediction_history[
