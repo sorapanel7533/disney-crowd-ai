@@ -1,6 +1,7 @@
 import random
 import time
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -34,6 +35,8 @@ from utils import (
     update_prediction_feedback,
 )
 
+JST = ZoneInfo("Asia/Tokyo")
+
 st.set_page_config(
     page_title="ディズニー混雑AI",
     page_icon="🏰",
@@ -42,34 +45,27 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-
 .stApp {
     background-color: #0f1117;
 }
-
 .block-container {
     padding-top: 2rem;
 }
-
 h1, h2, h3, h4, p, label {
     color: #f5f7ff !important;
 }
-
 [data-testid="stMetric"] {
     background-color: #1c1f2b;
     border: 1px solid #3b4260;
     padding: 18px;
     border-radius: 18px;
 }
-
 [data-testid="stMetricLabel"] {
     color: #e2e8ff !important;
 }
-
 [data-testid="stMetricValue"] {
     color: #ffffff !important;
 }
-
 .title-card {
     background: linear-gradient(135deg, #143b6d, #1f6feb);
     padding: 28px;
@@ -78,20 +74,17 @@ h1, h2, h3, h4, p, label {
     border: 1px solid #6aa4ff;
     box-shadow: 0 8px 28px rgba(0,0,0,0.5);
 }
-
 .title-card h1 {
     color: #ffffff !important;
     font-size: 42px;
     margin-bottom: 8px;
     text-shadow: 0 3px 12px rgba(0,0,0,0.7);
 }
-
 .title-card p {
     color: #eef5ff !important;
     font-size: 18px;
     margin: 0;
 }
-
 .card {
     background: linear-gradient(135deg,#1c1f2b,#252b3f);
     padding: 20px;
@@ -99,7 +92,6 @@ h1, h2, h3, h4, p, label {
     margin-bottom: 16px;
     border: 1px solid #3b4260;
 }
-
 .rank-card {
     background-color: #161a27;
     padding: 14px;
@@ -108,7 +100,6 @@ h1, h2, h3, h4, p, label {
     border-left: 5px solid #4ade80;
     color: #ffffff;
 }
-
 .advice-card {
     background: linear-gradient(135deg,#10243d,#193b63);
     padding: 18px;
@@ -117,45 +108,36 @@ h1, h2, h3, h4, p, label {
     border-left: 6px solid #60a5fa;
     color: #ffffff;
 }
-
 div[data-baseweb="select"] {
     background: linear-gradient(135deg, #182033, #202b44) !important;
     border-radius: 16px !important;
     border: 1px solid #4b63a0 !important;
     box-shadow: 0 4px 14px rgba(0,0,0,0.35);
 }
-
 div[data-baseweb="select"] span {
     color: white !important;
     font-weight: 600 !important;
 }
-
 div[data-baseweb="select"] svg {
     color: #93c5fd !important;
 }
-
 div[data-baseweb="popover"] {
     background-color: #1c1f2b !important;
     border-radius: 14px !important;
 }
-
 div[role="option"] {
     color: white !important;
     background-color: #1c1f2b !important;
 }
-
 div[role="option"]:hover {
     background-color: #2b3a5c !important;
 }
-
 thead tr th {
     color: white !important;
 }
-
 tbody tr td {
     color: white !important;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -175,13 +157,13 @@ def graph_ylim(values):
     return 200
 
 
-now_display = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+now_display = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
 
 st.markdown(f"""
 <div class="title-card">
 <h1>🏰 ディズニー混雑AI</h1>
 <p>東京ディズニーリゾート混雑分析システム</p>
-<p>最終更新: {now_display}</p>
+<p>最終更新: {now_display}（日本時間）</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -206,12 +188,12 @@ display_mode = st.selectbox(
 ticket_price_map, ticket_map_source = fetch_castel_ticket_prices()
 
 ticket_price, ticket_source = get_ticket_price_from_castel(
-    datetime.now(),
+    datetime.now(JST),
     ticket_price_map
 )
 
 today_bonus, today_reasons = get_calendar_bonus(
-    datetime.now(),
+    datetime.now(JST),
     ticket_price
 )
 
@@ -243,9 +225,7 @@ avg_wait, max_wait, var_wait, crowd_source = get_today_stats(
 )
 
 if len(valid_all_df) == 0:
-    st.warning(
-        "現在は営業中の有効な待ち時間データがありません。"
-    )
+    st.warning("現在は営業中の有効な待ち時間データがありません。")
 
 prediction_history = load_prediction_history(conn)
 
@@ -290,7 +270,7 @@ relative_rows = []
 
 if len(valid_all_df) > 0 and len(history_df) > 20:
 
-    now_hour = datetime.now().hour
+    now_hour = datetime.now(JST).hour
 
     hist_same_hour = history_df[
         (history_df["hour"] == now_hour)
@@ -997,7 +977,7 @@ st.write("全体予測補正:", round(global_feedback_error, 1))
 
 st.write(
     "最終更新:",
-    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S") + "（日本時間）"
 )
 
 refresh_seconds = 900
