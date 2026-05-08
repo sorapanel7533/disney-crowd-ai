@@ -2,12 +2,15 @@ import re
 import sqlite3
 from datetime import datetime, timedelta
 from html import unescape
+from zoneinfo import ZoneInfo
 
 import jpholiday
 import numpy as np
 import pandas as pd
 import requests
 
+
+JST = ZoneInfo("Asia/Tokyo")
 
 PARK_SETTINGS = {
     "DisneySea": {
@@ -36,6 +39,14 @@ PARK_SETTINGS = {
 
 CASTEL_TICKET_URL = "https://castel.jp/p/7339"
 GLOBAL_PREDICTION_NAME = "__ALL__"
+
+
+def now_jst():
+    return datetime.now(JST)
+
+
+def now_jst_str():
+    return now_jst().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def connect_db(db_name):
@@ -363,7 +374,7 @@ def load_prediction_history(conn):
 
 
 def save_wait_times(cursor, conn, valid_open_df, temperature, rain_mm):
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = now_jst_str()
 
     if len(valid_open_df) > 0:
         for _, row in valid_open_df.iterrows():
@@ -382,32 +393,51 @@ def save_wait_times(cursor, conn, valid_open_df, temperature, rain_mm):
 
 
 def save_prediction_rows(cursor, conn, pred_df, attraction_name):
-    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    created_at = now_jst_str()
+    created_hour_key = now_jst().strftime("%Y-%m-%d %H")
 
     for _, row in pred_df.iterrows():
+        target_hour = int(row["Hour"])
+        predicted_wait = float(row["Predicted Wait"])
+
         cursor.execute("""
-        INSERT INTO predictions
-        (
-            created_at,
-            target_hour,
-            predicted_wait,
-            actual_wait,
-            error,
-            attraction
-        )
-        VALUES (?, ?, ?, NULL, NULL, ?)
+        SELECT COUNT(*)
+        FROM predictions
+        WHERE attraction = ?
+        AND target_hour = ?
+        AND created_at LIKE ?
         """, (
-            created_at,
-            int(row["Hour"]),
-            float(row["Predicted Wait"]),
-            attraction_name
+            attraction_name,
+            target_hour,
+            f"{created_hour_key}%"
         ))
+
+        exists = cursor.fetchone()[0]
+
+        if exists == 0:
+            cursor.execute("""
+            INSERT INTO predictions
+            (
+                created_at,
+                target_hour,
+                predicted_wait,
+                actual_wait,
+                error,
+                attraction
+            )
+            VALUES (?, ?, ?, NULL, NULL, ?)
+            """, (
+                created_at,
+                target_hour,
+                predicted_wait,
+                attraction_name
+            ))
 
     conn.commit()
 
 
 def update_prediction_feedback(cursor, conn, valid_open_df, avg_wait):
-    now_hour = datetime.now().hour
+    now_hour = now_jst().hour
 
     if len(valid_open_df) == 0:
         return
@@ -482,7 +512,7 @@ def get_current_stats(valid_open_df):
 
 
 def get_today_stats(history_df, valid_open_df):
-    today = datetime.now().date()
+    today = now_jst().date()
 
     if len(history_df) > 0 and "date" in history_df.columns:
         today_df = history_df[
