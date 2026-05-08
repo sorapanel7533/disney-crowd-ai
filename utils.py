@@ -2,12 +2,15 @@ import re
 import sqlite3
 from datetime import datetime, timedelta
 from html import unescape
+from zoneinfo import ZoneInfo
 
 import jpholiday
 import numpy as np
 import pandas as pd
 import requests
 
+
+JST = ZoneInfo("Asia/Tokyo")
 
 PARK_SETTINGS = {
     "DisneySea": {
@@ -357,13 +360,19 @@ def load_prediction_history(conn):
 
     if len(prediction_df) > 0:
         prediction_df["created_at"] = pd.to_datetime(prediction_df["created_at"])
-        prediction_df["attraction"] = prediction_df["attraction"].fillna(GLOBAL_PREDICTION_NAME)
+
+        if "attraction" not in prediction_df.columns:
+            prediction_df["attraction"] = GLOBAL_PREDICTION_NAME
+
+        prediction_df["attraction"] = prediction_df["attraction"].fillna(
+            GLOBAL_PREDICTION_NAME
+        )
 
     return prediction_df
 
 
 def save_wait_times(cursor, conn, valid_open_df, temperature, rain_mm):
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
 
     if len(valid_open_df) > 0:
         for _, row in valid_open_df.iterrows():
@@ -382,7 +391,7 @@ def save_wait_times(cursor, conn, valid_open_df, temperature, rain_mm):
 
 
 def save_prediction_rows(cursor, conn, pred_df, attraction_name):
-    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    created_at = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
 
     for _, row in pred_df.iterrows():
         cursor.execute("""
@@ -407,7 +416,7 @@ def save_prediction_rows(cursor, conn, pred_df, attraction_name):
 
 
 def update_prediction_feedback(cursor, conn, valid_open_df, avg_wait):
-    now_hour = datetime.now().hour
+    now_hour = datetime.now(JST).hour
 
     if len(valid_open_df) == 0:
         return
@@ -453,6 +462,12 @@ def get_feedback_error(prediction_history, attraction_name=GLOBAL_PREDICTION_NAM
     if len(prediction_history) == 0:
         return 0
 
+    if "attraction" not in prediction_history.columns:
+        return 0
+
+    if "error" not in prediction_history.columns:
+        return 0
+
     error_df = prediction_history[
         (prediction_history["attraction"] == attraction_name)
         &
@@ -482,7 +497,7 @@ def get_current_stats(valid_open_df):
 
 
 def get_today_stats(history_df, valid_open_df):
-    today = datetime.now().date()
+    today = datetime.now(JST).date()
 
     if len(history_df) > 0 and "date" in history_df.columns:
         today_df = history_df[
