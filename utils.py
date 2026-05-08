@@ -35,6 +35,7 @@ PARK_SETTINGS = {
 }
 
 CASTEL_TICKET_URL = "https://castel.jp/p/7339"
+GLOBAL_PREDICTION_NAME = "__ALL__"
 
 
 def connect_db(db_name):
@@ -62,6 +63,19 @@ def connect_db(db_name):
     """)
 
     conn.commit()
+
+    cursor.execute("PRAGMA table_info(predictions)")
+    columns = [row[1] for row in cursor.fetchall()]
+
+    if "attraction" not in columns:
+        cursor.execute("ALTER TABLE predictions ADD COLUMN attraction TEXT")
+        cursor.execute("""
+        UPDATE predictions
+        SET attraction = ?
+        WHERE attraction IS NULL
+        """, (GLOBAL_PREDICTION_NAME,))
+        conn.commit()
+
     return conn, cursor
 
 
@@ -336,10 +350,16 @@ def load_history(conn):
 
 
 def load_prediction_history(conn):
-    return pd.read_sql_query(
-        "SELECT * FROM predictions WHERE error IS NOT NULL",
+    prediction_df = pd.read_sql_query(
+        "SELECT * FROM predictions",
         conn
     )
+
+    if len(prediction_df) > 0:
+        prediction_df["created_at"] = pd.to_datetime(prediction_df["created_at"])
+        prediction_df["attraction"] = prediction_df["attraction"].fillna(GLOBAL_PREDICTION_NAME)
+
+    return prediction_df
 
 
 def save_wait_times(cursor, conn, valid_open_df, temperature, rain_mm):
@@ -361,11 +381,56 @@ def save_wait_times(cursor, conn, valid_open_df, temperature, rain_mm):
         conn.commit()
 
 
+def save_prediction_rows(cursor, conn, pred_df, attraction_name):
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    for _, row in pred_df.iterrows():
+        cursor.execute("""
+        INSERT INTO predictions
+        (
+            created_at,
+            target_hour,
+            predicted_wait,
+            actual_wait,
+            error,
+            attraction
+        )
+        VALUES (?, ?, ?, NULL, NULL, ?)
+        """, (
+            created_at,
+            int(row["Hour"]),
+            float(row["Predicted Wait"]),
+            attraction_name
+        ))
+
+    conn.commit()
+
+
 def update_prediction_feedback(cursor, conn, valid_open_df, avg_wait):
     now_hour = datetime.now().hour
 
-    if len(valid_open_df) > 0:
-        actual_now = float(avg_wait)
+    if len(valid_open_df) == 0:
+        return
+
+    actual_now = float(avg_wait)
+
+    cursor.execute("""
+    UPDATE predictions
+    SET actual_wait = ?,
+        error = ? - predicted_wait
+    WHERE target_hour = ?
+    AND actual_wait IS NULL
+    AND attraction = ?
+    """, (
+        actual_now,
+        actual_now,
+        now_hour,
+        GLOBAL_PREDICTION_NAME
+    ))
+
+    for _, row in valid_open_df.iterrows():
+        attraction = row["Attraction"]
+        actual_wait = float(row["Wait"])
 
         cursor.execute("""
         UPDATE predictions
@@ -373,18 +438,29 @@ def update_prediction_feedback(cursor, conn, valid_open_df, avg_wait):
             error = ? - predicted_wait
         WHERE target_hour = ?
         AND actual_wait IS NULL
+        AND attraction = ?
         """, (
-            actual_now,
-            actual_now,
-            now_hour
+            actual_wait,
+            actual_wait,
+            now_hour,
+            attraction
         ))
 
-        conn.commit()
+    conn.commit()
 
 
-def get_feedback_error(prediction_history):
-    if len(prediction_history) > 0:
-        return prediction_history["error"].tail(30).mean()
+def get_feedback_error(prediction_history, attraction_name=GLOBAL_PREDICTION_NAME):
+    if len(prediction_history) == 0:
+        return 0
+
+    error_df = prediction_history[
+        (prediction_history["attraction"] == attraction_name)
+        &
+        (prediction_history["error"].notna())
+    ]
+
+    if len(error_df) > 0:
+        return error_df["error"].tail(30).mean()
 
     return 0
 
