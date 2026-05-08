@@ -28,6 +28,8 @@ from utils import (
     load_history,
     load_prediction_history,
     make_action_advice,
+    now_jst,
+    now_jst_str,
     predict_dpa_risk,
     save_prediction_rows,
     save_wait_times,
@@ -175,13 +177,54 @@ def graph_ylim(values):
     return 200
 
 
-now_display = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+def make_prediction(history_data, temperature, rain_mm, feedback, today_bonus):
+    model_df = history_data[
+        history_data["wait_time"] > 0
+    ].copy()
+
+    if len(model_df) <= 10:
+        return pd.DataFrame()
+
+    X = pd.DataFrame({
+        "hour": model_df["hour"],
+        "hour2": model_df["hour"] ** 2,
+        "temperature": model_df["temperature"],
+        "rain": model_df["rain"]
+    })
+
+    y = model_df["wait_time"]
+
+    model = LinearRegression()
+    model.fit(X, y)
+
+    future_hours = list(range(9, 22))
+
+    future = pd.DataFrame({
+        "hour": future_hours
+    })
+
+    future["hour2"] = future["hour"] ** 2
+    future["temperature"] = temperature
+    future["rain"] = rain_mm
+
+    pred = model.predict(future)
+    pred = pred + feedback
+    pred = pred + today_bonus * 5
+    pred = np.clip(pred, 0, None)
+
+    pred_df = pd.DataFrame({
+        "Hour": future_hours,
+        "Predicted Wait": pred
+    })
+
+    return pred_df
+
 
 st.markdown(f"""
 <div class="title-card">
 <h1>🏰 ディズニー混雑AI</h1>
 <p>東京ディズニーリゾート混雑分析システム</p>
-<p>最終更新: {now_display}</p>
+<p>最終更新: {now_jst_str()}（日本時間）</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -206,12 +249,12 @@ display_mode = st.selectbox(
 ticket_price_map, ticket_map_source = fetch_castel_ticket_prices()
 
 ticket_price, ticket_source = get_ticket_price_from_castel(
-    datetime.now(),
+    now_jst(),
     ticket_price_map
 )
 
 today_bonus, today_reasons = get_calendar_bonus(
-    datetime.now(),
+    now_jst(),
     ticket_price
 )
 
@@ -290,7 +333,7 @@ relative_rows = []
 
 if len(valid_all_df) > 0 and len(history_df) > 20:
 
-    now_hour = datetime.now().hour
+    now_hour = now_jst().hour
 
     hist_same_hour = history_df[
         (history_df["hour"] == now_hour)
@@ -333,6 +376,59 @@ save_wait_times(
 )
 
 history_df = load_history(conn)
+
+# ==========================================
+# 裏で全体予測・全アトラクション別予測を自動保存
+# ==========================================
+
+if len(history_df) > 20:
+
+    global_pred_df = make_prediction(
+        history_df,
+        temperature,
+        rain_mm,
+        global_feedback_error,
+        today_bonus
+    )
+
+    if len(global_pred_df) > 0:
+        save_prediction_rows(
+            cursor,
+            conn,
+            global_pred_df,
+            GLOBAL_PREDICTION_NAME
+        )
+
+    for attraction_name in sorted(history_df["attraction"].unique()):
+
+        one_history = history_df[
+            history_df["attraction"] == attraction_name
+        ].copy()
+
+        if len(one_history) > 10:
+
+            attraction_feedback_error = get_feedback_error(
+                prediction_history,
+                attraction_name
+            )
+
+            attraction_pred_df = make_prediction(
+                one_history,
+                temperature,
+                rain_mm,
+                attraction_feedback_error,
+                today_bonus
+            )
+
+            if len(attraction_pred_df) > 0:
+                save_prediction_rows(
+                    cursor,
+                    conn,
+                    attraction_pred_df,
+                    attraction_name
+                )
+
+prediction_history = load_prediction_history(conn)
 
 if display_mode == "ダッシュボード":
 
@@ -453,75 +549,39 @@ if display_mode == "ダッシュボード":
 
     st.subheader("🤖 1時間ごとの全体AI予測")
 
-    if len(history_df) > 20:
-        model_df = history_df[
-            history_df["wait_time"] > 0
-        ]
+    global_display_pred = make_prediction(
+        history_df,
+        temperature,
+        rain_mm,
+        global_feedback_error,
+        today_bonus
+    )
 
-        if len(model_df) > 20:
-            X = pd.DataFrame({
-                "hour": model_df["hour"],
-                "hour2": model_df["hour"] ** 2,
-                "temperature": model_df["temperature"],
-                "rain": model_df["rain"]
-            })
+    if len(global_display_pred) > 0:
+        st.dataframe(
+            global_display_pred,
+            use_container_width=True
+        )
 
-            y = model_df["wait_time"]
+        fig, ax = plt.subplots(figsize=(10, 5))
 
-            model = LinearRegression()
-            model.fit(X, y)
+        ax.plot(
+            global_display_pred["Hour"],
+            global_display_pred["Predicted Wait"],
+            marker="o"
+        )
 
-            future_hours = list(range(9, 22))
+        ax.set_ylim(
+            0,
+            graph_ylim(global_display_pred["Predicted Wait"].tolist())
+        )
 
-            future = pd.DataFrame({
-                "hour": future_hours
-            })
+        ax.set_ylabel("Predicted Wait")
+        ax.set_title(f"{park} Overall Prediction")
 
-            future["hour2"] = future["hour"] ** 2
-            future["temperature"] = temperature
-            future["rain"] = rain_mm
-
-            pred = model.predict(future)
-
-            pred = pred + global_feedback_error
-            pred = pred + today_bonus * 5
-
-            pred = np.clip(pred, 0, None)
-
-            pred_df = pd.DataFrame({
-                "Hour": future_hours,
-                "Predicted Wait": pred
-            })
-
-            save_prediction_rows(
-                cursor,
-                conn,
-                pred_df,
-                GLOBAL_PREDICTION_NAME
-            )
-
-            st.dataframe(
-                pred_df,
-                use_container_width=True
-            )
-
-            fig, ax = plt.subplots(figsize=(10, 5))
-
-            ax.plot(
-                pred_df["Hour"],
-                pred_df["Predicted Wait"],
-                marker="o"
-            )
-
-            ax.set_ylim(
-                0,
-                graph_ylim(pred_df["Predicted Wait"].tolist())
-            )
-
-            ax.set_ylabel("Predicted Wait")
-            ax.set_title(f"{park} Overall Prediction")
-
-            st.pyplot(fig)
+        st.pyplot(fig)
+    else:
+        st.info("全体予測には履歴データがもう少し必要です。")
 
 elif display_mode == "全アトラクション":
 
@@ -696,43 +756,6 @@ elif display_mode == "全アトラクション":
                 use_container_width=True
             )
 
-            st.subheader("📊 統計")
-
-            s1, s2, s3 = st.columns(3)
-
-            with s1:
-                st.metric(
-                    "平均待ち時間",
-                    round(
-                        one_history["wait_time"].mean(),
-                        1
-                    )
-                )
-
-            with s2:
-                st.metric(
-                    "最大待ち時間",
-                    int(
-                        one_history["wait_time"].max()
-                    )
-                )
-
-            with s3:
-                st.metric(
-                    "保存数",
-                    len(one_history)
-                )
-
-        else:
-            st.info(
-                "このアトラクションの有効な履歴データがまだありません。"
-            )
-
-    else:
-        st.info(
-            "履歴データがまだありません。営業中に起動すると保存されます。"
-        )
-
 elif display_mode == "アトラクション別予測":
 
     st.subheader("🎢 アトラクション別予測")
@@ -763,53 +786,15 @@ elif display_mode == "アトラクション別予測":
             == selected_attraction
         ].copy()
 
-        one_df = one_df[
-            one_df["wait_time"] > 0
-        ]
+        pred_df = make_prediction(
+            one_df,
+            temperature,
+            rain_mm,
+            attraction_feedback_error,
+            today_bonus
+        )
 
-        if len(one_df) > 10:
-
-            X = pd.DataFrame({
-                "hour": one_df["hour"],
-                "hour2": one_df["hour"] ** 2,
-                "temperature": one_df["temperature"],
-                "rain": one_df["rain"]
-            })
-
-            y = one_df["wait_time"]
-
-            model = LinearRegression()
-
-            model.fit(X, y)
-
-            future_hours = list(range(9, 22))
-
-            future = pd.DataFrame({
-                "hour": future_hours
-            })
-
-            future["hour2"] = future["hour"] ** 2
-            future["temperature"] = temperature
-            future["rain"] = rain_mm
-
-            pred = model.predict(future)
-
-            pred = pred + attraction_feedback_error
-            pred = pred + today_bonus * 5
-
-            pred = np.clip(pred, 0, None)
-
-            pred_df = pd.DataFrame({
-                "Hour": future_hours,
-                "Predicted Wait": pred
-            })
-
-            save_prediction_rows(
-                cursor,
-                conn,
-                pred_df,
-                selected_attraction
-            )
+        if len(pred_df) > 0:
 
             st.dataframe(
                 pred_df,
@@ -839,28 +824,24 @@ elif display_mode == "アトラクション別予測":
 
             st.pyplot(fig)
 
-            if len(prediction_history) > 0:
-                st.subheader("🧠 このアトラクションの予測誤差履歴")
+            st.subheader("🧠 このアトラクションの予測誤差履歴")
 
-                one_pred_history = prediction_history[
-                    (prediction_history["attraction"] == selected_attraction)
-                    &
-                    (prediction_history["error"].notna())
-                ].copy()
+            one_pred_history = prediction_history[
+                (prediction_history["attraction"] == selected_attraction)
+                &
+                (prediction_history["error"].notna())
+            ].copy()
 
-                if len(one_pred_history) > 0:
-                    st.dataframe(
-                        one_pred_history.tail(30),
-                        use_container_width=True
-                    )
-                else:
-                    st.info("このアトラクションの誤差データはまだありません。")
+            if len(one_pred_history) > 0:
+                st.dataframe(
+                    one_pred_history.tail(30),
+                    use_container_width=True
+                )
+            else:
+                st.info("このアトラクションの誤差データはまだありません。")
 
         else:
             st.info("このアトラクションの履歴がまだ足りません。")
-
-    else:
-        st.info("履歴データがまだありません。")
 
 elif display_mode == "DPA売切れ予測":
 
@@ -905,28 +886,28 @@ elif display_mode == "データ管理":
 
     st.subheader("🗂 データ管理")
 
-    total_count = len(history_df)
+    prediction_display = prediction_history.copy()
 
-    error_only_df = prediction_history[
-        prediction_history["error"].notna()
-    ].copy() if len(prediction_history) > 0 else pd.DataFrame()
+    if len(prediction_display) > 0:
+        prediction_display["attraction"] = prediction_display["attraction"].replace(
+            GLOBAL_PREDICTION_NAME,
+            "全体予測"
+        )
+
+    error_only_df = prediction_display[
+        prediction_display["error"].notna()
+    ].copy() if len(prediction_display) > 0 else pd.DataFrame()
 
     m1, m2, m3 = st.columns(3)
 
     with m1:
-        st.metric("保存データ数", total_count)
+        st.metric("保存データ数", len(history_df))
 
     with m2:
-        st.metric(
-            "予測データ数",
-            len(prediction_history)
-        )
+        st.metric("予測データ数", len(prediction_display))
 
     with m3:
-        st.metric(
-            "予測誤差データ",
-            len(error_only_df)
-        )
+        st.metric("予測誤差データ", len(error_only_df))
 
     if len(history_df) > 0:
 
@@ -986,19 +967,11 @@ elif display_mode == "データ管理":
 st.subheader("⚙ システム")
 
 st.write("選択中:", park)
-
 st.write("表示モード:", display_mode)
-
 st.write("保存データ:", len(history_df))
-
 st.write("予測データ:", len(prediction_history))
-
 st.write("全体予測補正:", round(global_feedback_error, 1))
-
-st.write(
-    "最終更新:",
-    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-)
+st.write("最終更新:", f"{now_jst_str()}（日本時間）")
 
 refresh_seconds = 900
 
