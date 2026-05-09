@@ -157,6 +157,51 @@ def graph_ylim(values):
     return 200
 
 
+def make_week_forecast(base_crowd):
+    week_rows = []
+
+    for i in range(7):
+        d = datetime.now(JST) + timedelta(days=i)
+        pred = base_crowd
+
+        weekday = d.weekday()
+        month = d.month
+        day = d.day
+
+        if weekday >= 5:
+            pred += 2
+        elif weekday == 4:
+            pred += 1
+
+        if month == 3 and day >= 20:
+            pred += 2
+
+        if (month == 4 and day >= 27) or (month == 5 and day <= 6):
+            pred += 3
+
+        if (month == 7 and day >= 20) or month == 8:
+            pred += 3
+
+        if month == 10:
+            pred += 3
+
+        if month == 12 and day <= 25:
+            pred += 3
+
+        if (month == 12 and day >= 26) or (month == 1 and day <= 5):
+            pred += 4
+
+        pred += random.randint(-1, 1)
+        pred = max(1, min(10, pred))
+
+        week_rows.append({
+            "Date": d.strftime("%m/%d"),
+            "Crowd Index": pred
+        })
+
+    return pd.DataFrame(week_rows)
+
+
 now_display = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
 
 st.markdown(f"""
@@ -219,9 +264,12 @@ history_df = load_history(conn)
 
 current_avg_wait, current_max_wait, current_var_wait = get_current_stats(valid_all_df)
 
+# 混雑指数は5大アトラクションだけで計算
 avg_wait, max_wait, var_wait, crowd_source = get_today_stats(
-    history_df,
-    valid_all_df
+    history_df[
+        history_df["attraction"].isin(settings["rides"])
+    ] if len(history_df) > 0 else history_df,
+    valid_target_df
 )
 
 if len(valid_all_df) == 0:
@@ -407,16 +455,18 @@ if display_mode == "ダッシュボード":
     m1, m2, m3, m4 = st.columns(4)
 
     with m1:
-        st.metric("平均待ち時間", round(avg_wait, 1))
+        st.metric("5大平均待ち時間", round(avg_wait, 1))
 
     with m2:
-        st.metric("最大待ち時間", round(max_wait, 1))
+        st.metric("5大最大待ち時間", round(max_wait, 1))
 
     with m3:
         st.metric("混雑指数", crowd_10)
 
     with m4:
         st.metric("全体予測補正", round(global_feedback_error, 1))
+
+    st.caption("混雑指数は5大アトラクションの、今日の開園後〜現在までの平均から算出しています。")
 
     level, color = get_level(crowd_10)
 
@@ -502,6 +552,29 @@ if display_mode == "ダッシュボード":
             ax.set_title(f"{park} Overall Prediction")
 
             st.pyplot(fig)
+
+    st.subheader("📅 1週間混雑指数予測")
+
+    week_df = make_week_forecast(crowd_10)
+
+    st.dataframe(
+        week_df,
+        use_container_width=True
+    )
+
+    fig_week, ax_week = plt.subplots(figsize=(10, 4))
+
+    ax_week.plot(
+        week_df["Date"],
+        week_df["Crowd Index"],
+        marker="o"
+    )
+
+    ax_week.set_ylim(0, 10)
+    ax_week.set_ylabel("Crowd Index")
+    ax_week.set_title(f"{park} 1 Week Crowd Forecast")
+
+    st.pyplot(fig_week)
 
 elif display_mode == "全アトラクション":
 
