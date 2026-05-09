@@ -37,6 +37,9 @@ from utils import (
 
 JST = ZoneInfo("Asia/Tokyo")
 
+OPEN_HOUR = 9
+CROWD_END_HOUR = 21
+
 st.set_page_config(
     page_title="ディズニー混雑AI",
     page_icon="🏰",
@@ -157,6 +160,17 @@ def graph_ylim(values):
     return 200
 
 
+def filter_crowd_hours(df):
+    if len(df) == 0 or "hour" not in df.columns:
+        return df
+
+    return df[
+        (df["hour"] >= OPEN_HOUR)
+        &
+        (df["hour"] < CROWD_END_HOUR)
+    ].copy()
+
+
 def make_week_forecast(base_crowd):
     week_rows = []
 
@@ -264,11 +278,14 @@ history_df = load_history(conn)
 
 current_avg_wait, current_max_wait, current_var_wait = get_current_stats(valid_all_df)
 
-# 混雑指数は5大アトラクションだけで計算
+target_history_df = history_df[
+    history_df["attraction"].isin(settings["rides"])
+].copy() if len(history_df) > 0 else history_df
+
+target_history_df = filter_crowd_hours(target_history_df)
+
 avg_wait, max_wait, var_wait, crowd_source = get_today_stats(
-    history_df[
-        history_df["attraction"].isin(settings["rides"])
-    ] if len(history_df) > 0 else history_df,
+    target_history_df,
     valid_target_df
 )
 
@@ -464,9 +481,11 @@ if display_mode == "ダッシュボード":
         st.metric("混雑指数", crowd_10)
 
     with m4:
-        st.metric("全体予測補正", round(global_feedback_error, 1))
+        st.metric("5大予測補正", round(global_feedback_error, 1))
 
-    st.caption("混雑指数は5大アトラクションの、今日の開園後〜現在までの平均から算出しています。")
+    st.caption(
+        "混雑指数は5大アトラクションのみを対象に、9:00〜20:59までの今日の保存データ平均から算出しています。"
+    )
 
     level, color = get_level(crowd_10)
 
@@ -481,11 +500,17 @@ if display_mode == "ダッシュボード":
         unsafe_allow_html=True
     )
 
-    st.subheader("🤖 1時間ごとの全体AI予測")
+    st.subheader("🤖 5大アトラクションの予想平均待ち時間")
 
-    if len(history_df) > 20:
-        model_df = history_df[
-            history_df["wait_time"] > 0
+    target_model_df = history_df[
+        history_df["attraction"].isin(settings["rides"])
+    ].copy() if len(history_df) > 0 else history_df
+
+    target_model_df = filter_crowd_hours(target_model_df)
+
+    if len(target_model_df) > 20:
+        model_df = target_model_df[
+            target_model_df["wait_time"] > 0
         ]
 
         if len(model_df) > 20:
@@ -501,7 +526,7 @@ if display_mode == "ダッシュボード":
             model = LinearRegression()
             model.fit(X, y)
 
-            future_hours = list(range(9, 22))
+            future_hours = list(range(OPEN_HOUR, CROWD_END_HOUR))
 
             future = pd.DataFrame({
                 "hour": future_hours
@@ -520,13 +545,19 @@ if display_mode == "ダッシュボード":
 
             pred_df = pd.DataFrame({
                 "Hour": future_hours,
-                "Predicted Wait": pred
+                "5大予想平均待ち時間": pred
             })
+
+            save_df = pred_df.rename(
+                columns={
+                    "5大予想平均待ち時間": "Predicted Wait"
+                }
+            )
 
             save_prediction_rows(
                 cursor,
                 conn,
-                pred_df,
+                save_df,
                 GLOBAL_PREDICTION_NAME
             )
 
@@ -539,19 +570,21 @@ if display_mode == "ダッシュボード":
 
             ax.plot(
                 pred_df["Hour"],
-                pred_df["Predicted Wait"],
+                pred_df["5大予想平均待ち時間"],
                 marker="o"
             )
 
             ax.set_ylim(
                 0,
-                graph_ylim(pred_df["Predicted Wait"].tolist())
+                graph_ylim(pred_df["5大予想平均待ち時間"].tolist())
             )
 
             ax.set_ylabel("Predicted Wait")
-            ax.set_title(f"{park} Overall Prediction")
+            ax.set_title(f"{park} Major Attractions Average Prediction")
 
             st.pyplot(fig)
+    else:
+        st.info("5大アトラクション平均予測には、9:00〜20:59の履歴データがもう少し必要です。")
 
     st.subheader("📅 1週間混雑指数予測")
 
@@ -700,9 +733,9 @@ elif display_mode == "全アトラクション":
                 )["wait_time"].mean().reset_index()
 
                 hourly_avg = hourly_avg[
-                    (hourly_avg["hour"] >= 8)
+                    (hourly_avg["hour"] >= OPEN_HOUR)
                     &
-                    (hourly_avg["hour"] <= 22)
+                    (hourly_avg["hour"] < CROWD_END_HOUR)
                 ]
 
                 ax.plot(
@@ -711,7 +744,7 @@ elif display_mode == "全アトラクション":
                     marker="o"
                 )
 
-                ax.set_xticks(range(8, 23))
+                ax.set_xticks(range(OPEN_HOUR, CROWD_END_HOUR))
                 ax.set_xlabel("Hour")
                 ax.set_title(
                     f"{selected_history_attraction} Average Wait by Hour"
@@ -820,6 +853,8 @@ elif display_mode == "アトラクション別予測":
             one_df["wait_time"] > 0
         ]
 
+        one_df = filter_crowd_hours(one_df)
+
         if len(one_df) > 10:
 
             X = pd.DataFrame({
@@ -835,7 +870,7 @@ elif display_mode == "アトラクション別予測":
 
             model.fit(X, y)
 
-            future_hours = list(range(9, 22))
+            future_hours = list(range(OPEN_HOUR, CROWD_END_HOUR))
 
             future = pd.DataFrame({
                 "hour": future_hours
@@ -1046,7 +1081,7 @@ st.write("保存データ:", len(history_df))
 
 st.write("予測データ:", len(prediction_history))
 
-st.write("全体予測補正:", round(global_feedback_error, 1))
+st.write("5大予測補正:", round(global_feedback_error, 1))
 
 st.write(
     "最終更新:",
