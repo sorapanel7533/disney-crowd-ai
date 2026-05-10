@@ -2428,6 +2428,173 @@ def get_data_quality_report(history_df, prediction_history, dpa_sellout_history,
     return pd.DataFrame(rows)
 
 
+def get_prediction_confidence(
+    history_df,
+    prediction_history,
+    dpa_sellout_history,
+    settings,
+    target_date=None,
+    weather_source="",
+):
+    target_date = target_date or datetime.now(JST).date()
+    target_history = pd.DataFrame()
+
+    if len(history_df) > 0:
+        target_history = history_df[
+            history_df["attraction"].isin(settings["rides"])
+        ].copy()
+        target_history = filter_crowd_history(target_history)
+
+    history_days = target_history["date"].nunique() if len(target_history) > 0 and "date" in target_history.columns else 0
+    ride_coverage = target_history["attraction"].nunique() if len(target_history) > 0 else 0
+
+    error_count = 0
+    recent_error = None
+
+    if len(prediction_history) > 0 and "error" in prediction_history.columns:
+        error_df = prediction_history[prediction_history["error"].notna()].copy()
+        error_count = len(error_df)
+
+        if len(error_df) > 0:
+            recent_error = float(error_df["error"].abs().tail(50).mean())
+
+    dpa_count = len(dpa_sellout_history)
+    weather_bonus = 10 if "日別" in str(weather_source) or "予報" in str(weather_source) else 4
+
+    score = 0
+    score += min(35, history_days * 4)
+    score += min(20, ride_coverage * 4)
+    score += min(25, error_count / 2)
+    score += min(10, dpa_count / 5)
+    score += weather_bonus
+
+    if recent_error is not None:
+        if recent_error <= 10:
+            score += 10
+        elif recent_error <= 20:
+            score += 5
+        elif recent_error >= 35:
+            score -= 10
+
+    score = int(max(0, min(100, round(score))))
+
+    if score >= 75:
+        label = "高い"
+    elif score >= 50:
+        label = "中くらい"
+    else:
+        label = "低い"
+
+    notes = []
+
+    if history_days < 7:
+        notes.append("5大アトラクションの履歴日数が少ない")
+    if ride_coverage < len(settings["rides"]):
+        notes.append("5大アトラクションの一部で履歴が不足")
+    if error_count < 20:
+        notes.append("予測誤差の学習データが少ない")
+    if dpa_count < 10:
+        notes.append("DPA売切れ履歴が少ない")
+    if not ("日別" in str(weather_source) or "予報" in str(weather_source)):
+        notes.append("対象日の天気予報ではなく現在天気を使っている可能性")
+
+    if not notes:
+        notes.append("主要な補正データはそろっています")
+
+    return {
+        "score": score,
+        "label": label,
+        "history_days": int(history_days),
+        "ride_coverage": int(ride_coverage),
+        "error_count": int(error_count),
+        "dpa_count": int(dpa_count),
+        "recent_mae": None if recent_error is None else round(recent_error, 1),
+        "notes": notes,
+    }
+
+
+def get_prediction_accuracy_report(prediction_history):
+    if len(prediction_history) == 0 or "error" not in prediction_history.columns:
+        return pd.DataFrame([{
+            "対象": "全体",
+            "誤差データ数": 0,
+            "平均絶対誤差": None,
+            "平均ズレ": None,
+            "状態": "予測誤差データがまだありません",
+        }])
+
+    error_df = prediction_history[prediction_history["error"].notna()].copy()
+
+    if len(error_df) == 0:
+        return pd.DataFrame([{
+            "対象": "全体",
+            "誤差データ数": 0,
+            "平均絶対誤差": None,
+            "平均ズレ": None,
+            "状態": "対象時刻の実測値がまだ入っていません",
+        }])
+
+    rows = []
+
+    for attraction, group in error_df.groupby("attraction"):
+        mae = float(group["error"].abs().mean())
+        bias = float(group["error"].mean())
+
+        if mae <= 10:
+            status = "良好"
+        elif mae <= 20:
+            status = "注意"
+        else:
+            status = "要改善"
+
+        rows.append({
+            "対象": attraction,
+            "誤差データ数": int(len(group)),
+            "平均絶対誤差": round(mae, 1),
+            "平均ズレ": round(bias, 1),
+            "状態": status,
+        })
+
+    return pd.DataFrame(rows).sort_values(
+        ["状態", "平均絶対誤差"],
+        ascending=[True, False]
+    )
+
+
+def get_prediction_alerts(wait_prediction_df, confidence):
+    alerts = []
+
+    if confidence["score"] < 50:
+        alerts.append({
+            "注意点": "信頼度が低め",
+            "内容": "履歴や誤差データが少ないため、指数よりも傾向として見てください。"
+        })
+
+    if len(wait_prediction_df) > 0:
+        max_wait = float(wait_prediction_df["Predicted Wait"].max())
+        avg_wait = float(wait_prediction_df["Predicted Wait"].mean())
+
+        if max_wait >= 150:
+            alerts.append({
+                "注意点": "長時間待ち予測",
+                "内容": f"最大{max_wait:.0f}分の予測があります。DPAや朝の優先取得を検討してください。"
+            })
+
+        if avg_wait >= 100:
+            alerts.append({
+                "注意点": "5大平均が高め",
+                "内容": f"平均{avg_wait:.0f}分前後の予測です。午後に集中しすぎない計画がおすすめです。"
+            })
+
+    if not alerts:
+        alerts.append({
+            "注意点": "大きな警告なし",
+            "内容": "現在のデータでは、特別に強い警告はありません。"
+        })
+
+    return pd.DataFrame(alerts)
+
+
 def get_current_stats(valid_open_df):
     if len(valid_open_df) > 0:
         avg_wait = valid_open_df["Wait"].mean()
