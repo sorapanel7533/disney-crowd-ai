@@ -20,6 +20,7 @@ CROWD_END_HOUR = 21
 PARK_SETTINGS = {
     "DisneySea": {
         "url": "https://queue-times.com/parks/275/queue_times.json",
+        "urtrip_url": "https://urtrip.jp/tds-attraction-waitingtime-realtime/#pass_status",
         "db": "disneysea.db",
         "rides": [
             "Journey to the Center of the Earth",
@@ -27,16 +28,31 @@ PARK_SETTINGS = {
             "Anna and Elsa's Frozen Journey",
             "Soaring: Fantastic Flight",
             "Toy Story Mania!"
+        ],
+        "dpa_order": [
+            "Soaring: Fantastic Flight",
+            "Anna and Elsa's Frozen Journey",
+            "Toy Story Mania!",
+            "Journey to the Center of the Earth",
+            "Rapunzel's Lantern Festival",
+            "Peter Pan's Never Land Adventure",
+            "Tower of Terror"
         ]
     },
     "Disneyland": {
         "url": "https://queue-times.com/parks/274/queue_times.json",
+        "urtrip_url": "https://urtrip.jp/tdl-attraction-waitingtime-realtime/#pass_status",
         "db": "disneyland.db",
         "rides": [
             "Enchanted Tale of Beauty and the Beast",
             "The Happy Ride with Baymax",
             "Monsters, Inc. Ride & Go Seek!",
             "Pooh's Hunny Hunt",
+            "Splash Mountain"
+        ],
+        "dpa_order": [
+            "Enchanted Tale of Beauty and the Beast",
+            "The Happy Ride with Baymax",
             "Splash Mountain"
         ]
     }
@@ -827,8 +843,22 @@ def load_dpa_sellouts(conn):
     return sellout_df
 
 
-def save_dpa_sellout(cursor, conn, attraction, sellout_hour, source="manual"):
+def save_dpa_sellout(cursor, conn, attraction, sellout_hour, source="manual", target_date=None):
     now = datetime.now(JST)
+    target_date = target_date or now.date()
+    target_date_text = target_date.strftime("%Y-%m-%d") if hasattr(target_date, "strftime") else str(target_date)
+
+    cursor.execute("""
+    DELETE FROM dpa_sellouts
+    WHERE target_date = ?
+    AND attraction = ?
+    AND source = ?
+    """, (
+        target_date_text,
+        attraction,
+        source
+    ))
+
     cursor.execute("""
     INSERT INTO dpa_sellouts
     (
@@ -841,12 +871,230 @@ def save_dpa_sellout(cursor, conn, attraction, sellout_hour, source="manual"):
     VALUES (?, ?, ?, ?, ?)
     """, (
         now.strftime("%Y-%m-%d %H:%M:%S"),
-        now.date().strftime("%Y-%m-%d"),
+        target_date_text,
         attraction,
         float(sellout_hour),
         source
     ))
     conn.commit()
+
+
+def clear_dpa_sellouts(cursor, conn, source=None):
+    if source:
+        cursor.execute(
+            "DELETE FROM dpa_sellouts WHERE source = ?",
+            (source,)
+        )
+    else:
+        cursor.execute("DELETE FROM dpa_sellouts")
+
+    conn.commit()
+
+
+def _time_text_to_hour(time_text):
+    match = re.search(r"(\d{1,2}):(\d{2})", str(time_text).strip())
+
+    if not match:
+        return None
+
+    hour = int(match.group(1))
+    minute = int(match.group(2))
+
+    if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+        return None
+
+    return hour + minute / 60
+
+
+def _parse_urtrip_date(date_text, page_date):
+    match = re.match(r"(\d{1,2})/(\d{1,2})", date_text)
+
+    if not match:
+        return None
+
+    month = int(match.group(1))
+    day = int(match.group(2))
+    year = page_date.year
+
+    if month > page_date.month + 1:
+        year -= 1
+
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
+
+
+def fetch_urtrip_dpa_sellouts(settings):
+    url = settings.get("urtrip_url")
+
+    if not url:
+        return pd.DataFrame(), "DPA取得URL未設定"
+
+    try:
+        res = requests.get(
+            url,
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=12
+        )
+        res.raise_for_status()
+    except Exception as exc:
+        return pd.DataFrame(), f"urtrip取得失敗: {exc}"
+
+    plain = re.sub(r"<[^>]+>", "\n", res.text)
+    plain = unescape(plain)
+    lines = [line.strip() for line in plain.splitlines() if line.strip()]
+
+    page_date = datetime.now(JST).date()
+
+    for line in lines[:160]:
+        match = re.search(r"(20\d{2})年\s*(\d{1,2})月\s*(\d{1,2})日", line)
+
+        if match:
+            page_date = date(
+                int(match.group(1)),
+                int(match.group(2)),
+                int(match.group(3))
+            )
+            break
+
+    dpa_start = None
+
+    for i, line in enumerate(lines):
+        if "ディズニー・プレミアアクセス" in line and "DPA" in line:
+            dpa_start = i
+            break
+
+    if dpa_start is None:
+        return pd.DataFrame(), "urtripにDPA欄が見つかりません"
+
+    dpa_end = len(lines)
+
+    for i in range(dpa_start + 1, len(lines)):
+        if "40周年記念" in lines[i] or "アトラクション待ち時間" in lines[i]:
+            dpa_end = i
+            break
+
+    section = lines[dpa_start:dpa_end]
+    dpa_order = settings.get("dpa_order", [])
+    rows = []
+    status_rows = []
+
+    for i, line in enumerate(section):
+        if line == "今日":
+            tokens = section[i + 1:]
+            current_values = []
+            skip_next = False
+
+            for token_index, token in enumerate(tokens):
+                if skip_next:
+                    skip_next = False
+                    continue
+
+                if re.match(r"\d{1,2}/\d{1,2}", token):
+                    break
+
+                if _time_text_to_hour(token) is not None:
+                    current_values.append(token)
+
+                    if token_index + 1 < len(tokens) and tokens[token_index + 1] == "発行終了":
+                        skip_next = True
+
+                elif token in ["発行中", "発行なし"]:
+                    current_values.append(token)
+
+            for attraction, value in zip(dpa_order, current_values):
+                sellout_hour = _time_text_to_hour(value)
+                status = "発行終了" if sellout_hour is not None else value
+                status_rows.append({
+                    "target_date": page_date,
+                    "attraction": attraction,
+                    "sellout_hour": sellout_hour,
+                    "status": status,
+                    "source": url
+                })
+
+                if sellout_hour is not None:
+                    rows.append(status_rows[-1])
+
+            break
+
+    for i, line in enumerate(section):
+        if not re.match(r"\d{1,2}/\d{1,2}", line):
+            continue
+
+        target_day = _parse_urtrip_date(line, page_date)
+
+        if target_day is None:
+            continue
+
+        values = []
+
+        for token in section[i + 1:]:
+            if re.match(r"\d{1,2}/\d{1,2}", token):
+                break
+
+            if "40周年記念" in token or "アトラクション待ち時間" in token:
+                break
+
+            values.append(token)
+
+            if len(values) >= len(dpa_order):
+                break
+
+        for attraction, value in zip(dpa_order, values):
+            sellout_hour = _time_text_to_hour(value)
+
+            if sellout_hour is None:
+                continue
+
+            rows.append({
+                "target_date": target_day,
+                "attraction": attraction,
+                "sellout_hour": sellout_hour,
+                "status": "発行終了",
+                "source": url
+            })
+
+    df = pd.DataFrame(rows)
+
+    if len(df) == 0:
+        return pd.DataFrame(status_rows), "urtripからDPA売切れ時刻は取得できませんでした"
+
+    df = df.drop_duplicates(
+        ["target_date", "attraction", "sellout_hour"],
+        keep="first"
+    ).reset_index(drop=True)
+
+    return df, f"urtripから{len(df)}件取得"
+
+
+def save_dpa_sellout_rows(cursor, conn, sellout_df, source="urtrip"):
+    if len(sellout_df) == 0:
+        return 0
+
+    saved_count = 0
+
+    for _, row in sellout_df.iterrows():
+        if pd.isna(row.get("sellout_hour")):
+            continue
+
+        target_date_value = row["target_date"]
+
+        if isinstance(target_date_value, pd.Timestamp):
+            target_date_value = target_date_value.date()
+
+        save_dpa_sellout(
+            cursor,
+            conn,
+            row["attraction"],
+            row["sellout_hour"],
+            source,
+            target_date_value
+        )
+        saved_count += 1
+
+    return saved_count
 
 
 def _weighted_average(values):
@@ -1113,19 +1361,24 @@ def make_week_forecast(
 
 def predict_dpa_sellout_time(attraction, wait, crowd_10, ticket_price, bonus, dpa_sellout_history):
     historical_hour = None
+    sample_count = 0
+    early_ratio = 0
 
     if len(dpa_sellout_history) > 0:
         one_history = dpa_sellout_history[
             dpa_sellout_history["attraction"] == attraction
         ]
         if len(one_history) > 0:
-            historical_hour = float(one_history["sellout_hour"].tail(10).mean())
+            recent_history = one_history.sort_values("target_date").tail(14)
+            sample_count = len(recent_history)
+            early_ratio = float((recent_history["sellout_hour"] < 18).mean())
+            historical_hour = float(recent_history["sellout_hour"].median())
 
     risk_text, risk_score = predict_dpa_risk(wait, crowd_10, ticket_price, bonus)
 
     if historical_hour is not None:
         predicted_hour = historical_hour - max(0, risk_score - 3) * 0.35
-        reason = "過去の売切れ時刻を基準に、現在の待ち時間と混雑指数で補正"
+        reason = f"過去{sample_count}件の中央値を基準に、現在の待ち時間と混雑指数で補正"
     else:
         predicted_hour = 20.5 - risk_score * 0.85
         reason = "売切れ履歴がないため、待ち時間・混雑指数・需要補正から推定"
@@ -1145,7 +1398,61 @@ def predict_dpa_sellout_time(attraction, wait, crowd_10, ticket_price, bonus, dp
         "Risk Score": risk_score,
         "予測売切れ時刻": f"{hour:02d}:{minute:02d}",
         "根拠": reason,
+        "履歴件数": sample_count,
+        "18時前売切れ率": round(early_ratio, 2),
     }
+
+
+def get_data_quality_report(history_df, prediction_history, dpa_sellout_history, settings):
+    rows = []
+
+    target_history = pd.DataFrame()
+
+    if len(history_df) > 0:
+        target_history = history_df[
+            history_df["attraction"].isin(settings["rides"])
+        ].copy()
+        target_history = filter_crowd_history(target_history)
+
+    if len(target_history) == 0:
+        rows.append({
+            "項目": "5大アトラクション履歴",
+            "状態": "不足",
+            "対応": "9:00〜20:59にアプリを起動し、待ち時間を蓄積してください。"
+        })
+    else:
+        days = target_history["date"].nunique()
+        rides = target_history["attraction"].nunique()
+        rows.append({
+            "項目": "5大アトラクション履歴",
+            "状態": f"{days}日 / {rides}施設",
+            "対応": "曜日差を学習するには複数週の履歴があると安定します。"
+        })
+
+    error_count = 0
+
+    if len(prediction_history) > 0 and "error" in prediction_history.columns:
+        error_count = len(prediction_history[prediction_history["error"].notna()])
+
+    rows.append({
+        "項目": "待ち時間予測誤差",
+        "状態": f"{error_count}件",
+        "対応": "少ない場合は予測補正が弱くなります。対象時刻にアプリが動いているほど増えます。"
+    })
+
+    dpa_count = len(dpa_sellout_history)
+    dpa_sources = ""
+
+    if dpa_count > 0 and "source" in dpa_sellout_history.columns:
+        dpa_sources = " / ".join(sorted(dpa_sellout_history["source"].dropna().unique()))
+
+    rows.append({
+        "項目": "DPA売切れ履歴",
+        "状態": f"{dpa_count}件" + (f" ({dpa_sources})" if dpa_sources else ""),
+        "対応": "urtrip取得または手入力で増えるほど、時刻予測が現在値だけに依存しなくなります。"
+    })
+
+    return pd.DataFrame(rows)
 
 
 def get_current_stats(valid_open_df):
