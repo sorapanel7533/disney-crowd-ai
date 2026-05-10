@@ -1,6 +1,6 @@
 import re
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from html import unescape
 from zoneinfo import ZoneInfo
 
@@ -43,7 +43,23 @@ PARK_SETTINGS = {
 }
 
 CASTEL_TICKET_URL = "https://castel.jp/p/7339"
+OFFICIAL_TICKET_URL = "https://www.tokyodisneyresort.co.jp/en/ticket/index.html"
 GLOBAL_PREDICTION_NAME = "__ALL__"
+MAJOR_AVERAGE_NAME = "__MAJOR_5_AVERAGE__"
+HOUR_PROFILE = {
+    9: 0.82,
+    10: 0.96,
+    11: 1.08,
+    12: 1.00,
+    13: 1.03,
+    14: 1.12,
+    15: 1.16,
+    16: 1.09,
+    17: 0.96,
+    18: 0.84,
+    19: 0.74,
+    20: 0.66,
+}
 
 
 def is_crowd_hour(dt):
@@ -97,6 +113,26 @@ def connect_db(db_name):
         predicted_wait REAL,
         actual_wait REAL,
         error REAL
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS daily_crowd_predictions (
+        created_at TEXT,
+        target_date TEXT,
+        predicted_crowd_index REAL,
+        actual_crowd_index REAL,
+        error REAL
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS dpa_sellouts (
+        observed_at TEXT,
+        target_date TEXT,
+        attraction TEXT,
+        sellout_hour REAL,
+        source TEXT
     )
     """)
 
@@ -204,7 +240,7 @@ def fetch_castel_ticket_prices():
         res = requests.get(
             CASTEL_TICKET_URL,
             headers={"User-Agent": "Mozilla/5.0"},
-            timeout=10
+            timeout=4
         )
 
         html = res.text
@@ -264,13 +300,138 @@ def fetch_castel_ticket_prices():
         return {}, "取得失敗"
 
 
+def fetch_official_ticket_prices():
+    try:
+        res = requests.get(
+            OFFICIAL_TICKET_URL,
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=4
+        )
+        res.raise_for_status()
+
+        plain = re.sub(r"<[^>]+>", "\n", res.text)
+        plain = unescape(plain)
+        lines = [x.strip() for x in plain.splitlines() if x.strip()]
+
+        month_map = {
+            "Jan": 1,
+            "Feb": 2,
+            "Mar": 3,
+            "Apr": 4,
+            "May": 5,
+            "Jun": 6,
+            "Jul": 7,
+            "Aug": 8,
+            "Sep": 9,
+            "Oct": 10,
+            "Nov": 11,
+            "Dec": 12,
+        }
+
+        prices = {}
+        current_year = None
+        month_queue = []
+        current_month = None
+        pending_day = None
+
+        for line in lines:
+            year_match = re.search(r"\b(20\d{2})\b", line)
+            month_hits = re.findall(
+                r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b",
+                line
+            )
+
+            if year_match and month_hits:
+                current_year = int(year_match.group(1))
+                month_queue = [month_map[x] for x in month_hits]
+                current_month = month_queue.pop(0)
+                pending_day = None
+                continue
+
+            if "As of" in line:
+                if month_queue:
+                    current_month = month_queue.pop(0)
+                pending_day = None
+                continue
+
+            if current_year is None or current_month is None:
+                continue
+
+            if re.fullmatch(r"\d{1,2}", line):
+                day = int(line)
+                if 1 <= day <= 31:
+                    pending_day = day
+                continue
+
+            price_match = re.fullmatch(
+                r"(7,900|8,400|8,900|9,400|9,900|10,900|7900|8400|8900|9400|9900|10900)",
+                line
+            )
+
+            if price_match and pending_day is not None:
+                price = int(price_match.group(1).replace(",", ""))
+                try:
+                    prices[date(current_year, current_month, pending_day)] = price
+                except ValueError:
+                    pass
+                pending_day = None
+
+        return prices, "東京ディズニーリゾート公式サイト"
+
+    except Exception:
+        return {}, "公式サイト取得失敗"
+
+
+def fetch_ticket_prices():
+    official_prices, official_source = fetch_official_ticket_prices()
+
+    if official_prices:
+        return official_prices, official_source
+
+    castel_prices, castel_source = fetch_castel_ticket_prices()
+    return castel_prices, castel_source
+
+
 def get_ticket_price_from_castel(target_date, price_map):
     d = target_date.date() if isinstance(target_date, datetime) else target_date
 
     if d in price_map:
-        return price_map[d], "Castelから取得"
+        return price_map[d], "価格表から取得"
 
-    return None, "価格未掲載"
+    return estimate_ticket_price(d), "公式価格未取得のため日付要因から推定"
+
+
+def estimate_ticket_price(target_date):
+    d = target_date.date() if isinstance(target_date, datetime) else target_date
+    month = d.month
+    day = d.day
+    weekday = d.weekday()
+
+    price = 7900
+
+    if weekday >= 5:
+        price = 9900
+    elif weekday == 4:
+        price = 8900
+    else:
+        price = 8400
+
+    if is_japanese_holiday(d):
+        price = max(price, 9900)
+
+    if (month == 3 and day >= 20) or (month == 4 and day <= 7):
+        price = max(price, 9900)
+
+    if (month == 4 and day >= 27) or (month == 5 and day <= 6):
+        price = max(price, 10900)
+
+    if (month == 7 and day >= 20) or month == 8 or month == 10:
+        price = max(price, 9900)
+
+    if (month == 12 and day <= 25) or (month == 12 and day >= 26) or (month == 1 and day <= 5):
+        price = max(price, 10900)
+
+    return price
 
 
 def get_ticket_bonus(price):
@@ -524,6 +685,467 @@ def get_feedback_error(prediction_history, attraction_name=GLOBAL_PREDICTION_NAM
         return error_df["error"].tail(30).mean()
 
     return 0
+
+
+def load_daily_crowd_predictions(conn):
+    try:
+        daily_df = pd.read_sql_query(
+            "SELECT * FROM daily_crowd_predictions",
+            conn
+        )
+    except Exception:
+        return pd.DataFrame()
+
+    if len(daily_df) > 0:
+        daily_df["created_at"] = pd.to_datetime(daily_df["created_at"])
+        daily_df["target_date"] = pd.to_datetime(daily_df["target_date"]).dt.date
+
+    return daily_df
+
+
+def get_daily_crowd_feedback_error(daily_prediction_history):
+    if len(daily_prediction_history) == 0 or "error" not in daily_prediction_history.columns:
+        return 0
+
+    error_df = daily_prediction_history[
+        daily_prediction_history["error"].notna()
+    ]
+
+    if len(error_df) == 0:
+        return 0
+
+    return float(error_df["error"].tail(14).mean())
+
+
+def save_daily_crowd_prediction(cursor, conn, target_date, predicted_crowd_index):
+    created_at = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
+    target_date_text = target_date.strftime("%Y-%m-%d")
+
+    cursor.execute("""
+    DELETE FROM daily_crowd_predictions
+    WHERE target_date = ?
+    AND actual_crowd_index IS NULL
+    """, (target_date_text,))
+
+    cursor.execute("""
+    INSERT INTO daily_crowd_predictions
+    (
+        created_at,
+        target_date,
+        predicted_crowd_index,
+        actual_crowd_index,
+        error
+    )
+    VALUES (?, ?, ?, NULL, NULL)
+    """, (
+        created_at,
+        target_date_text,
+        float(predicted_crowd_index)
+    ))
+
+    conn.commit()
+
+
+def update_daily_crowd_feedback(cursor, conn, history_df, settings):
+    if len(history_df) == 0:
+        return
+
+    today = datetime.now(JST).date()
+    target_history = history_df[
+        history_df["attraction"].isin(settings["rides"])
+    ].copy()
+    target_history = filter_crowd_history(target_history)
+
+    if len(target_history) == 0:
+        return
+
+    cursor.execute("""
+    SELECT rowid, target_date
+    FROM daily_crowd_predictions
+    WHERE actual_crowd_index IS NULL
+    """)
+    rows = cursor.fetchall()
+
+    for rowid, target_date_text in rows:
+        target_day = datetime.strptime(target_date_text, "%Y-%m-%d").date()
+
+        if target_day > today:
+            continue
+
+        day_df = target_history[
+            (target_history["date"] == target_day)
+            & (target_history["wait_time"] > 0)
+        ].copy()
+
+        if len(day_df) == 0:
+            continue
+
+        avg_wait = day_df["wait_time"].mean()
+        max_wait = day_df["wait_time"].max()
+        var_wait = day_df["wait_time"].var()
+
+        if pd.isna(var_wait):
+            var_wait = 0
+
+        actual_index = get_crowd_index(
+            avg_wait,
+            max_wait,
+            var_wait,
+            get_dpa_score(avg_wait, max_wait),
+            0,
+            0,
+            0
+        )
+
+        cursor.execute("""
+        UPDATE daily_crowd_predictions
+        SET actual_crowd_index = ?,
+            error = ? - predicted_crowd_index
+        WHERE rowid = ?
+        """, (
+            float(actual_index),
+            float(actual_index),
+            rowid
+        ))
+
+    conn.commit()
+
+
+def load_dpa_sellouts(conn):
+    try:
+        sellout_df = pd.read_sql_query(
+            "SELECT * FROM dpa_sellouts",
+            conn
+        )
+    except Exception:
+        return pd.DataFrame()
+
+    if len(sellout_df) > 0:
+        sellout_df["observed_at"] = pd.to_datetime(sellout_df["observed_at"])
+        sellout_df["target_date"] = pd.to_datetime(sellout_df["target_date"]).dt.date
+
+    return sellout_df
+
+
+def save_dpa_sellout(cursor, conn, attraction, sellout_hour, source="manual"):
+    now = datetime.now(JST)
+    cursor.execute("""
+    INSERT INTO dpa_sellouts
+    (
+        observed_at,
+        target_date,
+        attraction,
+        sellout_hour,
+        source
+    )
+    VALUES (?, ?, ?, ?, ?)
+    """, (
+        now.strftime("%Y-%m-%d %H:%M:%S"),
+        now.date().strftime("%Y-%m-%d"),
+        attraction,
+        float(sellout_hour),
+        source
+    ))
+    conn.commit()
+
+
+def _weighted_average(values):
+    clean_values = [(float(v), float(w)) for v, w in values if v is not None and not pd.isna(v) and w > 0]
+
+    if not clean_values:
+        return 0
+
+    total_weight = sum(w for _, w in clean_values)
+    return sum(v * w for v, w in clean_values) / total_weight
+
+
+def _prepare_model_history(history_df, rides):
+    if len(history_df) == 0:
+        return history_df
+
+    model_df = history_df[
+        history_df["attraction"].isin(rides)
+        & (history_df["wait_time"] > 0)
+    ].copy()
+    model_df = filter_crowd_history(model_df)
+
+    if len(model_df) > 0:
+        model_df["weekday"] = model_df["datetime"].dt.weekday
+        model_df["month"] = model_df["datetime"].dt.month
+
+    return model_df
+
+
+def predict_wait_times_for_date(
+    history_df,
+    settings,
+    target_date,
+    temperature,
+    rain_mm,
+    prediction_history,
+    ticket_price=None,
+    current_target_df=None,
+):
+    target_date = target_date.date() if isinstance(target_date, datetime) else target_date
+    model_df = _prepare_model_history(history_df, settings["rides"])
+    today = datetime.now(JST).date()
+    now_hour = datetime.now(JST).hour
+
+    target_bonus, target_reasons = get_calendar_bonus(target_date, ticket_price)
+    rows = []
+
+    if len(model_df) > 0:
+        hour_all = model_df.groupby("hour")["wait_time"].median()
+        attraction_all = model_df.groupby("attraction")["wait_time"].median()
+        attraction_hour = model_df.groupby(["attraction", "hour"])["wait_time"].median()
+        same_weekday = model_df[model_df["weekday"] == target_date.weekday()]
+        same_month = model_df[model_df["month"] == target_date.month]
+        overall = model_df["wait_time"].median()
+    else:
+        hour_all = pd.Series(dtype=float)
+        attraction_all = pd.Series(dtype=float)
+        attraction_hour = pd.Series(dtype=float)
+        same_weekday = pd.DataFrame()
+        same_month = pd.DataFrame()
+        overall = 75
+
+    current_map = {}
+    if current_target_df is not None and len(current_target_df) > 0:
+        current_map = dict(zip(current_target_df["Attraction"], current_target_df["Wait"]))
+
+    for attraction in settings["rides"]:
+        attraction_feedback = get_feedback_error(prediction_history, attraction)
+
+        for hour in range(OPEN_HOUR, CROWD_END_HOUR):
+            specific = attraction_hour.get((attraction, hour), None) if len(attraction_hour) > 0 else None
+            ride_base = attraction_all.get(attraction, None) if len(attraction_all) > 0 else None
+            hour_base = hour_all.get(hour, None) if len(hour_all) > 0 else None
+
+            weekday_value = None
+            if len(same_weekday) > 0:
+                weekday_rows = same_weekday[
+                    (same_weekday["attraction"] == attraction)
+                    & (same_weekday["hour"] == hour)
+                ]
+                if len(weekday_rows) > 0:
+                    weekday_value = weekday_rows["wait_time"].median()
+
+            month_value = None
+            if len(same_month) > 0:
+                month_rows = same_month[
+                    (same_month["attraction"] == attraction)
+                    & (same_month["hour"] == hour)
+                ]
+                if len(month_rows) > 0:
+                    month_value = month_rows["wait_time"].median()
+
+            profile_value = None
+            if ride_base is not None and not pd.isna(ride_base):
+                profile_value = ride_base * HOUR_PROFILE.get(hour, 1.0)
+
+            base_wait = _weighted_average([
+                (specific, 0.34),
+                (weekday_value, 0.20),
+                (month_value, 0.12),
+                (profile_value, 0.18),
+                (ride_base, 0.10),
+                (hour_base, 0.04),
+                (overall, 0.02),
+            ])
+
+            current_reason = ""
+            if target_date == today and attraction in current_map:
+                distance = abs(hour - now_hour)
+                if now_hour < 11:
+                    current_weight = 0.08
+                elif now_hour < 13:
+                    current_weight = 0.16
+                else:
+                    current_weight = 0.26
+
+                current_weight = current_weight / (distance + 1)
+                if hour < now_hour:
+                    current_weight *= 0.35
+
+                base_wait = _weighted_average([
+                    (base_wait, 1 - current_weight),
+                    (current_map[attraction], current_weight),
+                ])
+                current_reason = "現在値は朝の一時的な偏りを避けるため低めの重みで反映"
+
+            adjustment = target_bonus * 2.5
+
+            if rain_mm > 0:
+                adjustment -= min(8, rain_mm * 2)
+
+            if temperature >= 30:
+                adjustment -= 4
+            elif temperature <= 5:
+                adjustment -= 3
+
+            predicted = max(0, base_wait + adjustment + attraction_feedback)
+
+            rows.append({
+                "Hour": hour,
+                "Attraction": attraction,
+                "Predicted Wait": round(predicted, 1),
+                "理由": " / ".join([
+                    "履歴中央値",
+                    "曜日・月・時間帯プロファイル",
+                    "予測誤差補正",
+                    current_reason,
+                ] + target_reasons).strip(" / ")
+            })
+
+    return pd.DataFrame(rows)
+
+
+def make_major_average_prediction(wait_prediction_df):
+    if len(wait_prediction_df) == 0:
+        return pd.DataFrame(columns=["Hour", "Predicted Wait"])
+
+    avg_df = wait_prediction_df.groupby("Hour")["Predicted Wait"].mean().reset_index()
+    return avg_df.rename(columns={"Predicted Wait": "Predicted Wait"})
+
+
+def predict_crowd_index_for_date(
+    history_df,
+    settings,
+    target_date,
+    temperature,
+    rain_mm,
+    prediction_history,
+    daily_prediction_history,
+    ticket_price=None,
+    current_target_df=None,
+):
+    wait_df = predict_wait_times_for_date(
+        history_df,
+        settings,
+        target_date,
+        temperature,
+        rain_mm,
+        prediction_history,
+        ticket_price,
+        current_target_df,
+    )
+
+    if len(wait_df) == 0:
+        avg_wait = 0
+        max_wait = 0
+        var_wait = 0
+    else:
+        avg_wait = wait_df["Predicted Wait"].mean()
+        max_wait = wait_df["Predicted Wait"].max()
+        var_wait = wait_df["Predicted Wait"].var()
+
+    if pd.isna(var_wait):
+        var_wait = 0
+
+    target_bonus, reasons = get_calendar_bonus(target_date, ticket_price)
+    weather_score = get_weather_score(
+        "雨" if rain_mm > 0 else "晴れ",
+        rain_mm,
+        temperature
+    )
+    feedback_error = get_feedback_error(prediction_history, GLOBAL_PREDICTION_NAME)
+    daily_feedback = get_daily_crowd_feedback_error(daily_prediction_history)
+
+    crowd_index = get_crowd_index(
+        avg_wait,
+        max_wait,
+        var_wait,
+        get_dpa_score(avg_wait, max_wait),
+        weather_score,
+        feedback_error,
+        target_bonus
+    )
+
+    crowd_index = int(min(10, max(1, round(crowd_index + daily_feedback))))
+
+    reasons = reasons + [
+        f"5大予想平均 {avg_wait:.1f}分",
+        f"過去の混雑指数誤差補正 {daily_feedback:+.1f}",
+    ]
+
+    return crowd_index, wait_df, reasons
+
+
+def make_week_forecast(
+    history_df,
+    settings,
+    start_date,
+    temperature,
+    rain_mm,
+    prediction_history,
+    daily_prediction_history,
+    ticket_price_map,
+    current_target_df=None,
+):
+    rows = []
+
+    for i in range(7):
+        d = start_date + timedelta(days=i)
+        ticket_price, ticket_source = get_ticket_price_from_castel(d, ticket_price_map)
+        crowd_index, wait_df, reasons = predict_crowd_index_for_date(
+            history_df,
+            settings,
+            d,
+            temperature,
+            rain_mm,
+            prediction_history,
+            daily_prediction_history,
+            ticket_price,
+            current_target_df if d == datetime.now(JST).date() else None,
+        )
+
+        rows.append({
+            "Date": d.strftime("%m/%d"),
+            "Crowd Index": crowd_index,
+            "5大平均待ち時間": round(wait_df["Predicted Wait"].mean(), 1) if len(wait_df) > 0 else 0,
+            "チケット価格": "未取得" if ticket_price is None else ticket_price,
+            "主な理由": " / ".join(reasons[:4]),
+            "価格取得元": ticket_source,
+        })
+
+    return pd.DataFrame(rows)
+
+
+def predict_dpa_sellout_time(attraction, wait, crowd_10, ticket_price, bonus, dpa_sellout_history):
+    historical_hour = None
+
+    if len(dpa_sellout_history) > 0:
+        one_history = dpa_sellout_history[
+            dpa_sellout_history["attraction"] == attraction
+        ]
+        if len(one_history) > 0:
+            historical_hour = float(one_history["sellout_hour"].tail(10).mean())
+
+    risk_text, risk_score = predict_dpa_risk(wait, crowd_10, ticket_price, bonus)
+
+    if historical_hour is not None:
+        predicted_hour = historical_hour - max(0, risk_score - 3) * 0.35
+        reason = "過去の売切れ時刻を基準に、現在の待ち時間と混雑指数で補正"
+    else:
+        predicted_hour = 20.5 - risk_score * 0.85
+        reason = "売切れ履歴がないため、待ち時間・混雑指数・需要補正から推定"
+
+    predicted_hour = max(9.5, min(20.5, predicted_hour))
+    hour = int(predicted_hour)
+    minute = int(round((predicted_hour - hour) * 60 / 5) * 5)
+
+    if minute >= 60:
+        hour += 1
+        minute = 0
+
+    return {
+        "Attraction": attraction,
+        "Wait": wait,
+        "Risk": risk_text,
+        "Risk Score": risk_score,
+        "予測売切れ時刻": f"{hour:02d}:{minute:02d}",
+        "根拠": reason,
+    }
 
 
 def get_current_stats(valid_open_df):
