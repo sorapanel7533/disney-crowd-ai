@@ -31,6 +31,9 @@ from utils import (
     get_attraction_status_summary,
     get_event_bonus,
     get_park_hours_bonus,
+    get_prediction_accuracy_report,
+    get_prediction_alerts,
+    get_prediction_confidence,
     get_prediction_gap_summary,
     get_ticket_price_from_castel,
     get_today_stats,
@@ -664,6 +667,22 @@ if display_mode == "ダッシュボード":
         f"混雑指数は5大アトラクションのみを対象に、9:00〜20:59までのデータだけで算出しています。現在の参照元: {crowd_source}"
     )
 
+    today_confidence = get_prediction_confidence(
+        history_df,
+        prediction_history,
+        dpa_sellout_history,
+        settings,
+        datetime.now(JST).date(),
+        "現在天気"
+    )
+
+    c_conf1, c_conf2 = st.columns(2)
+    with c_conf1:
+        st.metric("予測信頼度", f"{today_confidence['score']}%")
+    with c_conf2:
+        st.metric("信頼度レベル", today_confidence["label"])
+    st.caption("信頼度の理由: " + " / ".join(today_confidence["notes"]))
+
     level, color = get_level(crowd_10)
 
     st.markdown(
@@ -718,6 +737,15 @@ if display_mode == "ダッシュボード":
 
         st.dataframe(
             major_display_df,
+            use_container_width=True
+        )
+
+        st.subheader("予測の注意点")
+        st.dataframe(
+            get_prediction_alerts(
+                wait_pred_df,
+                today_confidence
+            ),
             use_container_width=True
         )
 
@@ -915,6 +943,15 @@ elif display_mode == "全アトラクション":
 
             st.write(
                 f"表示中: {selected_history_attraction}"
+            )
+
+            st.subheader("予測の注意点")
+            st.dataframe(
+                get_prediction_alerts(
+                    pred_df,
+                    attraction_confidence
+                ),
+                use_container_width=True
             )
 
             fig, ax = plt.subplots(
@@ -1127,6 +1164,21 @@ elif display_mode == "アトラクション別予測":
         ].copy()
 
         if len(pred_df) > 0:
+            attraction_confidence = get_prediction_confidence(
+                history_df,
+                prediction_history,
+                dpa_sellout_history,
+                settings,
+                attraction_target_date,
+                attraction_weather_source
+            )
+
+            c_att_conf1, c_att_conf2 = st.columns(2)
+            with c_att_conf1:
+                st.metric("予測信頼度", f"{attraction_confidence['score']}%")
+            with c_att_conf2:
+                st.metric("信頼度レベル", attraction_confidence["label"])
+            st.caption("信頼度の理由: " + " / ".join(attraction_confidence["notes"]))
 
             save_prediction_rows(
                 cursor,
@@ -1397,6 +1449,14 @@ elif display_mode == "日付指定予測":
     )
 
     level, color = get_level(target_crowd)
+    target_confidence = get_prediction_confidence(
+        history_df,
+        prediction_history,
+        dpa_sellout_history,
+        settings,
+        target_date,
+        "手入力/日付指定"
+    )
 
     m1, m2, m3 = st.columns(3)
 
@@ -1414,6 +1474,9 @@ elif display_mode == "日付指定予測":
             "チケット価格",
             "未取得" if target_ticket_price is None else f"{target_ticket_price}円"
         )
+
+    st.metric("予測信頼度", f"{target_confidence['score']}%")
+    st.caption("信頼度の理由: " + " / ".join(target_confidence["notes"]))
 
     st.markdown(
         f"<div class='card'><h2 style='color:{color};'>{level}</h2></div>",
@@ -1438,6 +1501,15 @@ elif display_mode == "日付指定予測":
 
     st.dataframe(
         target_wait_df,
+        use_container_width=True
+    )
+
+    st.subheader("予測の注意点")
+    st.dataframe(
+        get_prediction_alerts(
+            target_wait_df,
+            target_confidence
+        ),
         use_container_width=True
     )
 
@@ -1543,6 +1615,14 @@ elif display_mode == "データ管理":
     )
 
     st.subheader("次に増やすべき機能と必要データ")
+    st.subheader("予測精度レポート")
+    st.dataframe(
+        get_prediction_accuracy_report(
+            prediction_history
+        ),
+        use_container_width=True
+    )
+
     st.dataframe(
         get_next_feature_plan(),
         use_container_width=True
