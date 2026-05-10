@@ -11,6 +11,7 @@ import streamlit as st
 from utils import (
     GLOBAL_PREDICTION_NAME,
     PARK_SETTINGS,
+    auto_save_context_data,
     auto_fetch_dpa_if_needed,
     connect_db,
     clear_dpa_sellouts,
@@ -24,6 +25,7 @@ from utils import (
     get_dpa_score,
     get_feedback_error,
     get_level,
+    get_next_feature_plan,
     get_prediction_gap_summary,
     get_ticket_price_from_castel,
     get_today_stats,
@@ -31,8 +33,11 @@ from utils import (
     get_weather,
     get_weather_score,
     load_daily_crowd_predictions,
+    load_data_fetch_logs,
     load_dpa_fetch_logs,
     load_dpa_sellouts,
+    load_ticket_price_snapshots,
+    load_weather_snapshots,
     log_dpa_fetch,
     load_history,
     load_prediction_history,
@@ -244,6 +249,19 @@ today_bonus, today_reasons = get_calendar_bonus(
 temperature, rain_mm, weather_text, hourly_weather, daily_weather = get_weather()
 
 conn, cursor = connect_db(settings["db"])
+auto_context_results = auto_save_context_data(
+    cursor,
+    conn,
+    park,
+    ticket_price_map,
+    ticket_map_source,
+    temperature,
+    rain_mm,
+    weather_text
+)
+data_fetch_logs = load_data_fetch_logs(conn)
+weather_snapshots = load_weather_snapshots(conn)
+ticket_price_snapshots = load_ticket_price_snapshots(conn)
 
 try:
     all_df, target_df = fetch_wait_times(settings)
@@ -1310,6 +1328,44 @@ elif display_mode == "データ管理":
         ),
         use_container_width=True
     )
+
+    st.subheader("Next features and data")
+    st.dataframe(
+        get_next_feature_plan(),
+        use_container_width=True
+    )
+
+    st.subheader("Auto data collection")
+    st.write("Today:", " / ".join(auto_context_results))
+
+    if len(data_fetch_logs) > 0:
+        st.dataframe(
+            data_fetch_logs.sort_values(
+                "fetched_at",
+                ascending=False
+            ).head(100),
+            use_container_width=True
+        )
+
+    if len(weather_snapshots) > 0:
+        st.subheader("Weather snapshots")
+        st.dataframe(
+            weather_snapshots.sort_values(
+                "observed_at",
+                ascending=False
+            ).head(100),
+            use_container_width=True
+        )
+
+    if len(ticket_price_snapshots) > 0:
+        st.subheader("Ticket price snapshots")
+        st.dataframe(
+            ticket_price_snapshots.sort_values(
+                "observed_at",
+                ascending=False
+            ).head(100),
+            use_container_width=True
+        )
 
     if len(error_only_df) > 0:
 
