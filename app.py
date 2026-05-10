@@ -11,6 +11,7 @@ import streamlit as st
 from utils import (
     GLOBAL_PREDICTION_NAME,
     PARK_SETTINGS,
+    auto_collect_prediction_context,
     auto_save_context_data,
     auto_fetch_dpa_if_needed,
     connect_db,
@@ -26,6 +27,9 @@ from utils import (
     get_feedback_error,
     get_level,
     get_next_feature_plan,
+    get_attraction_status_summary,
+    get_event_bonus,
+    get_park_hours_bonus,
     get_prediction_gap_summary,
     get_ticket_price_from_castel,
     get_today_stats,
@@ -36,6 +40,9 @@ from utils import (
     load_data_fetch_logs,
     load_dpa_fetch_logs,
     load_dpa_sellouts,
+    load_attraction_status_snapshots,
+    load_event_signals,
+    load_park_hours,
     load_ticket_price_snapshots,
     load_weather_snapshots,
     log_dpa_fetch,
@@ -50,6 +57,7 @@ from utils import (
     save_daily_crowd_prediction,
     save_dpa_sellout,
     save_dpa_sellout_rows,
+    save_attraction_status_snapshots,
     predict_dpa_risk,
     save_prediction_rows,
     save_wait_times,
@@ -245,7 +253,6 @@ today_bonus, today_reasons = get_calendar_bonus(
     datetime.now(JST),
     ticket_price
 )
-
 temperature, rain_mm, weather_text, hourly_weather, daily_weather = get_weather()
 
 conn, cursor = connect_db(settings["db"])
@@ -259,9 +266,18 @@ auto_context_results = auto_save_context_data(
     rain_mm,
     weather_text
 )
+auto_context_results.extend(
+    auto_collect_prediction_context(
+        cursor,
+        conn,
+        park
+    )
+)
 data_fetch_logs = load_data_fetch_logs(conn)
 weather_snapshots = load_weather_snapshots(conn)
 ticket_price_snapshots = load_ticket_price_snapshots(conn)
+park_hours_df = load_park_hours(conn)
+event_signals = load_event_signals(conn)
 
 try:
     all_df, target_df = fetch_wait_times(settings)
@@ -273,6 +289,15 @@ except Exception:
 if all_df.empty:
     st.error("アトラクションのデータが取得できませんでした")
     st.stop()
+
+save_attraction_status_snapshots(
+    cursor,
+    conn,
+    park,
+    all_df,
+    settings["rides"]
+)
+attraction_status_snapshots = load_attraction_status_snapshots(conn)
 
 valid_all_df = get_valid_open_df(all_df)
 valid_target_df = get_valid_open_df(target_df)
@@ -335,6 +360,19 @@ global_feedback_error = get_feedback_error(
     prediction_history,
     GLOBAL_PREDICTION_NAME
 )
+
+event_bonus, event_reasons = get_event_bonus(
+    event_signals,
+    datetime.now(JST).date(),
+    park
+)
+hours_bonus, hours_reasons = get_park_hours_bonus(
+    park_hours_df,
+    datetime.now(JST).date()
+)
+today_bonus += event_bonus + hours_bonus
+today_reasons.extend(event_reasons)
+today_reasons.extend(hours_reasons)
 
 dpa = get_dpa_score(avg_wait, max_wait)
 
@@ -610,7 +648,10 @@ if display_mode == "ダッシュボード":
         prediction_history,
         daily_prediction_history,
         ticket_price_map,
-        valid_target_df
+        valid_target_df,
+        event_signals,
+        park_hours_df,
+        park
     )
 
     for _, row in week_df.iterrows():
@@ -649,6 +690,36 @@ if display_mode == "ダッシュボード":
     error_only_df = prediction_history[
         prediction_history["error"].notna()
     ].copy() if len(prediction_history) > 0 else pd.DataFrame()
+
+    if len(park_hours_df) > 0:
+        st.subheader("営業時間データ")
+        st.dataframe(
+            park_hours_df.sort_values(
+                "target_date",
+                ascending=True
+            ).head(100),
+            use_container_width=True
+        )
+
+    if len(event_signals) > 0:
+        st.subheader("イベント/休暇シグナル")
+        st.dataframe(
+            event_signals.sort_values(
+                "target_date",
+                ascending=True
+            ).head(100),
+            use_container_width=True
+        )
+
+    if len(attraction_status_snapshots) > 0:
+        st.subheader("アトラクション営業状態履歴")
+        st.dataframe(
+            attraction_status_snapshots.sort_values(
+                "observed_at",
+                ascending=False
+            ).head(100),
+            use_container_width=True
+        )
 
     if len(error_only_df) > 0:
         st.caption("予測時刻に実測待ち時間が取得できたものは、予測誤差として保存されています。")
@@ -988,17 +1059,17 @@ elif display_mode == "DPA売切れ予測":
 
     if dpa_auto_fetch_result["status"] == "success":
         st.success(
-            f"DPA auto fetch: saved {dpa_auto_fetch_result['saved_count']} rows. "
+            f"DPA自動取得: {dpa_auto_fetch_result['saved_count']}件保存しました。"
             f"{dpa_auto_fetch_result['message']}"
         )
     elif dpa_auto_fetch_result["status"] == "skipped":
         st.info(
-            f"DPA auto fetch: already checked today. "
+            f"DPA自動取得: 今日はすでに確認済みです。"
             f"{dpa_auto_fetch_result['message']}"
         )
     else:
         st.warning(
-            f"DPA auto fetch failed: {dpa_auto_fetch_result['message']}"
+            f"DPA自動取得に失敗しました: {dpa_auto_fetch_result['message']}"
         )
 
     if len(dpa_fetch_logs) > 0:
@@ -1007,10 +1078,10 @@ elif display_mode == "DPA売切れ予測":
             ascending=False
         ).iloc[0]
         st.caption(
-            "Latest DPA fetch: "
+            "最新のDPA取得: "
             f"{latest_dpa_fetch['fetched_at']} / "
             f"{latest_dpa_fetch.get('status', '')} / "
-            f"{latest_dpa_fetch.get('saved_count', 0)} rows"
+            f"{latest_dpa_fetch.get('saved_count', 0)}件"
         )
 
     col_fetch, col_clear = st.columns(2)
@@ -1180,7 +1251,10 @@ elif display_mode == "日付指定予測":
         prediction_history,
         daily_prediction_history,
         target_ticket_price,
-        valid_target_df if target_date == datetime.now(JST).date() else None
+        valid_target_df if target_date == datetime.now(JST).date() else None,
+        event_signals,
+        park_hours_df,
+        park
     )
 
     level, color = get_level(target_crowd)
@@ -1293,7 +1367,7 @@ elif display_mode == "データ管理":
             len(dpa_sellout_history)
         )
 
-    st.metric("DPA fetch logs", len(dpa_fetch_logs))
+    st.metric("DPA取得ログ", len(dpa_fetch_logs))
 
     if len(history_df) > 0:
 
@@ -1329,14 +1403,23 @@ elif display_mode == "データ管理":
         use_container_width=True
     )
 
-    st.subheader("Next features and data")
+    st.subheader("次に増やすべき機能と必要データ")
     st.dataframe(
         get_next_feature_plan(),
         use_container_width=True
     )
 
-    st.subheader("Auto data collection")
-    st.write("Today:", " / ".join(auto_context_results))
+    st.subheader("営業状態サマリー")
+    st.dataframe(
+        get_attraction_status_summary(
+            attraction_status_snapshots,
+            settings
+        ),
+        use_container_width=True
+    )
+
+    st.subheader("自動データ取得")
+    st.write("今日の取得状態:", " / ".join(auto_context_results))
 
     if len(data_fetch_logs) > 0:
         st.dataframe(
@@ -1348,7 +1431,7 @@ elif display_mode == "データ管理":
         )
 
     if len(weather_snapshots) > 0:
-        st.subheader("Weather snapshots")
+        st.subheader("天気スナップショット")
         st.dataframe(
             weather_snapshots.sort_values(
                 "observed_at",
@@ -1358,7 +1441,7 @@ elif display_mode == "データ管理":
         )
 
     if len(ticket_price_snapshots) > 0:
-        st.subheader("Ticket price snapshots")
+        st.subheader("チケット価格スナップショット")
         st.dataframe(
             ticket_price_snapshots.sort_values(
                 "observed_at",
