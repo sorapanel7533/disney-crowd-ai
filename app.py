@@ -25,6 +25,7 @@ from utils import (
     get_data_quality_report,
     get_dpa_score,
     get_feedback_error,
+    get_forecast_weather_for_date,
     get_level,
     get_next_feature_plan,
     get_attraction_status_summary,
@@ -766,7 +767,8 @@ if display_mode == "ダッシュボード":
         valid_target_df,
         event_signals,
         park_hours_df,
-        park
+        park,
+        daily_weather
     )
 
     for _, row in week_df.iterrows():
@@ -1077,6 +1079,28 @@ elif display_mode == "アトラクション別予測":
             attraction_list
         )
 
+        attraction_target_date = st.date_input(
+            "予測する日付",
+            value=datetime.now(JST).date() + timedelta(days=1),
+            min_value=datetime.now(JST).date(),
+            max_value=datetime.now(JST).date() + timedelta(days=7),
+            key="attraction_prediction_date"
+        )
+
+        attraction_temperature, attraction_rain, attraction_weather_source = get_forecast_weather_for_date(
+            daily_weather,
+            attraction_target_date,
+            temperature,
+            rain_mm
+        )
+
+        st.caption(
+            f"{attraction_target_date} の予測です。"
+            f"天気: {attraction_weather_source} / "
+            f"気温 {attraction_temperature:.1f}℃ / "
+            f"降水量 {attraction_rain:.1f}mm"
+        )
+
         attraction_feedback_error = get_feedback_error(
             prediction_history,
             selected_attraction
@@ -1090,12 +1114,12 @@ elif display_mode == "アトラクション別予測":
         pred_all_df = predict_wait_times_for_date(
             history_df,
             settings,
-            datetime.now(JST).date(),
-            temperature,
-            rain_mm,
+            attraction_target_date,
+            attraction_temperature,
+            attraction_rain,
             prediction_history,
             ticket_price,
-            valid_target_df
+            valid_target_df if attraction_target_date == datetime.now(JST).date() else None
         )
 
         pred_df = pred_all_df[
@@ -1134,7 +1158,7 @@ elif display_mode == "アトラクション別予測":
             ax.set_ylabel("Predicted Wait")
 
             ax.set_title(
-                f"{selected_attraction} Prediction"
+                f"{selected_attraction} Prediction {attraction_target_date}"
             )
 
             st.pyplot(fig)
