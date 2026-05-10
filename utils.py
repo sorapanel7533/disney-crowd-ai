@@ -60,6 +60,7 @@ PARK_SETTINGS = {
 
 CASTEL_TICKET_URL = "https://castel.jp/p/7339"
 OFFICIAL_TICKET_URL = "https://www.tokyodisneyresort.co.jp/en/ticket/index.html"
+OFFICIAL_CALENDAR_URL = "https://www.tokyodisneyresort.jp/en/tdr/calendar.html"
 GLOBAL_PREDICTION_NAME = "__ALL__"
 MAJOR_AVERAGE_NAME = "__MAJOR_5_AVERAGE__"
 HOUR_PROFILE = {
@@ -195,6 +196,44 @@ def connect_db(db_name):
         park TEXT,
         price INTEGER,
         source TEXT
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS attraction_status_snapshots (
+        observed_at TEXT,
+        target_date TEXT,
+        park TEXT,
+        attraction TEXT,
+        wait_time INTEGER,
+        is_open INTEGER,
+        is_major INTEGER,
+        source TEXT
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS park_hours (
+        observed_at TEXT,
+        target_date TEXT,
+        park TEXT,
+        open_hour REAL,
+        close_hour REAL,
+        ticket_price INTEGER,
+        source TEXT,
+        note TEXT
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS event_signals (
+        observed_at TEXT,
+        target_date TEXT,
+        park TEXT,
+        event_name TEXT,
+        bonus REAL,
+        source TEXT,
+        note TEXT
     )
     """)
 
@@ -590,6 +629,18 @@ def get_calendar_bonus(target_date, price):
     if month == 1 and day <= 5:
         bonus += 4
         reasons.append("年始")
+
+    if month == 1 and 15 <= day <= 31 and weekday < 5:
+        bonus += 1
+        reasons.append("学校休み/入試休み推定")
+
+    if month == 2 and 1 <= day <= 20 and weekday < 5:
+        bonus += 1
+        reasons.append("学校休み/入試休み推定")
+
+    if month == 6 and 15 <= day <= 25 and weekday < 5:
+        bonus += 1
+        reasons.append("県民の日/学校休み推定")
 
     ticket_bonus, ticket_reasons = get_ticket_bonus(price)
     bonus += ticket_bonus
@@ -1066,6 +1117,447 @@ def save_ticket_price_snapshots(cursor, conn, park, ticket_price_map, source):
     return saved_count
 
 
+def _date_text(target_date):
+    return target_date.strftime("%Y-%m-%d") if hasattr(target_date, "strftime") else str(target_date)
+
+
+def _parse_hour_text(text):
+    match = re.search(r"(\d{1,2}):(\d{2})\s*(a\.m\.|p\.m\.)", str(text), re.IGNORECASE)
+
+    if not match:
+        return None
+
+    hour = int(match.group(1))
+    minute = int(match.group(2))
+    suffix = match.group(3).lower()
+
+    if suffix.startswith("p") and hour != 12:
+        hour += 12
+    if suffix.startswith("a") and hour == 12:
+        hour = 0
+
+    return hour + minute / 60
+
+
+def save_attraction_status_snapshots(cursor, conn, park, all_df, major_rides):
+    if len(all_df) == 0:
+        return 0
+
+    now = datetime.now(JST)
+    saved_count = 0
+
+    for _, row in all_df.iterrows():
+        cursor.execute("""
+        INSERT INTO attraction_status_snapshots
+        (
+            observed_at,
+            target_date,
+            park,
+            attraction,
+            wait_time,
+            is_open,
+            is_major,
+            source
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            now.strftime("%Y-%m-%d %H:%M:%S"),
+            now.date().strftime("%Y-%m-%d"),
+            park,
+            row["Attraction"],
+            int(row["Wait"]),
+            1 if bool(row["Open"]) else 0,
+            1 if row["Attraction"] in major_rides else 0,
+            "queue-times"
+        ))
+        saved_count += 1
+
+    conn.commit()
+    return saved_count
+
+
+def load_attraction_status_snapshots(conn):
+    try:
+        df = pd.read_sql_query("SELECT * FROM attraction_status_snapshots", conn)
+    except Exception:
+        return pd.DataFrame()
+
+    if len(df) > 0:
+        df["observed_at"] = pd.to_datetime(df["observed_at"])
+        df["target_date"] = pd.to_datetime(df["target_date"]).dt.date
+
+    return df
+
+
+def get_attraction_status_summary(status_df, settings):
+    if len(status_df) == 0:
+        return pd.DataFrame([{
+            "項目": "アトラクション営業状態",
+            "状態": "未保存",
+            "説明": "待ち時間APIから営業中/休止状態を保存すると、休止による予測ズレを判定できます。"
+        }])
+
+    today = datetime.now(JST).date()
+    today_df = status_df[status_df["target_date"] == today].copy()
+
+    if len(today_df) == 0:
+        return pd.DataFrame([{
+            "項目": "アトラクション営業状態",
+            "状態": "今日の保存なし",
+            "説明": "今日の営業状態がまだ保存されていません。"
+        }])
+
+    latest_time = today_df["observed_at"].max()
+    latest_df = today_df[today_df["observed_at"] == latest_time]
+    major_df = latest_df[latest_df["attraction"].isin(settings["rides"])]
+    major_closed = int((major_df["is_open"] == 0).sum()) if len(major_df) > 0 else 0
+    all_closed = int((latest_df["is_open"] == 0).sum())
+
+    return pd.DataFrame([
+        {
+            "項目": "5大アトラクション休止数",
+            "状態": f"{major_closed}件",
+            "説明": "5大内の休止が多いと、他施設へ待ち時間が集中しやすくなります。"
+        },
+        {
+            "項目": "全体休止数",
+            "状態": f"{all_closed}件",
+            "説明": "全体の休止が多い日は、通常の曜日パターンより待ち時間が上振れしやすくなります。"
+        },
+    ])
+
+
+def build_estimated_park_hours(start_date=None, days=90):
+    start_date = start_date or datetime.now(JST).date()
+    rows = []
+
+    for i in range(days):
+        d = start_date + timedelta(days=i)
+        rows.append({
+            "target_date": d,
+            "open_hour": 9.0,
+            "close_hour": 21.0,
+            "ticket_price": estimate_ticket_price(d),
+            "source": "rule_estimate",
+            "note": "公式営業時間を取得できない場合の推定"
+        })
+
+    return pd.DataFrame(rows)
+
+
+def fetch_official_park_hours():
+    try:
+        res = requests.get(
+            OFFICIAL_CALENDAR_URL,
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=10
+        )
+        res.raise_for_status()
+    except Exception as exc:
+        estimated_df = build_estimated_park_hours()
+        return estimated_df, f"公式カレンダー取得失敗。推定営業時間を使用: {exc}"
+
+    plain = re.sub(r"<[^>]+>", "\n", res.text)
+    plain = unescape(plain)
+    plain = re.sub(r"\s+", " ", plain)
+    today = datetime.now(JST).date()
+    rows = []
+
+    month_names = {
+        "Jan": 1, "January": 1,
+        "Feb": 2, "February": 2,
+        "Mar": 3, "March": 3,
+        "Apr": 4, "April": 4,
+        "May": 5,
+        "Jun": 6, "June": 6,
+        "Jul": 7, "July": 7,
+        "Aug": 8, "August": 8,
+        "Sep": 9, "September": 9,
+        "Oct": 10, "October": 10,
+        "Nov": 11, "November": 11,
+        "Dec": 12, "December": 12,
+    }
+
+    current_year = today.year
+    current_month = today.month
+
+    month_match = re.search(r"(January|February|March|April|May|June|July|August|September|October|November|December)\s+(20\d{2})", plain)
+    if month_match:
+        current_month = month_names[month_match.group(1)]
+        current_year = int(month_match.group(2))
+
+    pattern = re.compile(
+        r"(\d{1,2})\s*\([A-Z]\)\s+"
+        r"(\d{1,2}:\d{2}\s*(?:a\.m\.|p\.m\.))\s*-\s*"
+        r"(\d{1,2}:\d{2}\s*(?:a\.m\.|p\.m\.))\s+"
+        r"([\d,]{4,6})\s*yen",
+        re.IGNORECASE
+    )
+
+    for match in pattern.finditer(plain):
+        day = int(match.group(1))
+        try:
+            d = date(current_year, current_month, day)
+        except ValueError:
+            continue
+
+        if d < today - timedelta(days=7):
+            continue
+
+        rows.append({
+            "target_date": d,
+            "open_hour": _parse_hour_text(match.group(2)) or 9.0,
+            "close_hour": _parse_hour_text(match.group(3)) or 21.0,
+            "ticket_price": int(match.group(4).replace(",", "")),
+            "source": "official_calendar",
+            "note": "東京ディズニーリゾート公式カレンダー"
+        })
+
+    if not rows:
+        estimated_df = build_estimated_park_hours()
+        return estimated_df, "公式カレンダーの解析に失敗。推定営業時間を使用"
+
+    return pd.DataFrame(rows).drop_duplicates(["target_date"], keep="first"), f"公式カレンダーから{len(rows)}件取得"
+
+
+def save_park_hours_rows(cursor, conn, park, hours_df):
+    if len(hours_df) == 0:
+        return 0
+
+    now = datetime.now(JST)
+    saved_count = 0
+
+    for _, row in hours_df.iterrows():
+        target_date_text = _date_text(row["target_date"])
+        cursor.execute("""
+        DELETE FROM park_hours
+        WHERE target_date = ?
+        AND park = ?
+        AND source = ?
+        """, (
+            target_date_text,
+            park,
+            row.get("source", "")
+        ))
+        cursor.execute("""
+        INSERT INTO park_hours
+        (
+            observed_at,
+            target_date,
+            park,
+            open_hour,
+            close_hour,
+            ticket_price,
+            source,
+            note
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            now.strftime("%Y-%m-%d %H:%M:%S"),
+            target_date_text,
+            park,
+            float(row.get("open_hour", 9.0)),
+            float(row.get("close_hour", 21.0)),
+            int(row.get("ticket_price", 0) or 0),
+            row.get("source", ""),
+            row.get("note", "")
+        ))
+        saved_count += 1
+
+    conn.commit()
+    return saved_count
+
+
+def load_park_hours(conn):
+    try:
+        df = pd.read_sql_query("SELECT * FROM park_hours", conn)
+    except Exception:
+        return pd.DataFrame()
+
+    if len(df) > 0:
+        df["observed_at"] = pd.to_datetime(df["observed_at"])
+        df["target_date"] = pd.to_datetime(df["target_date"]).dt.date
+
+    return df
+
+
+def get_park_hours_bonus(park_hours_df, target_date):
+    if len(park_hours_df) == 0:
+        return 0, []
+
+    d = target_date.date() if isinstance(target_date, datetime) else target_date
+    day_rows = park_hours_df[park_hours_df["target_date"] == d]
+
+    if len(day_rows) == 0:
+        return 0, []
+
+    row = day_rows.sort_values("observed_at", ascending=False).iloc[0]
+    close_hour = float(row.get("close_hour", 21.0) or 21.0)
+    open_hour = float(row.get("open_hour", 9.0) or 9.0)
+    duration = close_hour - open_hour
+
+    if duration <= 9:
+        return 1, [f"短縮営業推定({open_hour:.0f}:00-{close_hour:.0f}:00)"]
+
+    return 0, [f"営業時間{open_hour:.0f}:00-{close_hour:.0f}:00"]
+
+
+def build_event_signal_rows(park, start_date=None, days=120):
+    start_date = start_date or datetime.now(JST).date()
+    rows = []
+
+    for i in range(days):
+        d = start_date + timedelta(days=i)
+        signals = []
+
+        if d.month == 1 and d.day <= 5:
+            signals.append(("年始混雑", 2.0, "年始休暇の需要増"))
+        if d.month == 3 and d.day >= 20:
+            signals.append(("春休み", 1.5, "学生休暇の需要増"))
+        if d.month == 4 and d.day <= 7:
+            signals.append(("春休み", 1.0, "学生休暇の需要増"))
+        if (d.month == 4 and d.day >= 27) or (d.month == 5 and d.day <= 6):
+            signals.append(("ゴールデンウィーク", 2.0, "大型連休"))
+        if (d.month == 7 and d.day >= 20) or d.month == 8:
+            signals.append(("夏休み", 1.5, "学生休暇の需要増"))
+        if d.month == 8 and 10 <= d.day <= 18:
+            signals.append(("お盆", 1.5, "帰省/旅行需要"))
+        if d.month == 10:
+            signals.append(("ハロウィーン", 1.0, "季節イベント"))
+        if d.month == 12 and d.day <= 25:
+            signals.append(("クリスマス", 1.0, "季節イベント"))
+        if d.month == 12 and d.day >= 26:
+            signals.append(("年末混雑", 2.0, "年末休暇の需要増"))
+        if d.weekday() == 0 and 15 <= d.day <= 25 and d.month in [1, 2, 6]:
+            signals.append(("学校行事休み推定", 0.5, "地域差のある平日上振れ候補"))
+
+        for event_name, bonus, note in signals:
+            rows.append({
+                "target_date": d,
+                "park": park,
+                "event_name": event_name,
+                "bonus": bonus,
+                "source": "rule_estimate",
+                "note": note
+            })
+
+    return pd.DataFrame(rows)
+
+
+def save_event_signal_rows(cursor, conn, park, event_df):
+    now = datetime.now(JST)
+    cursor.execute(
+        "DELETE FROM event_signals WHERE park = ? AND source = ?",
+        (park, "rule_estimate")
+    )
+
+    if len(event_df) == 0:
+        conn.commit()
+        return 0
+
+    saved_count = 0
+
+    for _, row in event_df.iterrows():
+        cursor.execute("""
+        INSERT INTO event_signals
+        (
+            observed_at,
+            target_date,
+            park,
+            event_name,
+            bonus,
+            source,
+            note
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            now.strftime("%Y-%m-%d %H:%M:%S"),
+            _date_text(row["target_date"]),
+            park,
+            row["event_name"],
+            float(row["bonus"]),
+            row["source"],
+            row["note"]
+        ))
+        saved_count += 1
+
+    conn.commit()
+    return saved_count
+
+
+def load_event_signals(conn):
+    try:
+        df = pd.read_sql_query("SELECT * FROM event_signals", conn)
+    except Exception:
+        return pd.DataFrame()
+
+    if len(df) > 0:
+        df["observed_at"] = pd.to_datetime(df["observed_at"])
+        df["target_date"] = pd.to_datetime(df["target_date"]).dt.date
+
+    return df
+
+
+def get_event_bonus(event_signals, target_date, park=None):
+    if len(event_signals) == 0:
+        return 0, []
+
+    d = target_date.date() if isinstance(target_date, datetime) else target_date
+    rows = event_signals[event_signals["target_date"] == d].copy()
+
+    if park is not None and "park" in rows.columns:
+        rows = rows[rows["park"] == park]
+
+    if len(rows) == 0:
+        return 0, []
+
+    bonus = float(rows["bonus"].sum())
+    reasons = rows["event_name"].dropna().astype(str).unique().tolist()
+    return bonus, reasons
+
+
+def auto_collect_prediction_context(cursor, conn, park):
+    logs = load_data_fetch_logs(conn)
+    today = datetime.now(JST).date()
+    results = []
+
+    if should_fetch_data_today(logs, park, "park_hours", today):
+        hours_df, message = fetch_official_park_hours()
+        saved_count = save_park_hours_rows(cursor, conn, park, hours_df)
+        log_data_fetch(
+            cursor,
+            conn,
+            park,
+            "park_hours",
+            "success" if saved_count > 0 else "empty",
+            message,
+            saved_count,
+            today
+        )
+        results.append(f"営業時間を{saved_count}件保存")
+    else:
+        results.append("営業時間は確認済み")
+
+    if should_fetch_data_today(logs, park, "event_signals", today):
+        event_df = build_event_signal_rows(park)
+        saved_count = save_event_signal_rows(cursor, conn, park, event_df)
+        log_data_fetch(
+            cursor,
+            conn,
+            park,
+            "event_signals",
+            "success" if saved_count > 0 else "empty",
+            "季節/休暇シグナルを生成",
+            saved_count,
+            today
+        )
+        results.append(f"イベントシグナルを{saved_count}件保存")
+    else:
+        results.append("イベントシグナルは確認済み")
+
+    return results
+
+
 def auto_save_context_data(cursor, conn, park, ticket_price_map, ticket_source, temperature, rain_mm, weather_text):
     logs = load_data_fetch_logs(conn)
     today = datetime.now(JST).date()
@@ -1090,9 +1582,9 @@ def auto_save_context_data(cursor, conn, park, ticket_price_map, ticket_source, 
             1,
             today
         )
-        results.append("weather saved")
+        results.append("天気を保存")
     else:
-        results.append("weather already checked")
+        results.append("天気は確認済み")
 
     if should_fetch_data_today(logs, park, "ticket_price", today):
         saved_count = save_ticket_price_snapshots(
@@ -1103,7 +1595,7 @@ def auto_save_context_data(cursor, conn, park, ticket_price_map, ticket_source, 
             ticket_source
         )
         status = "success" if saved_count > 0 else "empty"
-        message = f"ticket price snapshots saved: {saved_count}"
+        message = f"チケット価格を{saved_count}件保存"
         log_data_fetch(
             cursor,
             conn,
@@ -1116,7 +1608,7 @@ def auto_save_context_data(cursor, conn, park, ticket_price_map, ticket_source, 
         )
         results.append(message)
     else:
-        results.append("ticket prices already checked")
+        results.append("チケット価格は確認済み")
 
     return results
 
@@ -1696,6 +2188,9 @@ def predict_crowd_index_for_date(
     daily_prediction_history,
     ticket_price=None,
     current_target_df=None,
+    event_signals=None,
+    park_hours_df=None,
+    park=None,
 ):
     wait_df = predict_wait_times_for_date(
         history_df,
@@ -1721,6 +2216,11 @@ def predict_crowd_index_for_date(
         var_wait = 0
 
     target_bonus, reasons = get_calendar_bonus(target_date, ticket_price)
+    event_bonus, event_reasons = get_event_bonus(event_signals if event_signals is not None else pd.DataFrame(), target_date, park)
+    hours_bonus, hours_reasons = get_park_hours_bonus(park_hours_df if park_hours_df is not None else pd.DataFrame(), target_date)
+    target_bonus += event_bonus + hours_bonus
+    reasons.extend(event_reasons)
+    reasons.extend(hours_reasons)
     weather_score = get_weather_score(
         "雨" if rain_mm > 0 else "晴れ",
         rain_mm,
@@ -1759,6 +2259,9 @@ def make_week_forecast(
     daily_prediction_history,
     ticket_price_map,
     current_target_df=None,
+    event_signals=None,
+    park_hours_df=None,
+    park=None,
 ):
     rows = []
 
@@ -1775,6 +2278,9 @@ def make_week_forecast(
             daily_prediction_history,
             ticket_price,
             current_target_df if d == datetime.now(JST).date() else None,
+            event_signals,
+            park_hours_df,
+            park,
         )
 
         rows.append({
