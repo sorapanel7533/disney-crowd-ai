@@ -865,11 +865,11 @@ if display_mode == "ダッシュボード":
         )
         st.subheader("📝 21時投稿用 X文面")
         st.text_area(
-            "明日の混雑予測投稿文（約200字）",
+            "\u660e\u65e5\u306e\u6295\u7a3f\u6587\uff08\u524d\u534a140\u5b57:\u6982\u8981 / \u5f8c\u534a140\u5b57:\u30a2\u30c8\u30e9\u30af\u30b7\u30e7\u30f3\u8a73\u7d30\uff09",
             x_post_text,
             height=130
         )
-        st.caption("毎日21時にこの文面をXへ投稿する想定です。天気・価格・履歴・誤差補正から翌日分を作成します。")
+        st.caption("\u524d\u534a\u306f\u660e\u65e5\u306e\u5168\u4f53\u6982\u8981\u3001\u5f8c\u534a\u306f\u4f55\u6642\u3054\u308d\u306b\u4f55\u304c\u7a7a\u304d\u305d\u3046\u304b\u3092\u5177\u4f53\u7684\u306a\u5206\u6570\u3064\u304d\u3067\u4f5c\u6210\u3057\u307e\u3059\u3002")
         st.subheader("予測の注意点")
         st.dataframe(
             get_prediction_alerts(
