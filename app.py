@@ -88,98 +88,213 @@ def cached_fetch_urtrip_dpa_sellouts(park_name):
 
 st.markdown("""
 <style>
+html, body, [class*="css"] {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+        "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif !important;
+}
 .stApp {
-    background-color: #0f1117;
+    background: #f5f5f7;
+    color: #1d1d1f;
 }
 .block-container {
-    padding-top: 2rem;
+    max-width: 980px;
+    padding-top: 1.1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-bottom: 5rem;
 }
-h1, h2, h3, h4, p, label {
-    color: #f5f7ff !important;
+h1, h2, h3, h4, h5, h6, p, label, span, div {
+    color: #1d1d1f !important;
+    letter-spacing: 0 !important;
+}
+h1 {
+    font-size: 30px !important;
+    font-weight: 800 !important;
+}
+h2, h3 {
+    font-weight: 750 !important;
+    margin-top: 1.1rem !important;
+}
+.stMarkdown, .stDataFrame, .stPlotlyChart, .stPyplot, .stAlert, .stForm {
+    max-width: 100%;
 }
 [data-testid="stMetric"] {
-    background-color: #1c1f2b;
-    border: 1px solid #3b4260;
-    padding: 18px;
-    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(60, 60, 67, 0.12);
+    padding: 16px 15px;
+    border-radius: 22px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    min-height: 104px;
 }
 [data-testid="stMetricLabel"] {
-    color: #e2e8ff !important;
+    color: #6e6e73 !important;
+    font-size: 13px !important;
+    font-weight: 650 !important;
 }
 [data-testid="stMetricValue"] {
-    color: #ffffff !important;
+    color: #111111 !important;
+    font-size: 27px !important;
+    font-weight: 800 !important;
 }
 .title-card {
-    background: linear-gradient(135deg, #143b6d, #1f6feb);
-    padding: 28px;
-    border-radius: 22px;
-    margin-bottom: 18px;
-    border: 1px solid #6aa4ff;
-    box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+    background: rgba(255, 255, 255, 0.94);
+    padding: 22px;
+    border-radius: 28px;
+    margin-bottom: 16px;
+    border: 1px solid rgba(60, 60, 67, 0.12);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.10);
 }
 .title-card h1 {
-    color: #ffffff !important;
-    font-size: 42px;
+    color: #111111 !important;
+    font-size: 34px;
+    line-height: 1.12;
     margin-bottom: 8px;
-    text-shadow: 0 3px 12px rgba(0,0,0,0.7);
+    text-shadow: none;
 }
 .title-card p {
-    color: #eef5ff !important;
-    font-size: 18px;
+    color: #6e6e73 !important;
+    font-size: 15px;
     margin: 0;
 }
 .card {
-    background: linear-gradient(135deg,#1c1f2b,#252b3f);
-    padding: 20px;
-    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.92);
+    padding: 18px;
+    border-radius: 22px;
     margin-bottom: 16px;
-    border: 1px solid #3b4260;
+    border: 1px solid rgba(60, 60, 67, 0.12);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 .rank-card {
-    background-color: #161a27;
-    padding: 14px;
-    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.94);
+    padding: 15px;
+    border-radius: 20px;
     margin-bottom: 10px;
-    border-left: 5px solid #4ade80;
-    color: #ffffff;
+    border: 1px solid rgba(60, 60, 67, 0.12);
+    border-left: 5px solid #34c759;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.07);
+    color: #1d1d1f;
 }
 .advice-card {
-    background: linear-gradient(135deg,#10243d,#193b63);
-    padding: 18px;
-    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.94);
+    padding: 16px;
+    border-radius: 20px;
     margin-bottom: 10px;
-    border-left: 6px solid #60a5fa;
-    color: #ffffff;
+    border: 1px solid rgba(60, 60, 67, 0.12);
+    border-left: 5px solid #007aff;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.07);
+    color: #1d1d1f;
 }
 div[data-baseweb="select"] {
-    background: linear-gradient(135deg, #182033, #202b44) !important;
-    border-radius: 16px !important;
-    border: 1px solid #4b63a0 !important;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+    background: rgba(255, 255, 255, 0.96) !important;
+    border-radius: 18px !important;
+    border: 1px solid rgba(60, 60, 67, 0.18) !important;
+    box-shadow: 0 5px 18px rgba(0, 0, 0, 0.07);
+    min-height: 46px;
 }
 div[data-baseweb="select"] span {
-    color: white !important;
+    color: #1d1d1f !important;
     font-weight: 600 !important;
 }
 div[data-baseweb="select"] svg {
-    color: #93c5fd !important;
+    color: #007aff !important;
 }
 div[data-baseweb="popover"] {
-    background-color: #1c1f2b !important;
-    border-radius: 14px !important;
+    background-color: #ffffff !important;
+    border-radius: 18px !important;
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.16) !important;
 }
 div[role="option"] {
-    color: white !important;
-    background-color: #1c1f2b !important;
+    color: #1d1d1f !important;
+    background-color: #ffffff !important;
 }
 div[role="option"]:hover {
-    background-color: #2b3a5c !important;
+    background-color: #f2f2f7 !important;
 }
 thead tr th {
-    color: white !important;
+    color: #1d1d1f !important;
 }
 tbody tr td {
+    color: #1d1d1f !important;
+}
+[data-testid="stDataFrame"],
+[data-testid="stTable"],
+[data-testid="stAlert"],
+[data-testid="stExpander"],
+[data-testid="stForm"] {
+    border-radius: 22px !important;
+    overflow: hidden;
+}
+button[kind="primary"], button[kind="secondary"], .stButton > button {
+    width: 100%;
+    min-height: 44px;
+    border-radius: 999px !important;
+    background: #007aff !important;
     color: white !important;
+    border: none !important;
+    box-shadow: 0 6px 16px rgba(0, 122, 255, 0.24);
+    font-weight: 700 !important;
+}
+.stButton > button p,
+.stButton > button span {
+    color: white !important;
+}
+input, textarea {
+    border-radius: 16px !important;
+}
+[data-testid="stImage"],
+[data-testid="stPyplot"] {
+    background: #ffffff;
+    border-radius: 22px;
+    padding: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(60, 60, 67, 0.12);
+}
+[data-testid="stPyplot"] img,
+[data-testid="stImage"] img {
+    width: 100% !important;
+    height: auto !important;
+}
+.stCaptionContainer, .stCaptionContainer p {
+    color: #6e6e73 !important;
+}
+@media (max-width: 760px) {
+    .block-container {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+        padding-top: 0.75rem;
+    }
+    [data-testid="stHorizontalBlock"] {
+        flex-direction: column !important;
+        gap: 0.75rem !important;
+    }
+    [data-testid="column"] {
+        width: 100% !important;
+        flex: 1 1 100% !important;
+        min-width: 100% !important;
+    }
+    .title-card {
+        padding: 18px;
+        border-radius: 24px;
+    }
+    .title-card h1 {
+        font-size: 28px;
+    }
+    [data-testid="stMetric"] {
+        min-height: 92px;
+        padding: 14px;
+    }
+    [data-testid="stMetricValue"] {
+        font-size: 24px !important;
+    }
+    h1 {
+        font-size: 27px !important;
+    }
+    h2, h3 {
+        font-size: 21px !important;
+    }
+    [data-testid="stDataFrame"] {
+        font-size: 13px;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
