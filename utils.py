@@ -3495,7 +3495,8 @@ def format_crowd_index(value):
 
 
 
-def _low_wait_slots(wait_prediction_df, limit=3):
+
+def _attraction_prediction_profiles(wait_prediction_df, limit=5):
     if wait_prediction_df is None or len(wait_prediction_df) == 0:
         return []
     required = {"Attraction", "Hour", "Predicted Wait"}
@@ -3509,10 +3510,20 @@ def _low_wait_slots(wait_prediction_df, limit=3):
 
     rows = []
     for attraction, group in df.groupby("Attraction"):
+        group = group.sort_values("Hour").copy()
         best = group.sort_values("Predicted Wait").head(1)
         worst = group.sort_values("Predicted Wait", ascending=False).head(1)
-        if len(best) == 0:
+        if len(best) == 0 or len(worst) == 0:
             continue
+
+        group["diff"] = group["Predicted Wait"].diff()
+        surge = group.sort_values("diff", ascending=False).head(1)
+        surge_hour = None
+        surge_delta = 0
+        if len(surge) > 0 and not pd.isna(surge.iloc[0].get("diff")):
+            surge_hour = int(surge.iloc[0]["Hour"])
+            surge_delta = float(surge.iloc[0]["diff"])
+
         best_row = best.iloc[0]
         worst_row = worst.iloc[0]
         rows.append({
@@ -3521,10 +3532,16 @@ def _low_wait_slots(wait_prediction_df, limit=3):
             "wait": float(best_row["Predicted Wait"]),
             "peak_hour": int(worst_row["Hour"]),
             "peak_wait": float(worst_row["Predicted Wait"]),
+            "surge_hour": surge_hour,
+            "surge_delta": surge_delta,
+            "range": float(worst_row["Predicted Wait"] - best_row["Predicted Wait"]),
         })
 
-    return sorted(rows, key=lambda x: x["wait"])[:limit]
+    return sorted(rows, key=lambda x: (x["wait"], -x["range"]))[:limit]
 
+
+def _low_wait_slots(wait_prediction_df, limit=3):
+    return _attraction_prediction_profiles(wait_prediction_df, limit=limit)
 
 
 def _short_attraction_name(name):
@@ -3620,25 +3637,34 @@ def make_x_post_summary(
             + _u("\u6642\u9593\u5e2f\u5225\u306e\u8a73\u7d30\u306f\u30c7\u30fc\u30bf\u84c4\u7a4d\u4e2d\u3067\u3059\u3002")
         )
 
-    slots = _low_wait_slots(df, limit=3)
-    if slots:
-        first = slots[0]
-        first_name = _short_attraction_name(first["attraction"])
-        detail_text = (
-            f"{first_name}{_u('\\u306f')}{first['hour']}{_u('\\u6642\\u306b')}{first['wait']:.0f}{_u('\\u5206\\u4e88\\u6e2c\\u3002')}"
-        )
-        if len(slots) > 1:
-            detail_text += _u("\u307b\u304b\u306e\u72d9\u3044\u76ee\u306f")
-            detail_text += _u("\u3001").join([
-                f"{_short_attraction_name(s['attraction'])}{s['hour']}{_u('\\u6642')}{s['wait']:.0f}{_u('\\u5206')}"
-                for s in slots[1:3]
-            ])
-            detail_text += _u("\u3002")
-        detail_text += _u("\u304a\u3059\u3059\u3081\u306f\u5348\u524d\u306b\u4eba\u6c17\u65bd\u8a2d\u30921\u3064\u62bc\u3055\u3048\u3001\u5915\u65b9\u4ee5\u964d\u306b\u4e0b\u304c\u308b\u5019\u88dc\u3092\u62fe\u3046\u52d5\u304d\u3002")
+    profiles = _attraction_prediction_profiles(df, limit=5)
+    if profiles:
+        pick_parts = []
+        for profile in profiles[:4]:
+            pick_parts.append(
+                f"{_short_attraction_name(profile['attraction'])}{profile['hour']}{_u('\\u6642')}{profile['wait']:.0f}{_u('\\u5206')}"
+            )
+        detail_text = _u(r"\u72d9\u3044\u76ee:") + _u(r"\u3001").join(pick_parts) + _u(r"\u3002")
+
+        surge_candidates = [p for p in profiles if p.get("surge_hour") is not None and p.get("surge_delta", 0) >= 10]
+        if surge_candidates:
+            surge = sorted(surge_candidates, key=lambda x: x["surge_delta"], reverse=True)[0]
+            detail_text += (
+                f"{_short_attraction_name(surge['attraction'])}"
+                f"{_u('\\u306f')}{surge['surge_hour']}{_u('\\u6642\\u53f0\\u306b')}{surge['surge_delta']:.0f}"
+                f"{_u('\\u5206\\u307b\\u3069\\u6025\\u306b\\u4f38\\u3073\\u308b\\u50be\\u5411\\u3002')}"
+            )
+        else:
+            peak = sorted(profiles, key=lambda x: x["peak_wait"], reverse=True)[0]
+            detail_text += (
+                f"{_short_attraction_name(peak['attraction'])}"
+                f"{_u('\\u306f\\u30d4\\u30fc\\u30af')}{peak['peak_hour']}{_u('\\u6642\\u53f0')}"
+                f"{peak['peak_wait']:.0f}{_u('\\u5206\\u4e88\\u60f3\\u3002')}"
+            )
     else:
         detail_text = _u("\u30a2\u30c8\u30e9\u30af\u30b7\u30e7\u30f3\u5225\u306e\u8a73\u7d30\u306f\u30c7\u30fc\u30bf\u84c4\u7a4d\u4e2d\u3002\u304a\u3059\u3059\u3081\u306f\u5348\u524d\u306b\u4eba\u6c17\u65bd\u8a2d\u30921\u3064\u62bc\u3055\u3048\u308b\u52d5\u304d\u3002")
 
-    return _truncate_text(overview, 140) + "\n" + _truncate_text(detail_text, 140)
+    return _truncate_text(overview, 150) + "\n" + _truncate_text(detail_text, 170)
 
 def get_crowd_index(avg_wait, max_wait, var_wait, dpa, weather_score, feedback_error, today_bonus):
     crowd_score = (
