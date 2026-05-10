@@ -829,47 +829,52 @@ if display_mode == "ダッシュボード":
                 )
 
 
-        tomorrow_date = datetime.now(JST).date() + timedelta(days=1)
-        tomorrow_ticket_price, _ = get_ticket_price_from_castel(
-            tomorrow_date,
+        x_base_now = datetime.now(JST)
+        x_target_date = (
+            x_base_now.date() + timedelta(days=1)
+            if x_base_now.hour >= 21
+            else x_base_now.date()
+        )
+        x_ticket_price, _ = get_ticket_price_from_castel(
+            x_target_date,
             ticket_price_map
         )
-        tomorrow_temperature, tomorrow_rain, tomorrow_weather_source = get_forecast_weather_for_date(
+        x_temperature, x_rain, x_weather_source = get_forecast_weather_for_date(
             daily_weather,
-            tomorrow_date,
+            x_target_date,
             temperature,
             rain_mm
         )
-        tomorrow_crowd, tomorrow_wait_df, tomorrow_reasons = predict_crowd_index_for_date(
+        x_crowd, x_wait_df, x_reasons = predict_crowd_index_for_date(
             history_df,
             settings,
-            tomorrow_date,
-            tomorrow_temperature,
-            tomorrow_rain,
+            x_target_date,
+            x_temperature,
+            x_rain,
             prediction_history,
             daily_prediction_history,
-            tomorrow_ticket_price,
-            None,
+            x_ticket_price,
+            valid_target_df if x_target_date == x_base_now.date() else None,
             event_signals,
             park_hours_df,
             park
         )
         x_post_text = make_x_post_summary(
             park,
-            tomorrow_date,
-            tomorrow_crowd,
-            tomorrow_wait_df,
-            tomorrow_weather_source,
-            tomorrow_ticket_price,
-            tomorrow_reasons
+            x_target_date,
+            x_crowd,
+            x_wait_df,
+            x_weather_source,
+            x_ticket_price,
+            x_reasons
         )
         st.subheader("📝 21時投稿用 X文面")
         st.text_area(
-            "\u660e\u65e5\u306e\u6295\u7a3f\u6587\uff08\u524d\u534a140\u5b57:\u6982\u8981 / \u5f8c\u534a140\u5b57:\u30a2\u30c8\u30e9\u30af\u30b7\u30e7\u30f3\u8a73\u7d30\uff09",
+            "\u6295\u7a3f\u6587\uff080:00\u301c20:59\u306f\u4eca\u65e5\u300121:00\u4ee5\u964d\u306f\u660e\u65e5\u5206\uff09",
             x_post_text,
             height=130
         )
-        st.caption("\u524d\u534a\u306f\u660e\u65e5\u306e\u5168\u4f53\u6982\u8981\u3001\u5f8c\u534a\u306f\u4f55\u6642\u3054\u308d\u306b\u4f55\u304c\u7a7a\u304d\u305d\u3046\u304b\u3092\u5177\u4f53\u7684\u306a\u5206\u6570\u3064\u304d\u3067\u4f5c\u6210\u3057\u307e\u3059\u3002")
+        st.caption("\u524d\u65e521\u6642\u304b\u3089\u4e88\u6e2c\u65e5\u5f53\u65e520:59\u307e\u3067\u306f\u305d\u306e\u65e5\u306e\u4e88\u6e2c\u300121\u6642\u4ee5\u964d\u306f\u7fcc\u65e5\u4e88\u6e2c\u3092\u4f5c\u6210\u3057\u307e\u3059\u3002")
         st.subheader("予測の注意点")
         st.dataframe(
             get_prediction_alerts(
