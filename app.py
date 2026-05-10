@@ -868,13 +868,15 @@ if display_mode == "ダッシュボード":
             x_ticket_price,
             x_reasons
         )
-        st.subheader("📝 21時投稿用 X文面")
+        st.subheader("\U0001f4dd 21\u6642\u6295\u7a3f\u7528 X\u6587\u9762 v22")
+        st.code(x_post_text, language="text")
         st.text_area(
-            "\u6295\u7a3f\u6587\uff080:00\u301c20:59\u306f\u4eca\u65e5\u300121:00\u4ee5\u964d\u306f\u660e\u65e5\u5206\uff09",
-            x_post_text,
-            height=130
+            "\u6295\u7a3f\u6587\u30b3\u30d4\u30fc\u7528\uff08v22\u30fb\u81ea\u52d5\u66f4\u65b0\uff09",
+            value=x_post_text,
+            height=150,
+            key=f"x_post_text_v22_{park}_{x_target_date}_{format_crowd_index(x_crowd)}"
         )
-        st.caption("v20: \u5929\u6c17\u30fb\u4fa1\u683c\u30fb\u55b6\u696d\u6642\u9593\u306f\u5165\u308c\u305a\u3001\u6df7\u96d1\u6307\u6570\u30fb5\u5927\u5e73\u5747\u30fb\u30d4\u30fc\u30af\u30fb\u500b\u5225\u30a2\u30c8\u30e9\u30af\u30b7\u30e7\u30f3\u4e88\u6e2c\u3092\u51fa\u3057\u307e\u3059\u3002")
+        st.caption("v22: Streamlit\u306e\u53e4\u3044\u5165\u529b\u72b6\u614b\u3092\u907f\u3051\u308b\u305f\u3081\u3001\u4e0a\u306b\u6700\u65b0\u751f\u6210\u6587\u3092\u56fa\u5b9a\u8868\u793a\u3057\u3066\u3044\u307e\u3059\u3002\u5929\u6c17\u30fb\u4fa1\u683c\u30fb\u55b6\u696d\u6642\u9593\u306f\u5165\u308c\u307e\u305b\u3093\u3002")
         st.subheader("予測の注意点")
         st.dataframe(
             get_prediction_alerts(
