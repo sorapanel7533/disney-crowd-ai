@@ -1,1099 +1,764 @@
-import random
-import time
+import re
+import sqlite3
 from datetime import datetime, timedelta
+from html import unescape
 from zoneinfo import ZoneInfo
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import streamlit as st
-from sklearn.linear_model import LinearRegression
+import requests
 
-from utils import (
-    GLOBAL_PREDICTION_NAME,
-    PARK_SETTINGS,
-    connect_db,
-    fetch_castel_ticket_prices,
-    fetch_wait_times,
-    get_calendar_bonus,
-    get_crowd_index,
-    get_current_stats,
-    get_dpa_score,
-    get_feedback_error,
-    get_level,
-    get_ticket_price_from_castel,
-    get_today_stats,
-    get_valid_open_df,
-    get_weather,
-    get_weather_score,
-    load_history,
-    load_prediction_history,
-    make_action_advice,
-    predict_dpa_risk,
-    save_prediction_rows,
-    save_wait_times,
-    update_prediction_feedback,
-)
+try:
+    import jpholiday
+except ImportError:
+    jpholiday = None
 
 JST = ZoneInfo("Asia/Tokyo")
-
 OPEN_HOUR = 9
 CROWD_END_HOUR = 21
 
-st.set_page_config(
-    page_title="ディズニー混雑AI",
-    page_icon="🏰",
-    layout="wide"
-)
+PARK_SETTINGS = {
+    "DisneySea": {
+        "url": "https://queue-times.com/parks/275/queue_times.json",
+        "db": "disneysea.db",
+        "rides": [
+            "Journey to the Center of the Earth",
+            "Tower of Terror",
+            "Anna and Elsa's Frozen Journey",
+            "Soaring: Fantastic Flight",
+            "Toy Story Mania!"
+        ]
+    },
+    "Disneyland": {
+        "url": "https://queue-times.com/parks/274/queue_times.json",
+        "db": "disneyland.db",
+        "rides": [
+            "Enchanted Tale of Beauty and the Beast",
+            "The Happy Ride with Baymax",
+            "Monsters, Inc. Ride & Go Seek!",
+            "Pooh's Hunny Hunt",
+            "Splash Mountain"
+        ]
+    }
+}
 
-st.markdown("""
-<style>
-.stApp {
-    background-color: #0f1117;
-}
-.block-container {
-    padding-top: 2rem;
-}
-h1, h2, h3, h4, p, label {
-    color: #f5f7ff !important;
-}
-[data-testid="stMetric"] {
-    background-color: #1c1f2b;
-    border: 1px solid #3b4260;
-    padding: 18px;
-    border-radius: 18px;
-}
-[data-testid="stMetricLabel"] {
-    color: #e2e8ff !important;
-}
-[data-testid="stMetricValue"] {
-    color: #ffffff !important;
-}
-.title-card {
-    background: linear-gradient(135deg, #143b6d, #1f6feb);
-    padding: 28px;
-    border-radius: 22px;
-    margin-bottom: 18px;
-    border: 1px solid #6aa4ff;
-    box-shadow: 0 8px 28px rgba(0,0,0,0.5);
-}
-.title-card h1 {
-    color: #ffffff !important;
-    font-size: 42px;
-    margin-bottom: 8px;
-    text-shadow: 0 3px 12px rgba(0,0,0,0.7);
-}
-.title-card p {
-    color: #eef5ff !important;
-    font-size: 18px;
-    margin: 0;
-}
-.card {
-    background: linear-gradient(135deg,#1c1f2b,#252b3f);
-    padding: 20px;
-    border-radius: 18px;
-    margin-bottom: 16px;
-    border: 1px solid #3b4260;
-}
-.rank-card {
-    background-color: #161a27;
-    padding: 14px;
-    border-radius: 14px;
-    margin-bottom: 10px;
-    border-left: 5px solid #4ade80;
-    color: #ffffff;
-}
-.advice-card {
-    background: linear-gradient(135deg,#10243d,#193b63);
-    padding: 18px;
-    border-radius: 16px;
-    margin-bottom: 10px;
-    border-left: 6px solid #60a5fa;
-    color: #ffffff;
-}
-div[data-baseweb="select"] {
-    background: linear-gradient(135deg, #182033, #202b44) !important;
-    border-radius: 16px !important;
-    border: 1px solid #4b63a0 !important;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
-}
-div[data-baseweb="select"] span {
-    color: white !important;
-    font-weight: 600 !important;
-}
-div[data-baseweb="select"] svg {
-    color: #93c5fd !important;
-}
-div[data-baseweb="popover"] {
-    background-color: #1c1f2b !important;
-    border-radius: 14px !important;
-}
-div[role="option"] {
-    color: white !important;
-    background-color: #1c1f2b !important;
-}
-div[role="option"]:hover {
-    background-color: #2b3a5c !important;
-}
-thead tr th {
-    color: white !important;
-}
-tbody tr td {
-    color: white !important;
-}
-</style>
-""", unsafe_allow_html=True)
+CASTEL_TICKET_URL = "https://castel.jp/p/7339"
+GLOBAL_PREDICTION_NAME = "__ALL__"
 
 
-def graph_ylim(values):
-    if len(values) == 0:
-        return 200
-
-    max_value = max(values)
-
-    if pd.isna(max_value):
-        return 200
-
-    if max_value > 200:
-        return int(max_value + 50)
-
-    return 200
+def is_crowd_hour(dt):
+    return OPEN_HOUR <= dt.hour < CROWD_END_HOUR
 
 
-def filter_crowd_hours(df):
-    if len(df) == 0 or "hour" not in df.columns:
+def is_japanese_holiday(d):
+    if jpholiday is None:
+        return False
+
+    return jpholiday.is_holiday(d)
+
+
+def filter_crowd_history(df):
+    if len(df) == 0:
         return df
 
-    return df[
-        (df["hour"] >= OPEN_HOUR)
+    filtered_df = df.copy()
+
+    if "hour" not in filtered_df.columns and "datetime" in filtered_df.columns:
+        filtered_df["hour"] = pd.to_datetime(filtered_df["datetime"]).dt.hour
+
+    if "hour" not in filtered_df.columns:
+        return filtered_df
+
+    return filtered_df[
+        (filtered_df["hour"] >= OPEN_HOUR)
         &
-        (df["hour"] < CROWD_END_HOUR)
+        (filtered_df["hour"] < CROWD_END_HOUR)
     ].copy()
 
 
-def make_week_forecast(base_crowd):
-    week_rows = []
+def connect_db(db_name):
+    conn = sqlite3.connect(db_name, check_same_thread=False)
+    cursor = conn.cursor()
 
-    for i in range(7):
-        d = datetime.now(JST) + timedelta(days=i)
-        pred = base_crowd
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS wait_times (
+        datetime TEXT,
+        attraction TEXT,
+        wait_time INTEGER,
+        temperature REAL,
+        rain REAL
+    )
+    """)
 
-        weekday = d.weekday()
-        month = d.month
-        day = d.day
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS predictions (
+        created_at TEXT,
+        target_hour INTEGER,
+        predicted_wait REAL,
+        actual_wait REAL,
+        error REAL
+    )
+    """)
 
-        if weekday >= 5:
-            pred += 2
-        elif weekday == 4:
-            pred += 1
+    conn.commit()
 
-        if month == 3 and day >= 20:
-            pred += 2
+    cursor.execute("PRAGMA table_info(predictions)")
+    columns = [row[1] for row in cursor.fetchall()]
 
-        if (month == 4 and day >= 27) or (month == 5 and day <= 6):
-            pred += 3
+    if "attraction" not in columns:
+        cursor.execute("ALTER TABLE predictions ADD COLUMN attraction TEXT")
+        cursor.execute("""
+        UPDATE predictions
+        SET attraction = ?
+        WHERE attraction IS NULL
+        """, (GLOBAL_PREDICTION_NAME,))
+        conn.commit()
 
-        if (month == 7 and day >= 20) or month == 8:
-            pred += 3
+    return conn, cursor
 
-        if month == 10:
-            pred += 3
 
-        if month == 12 and day <= 25:
-            pred += 3
+def get_weather():
+    try:
+        weather_url = (
+            "https://api.open-meteo.com/v1/forecast"
+            "?latitude=35.6329"
+            "&longitude=139.8804"
+            "&current=temperature_2m,precipitation,weather_code"
+            "&hourly=temperature_2m,precipitation"
+            "&daily=temperature_2m_max,precipitation_sum"
+            "&timezone=Asia%2FTokyo"
+        )
 
-        if (month == 12 and day >= 26) or (month == 1 and day <= 5):
-            pred += 4
+        res = requests.get(weather_url, timeout=5)
+        data = res.json()
 
-        pred += random.randint(-1, 1)
-        pred = max(1, min(10, pred))
+        current = data["current"]
+        hourly = pd.DataFrame(data.get("hourly", {}))
+        daily = pd.DataFrame(data.get("daily", {}))
 
-        week_rows.append({
-            "Date": d.strftime("%m/%d"),
-            "Crowd Index": pred
+        if len(hourly) > 0 and "time" in hourly.columns:
+            hourly["time"] = pd.to_datetime(hourly["time"])
+
+        if len(daily) > 0 and "time" in daily.columns:
+            daily["time"] = pd.to_datetime(daily["time"])
+
+        temp = current.get("temperature_2m", 0)
+        rain = current.get("precipitation", 0)
+        code = current.get("weather_code", 0)
+
+        if rain > 0:
+            weather_text = "雨"
+        elif code in [0, 1]:
+            weather_text = "晴れ"
+        elif code in [2, 3]:
+            weather_text = "くもり"
+        else:
+            weather_text = "その他"
+
+        return temp, rain, weather_text, hourly, daily
+
+    except Exception:
+        return 0, 0, "取得失敗", pd.DataFrame(), pd.DataFrame()
+
+
+def fetch_wait_times(settings):
+    response = requests.get(
+        settings["url"],
+        headers={"User-Agent": "Mozilla/5.0"},
+        timeout=10
+    )
+
+    data = response.json()
+
+    all_results = []
+
+    for ride in data["rides"]:
+        all_results.append({
+            "Attraction": ride["name"],
+            "Wait": ride["wait_time"],
+            "Open": ride["is_open"]
         })
 
-    return pd.DataFrame(week_rows)
+    all_df = pd.DataFrame(all_results)
+
+    target_df = all_df[
+        all_df["Attraction"].isin(settings["rides"])
+    ].copy()
+
+    return all_df, target_df
 
 
-now_display = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
+def get_valid_open_df(df):
+    if df.empty:
+        return df
 
-st.markdown(f"""
-<div class="title-card">
-<h1>🏰 ディズニー混雑AI</h1>
-<p>東京ディズニーリゾート混雑分析システム</p>
-<p>最終更新: {now_display}（日本時間）</p>
-</div>
-""", unsafe_allow_html=True)
+    return df[
+        (df["Open"] == True)
+        &
+        (df["Wait"] > 0)
+    ].copy()
 
-park = st.selectbox(
-    "🏰 パークを選択",
-    ["DisneySea", "Disneyland"]
-)
 
-settings = PARK_SETTINGS[park]
+def fetch_castel_ticket_prices():
+    try:
+        res = requests.get(
+            CASTEL_TICKET_URL,
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=10
+        )
 
-display_mode = st.selectbox(
-    "🧭 表示モードを選択",
-    [
-        "ダッシュボード",
-        "全アトラクション",
-        "アトラクション別予測",
-        "DPA売切れ予測",
-        "データ管理"
+        html = res.text
+        plain = re.sub(r"<[^>]+>", "\n", html)
+        plain = unescape(plain)
+        plain = re.sub(r"\r", "\n", plain)
+
+        if "ディズニーチケット価格カレンダー(月曜始まり)" in plain:
+            plain = plain.split("ディズニーチケット価格カレンダー(月曜始まり)")[0]
+
+        lines = [x.strip() for x in plain.split("\n") if x.strip()]
+
+        prices = {}
+        current_year = None
+        current_month = None
+        pending_day = None
+
+        for line in lines:
+            month_match = re.search(
+                r"(\d{4})年\s*(\d{1,2})月\s*ディズニーチケット価格表",
+                line
+            )
+
+            if month_match:
+                current_year = int(month_match.group(1))
+                current_month = int(month_match.group(2))
+                pending_day = None
+                continue
+
+            if current_year is None or current_month is None:
+                continue
+
+            day_match = re.match(r"^(\d{1,2})(?:\s|$)", line)
+
+            if day_match:
+                day = int(day_match.group(1))
+                if 1 <= day <= 31:
+                    pending_day = day
+                continue
+
+            price_match = re.match(r"^(7900|8400|8900|9400|9900|10900)$", line)
+
+            if price_match and pending_day is not None:
+                price = int(price_match.group(1))
+
+                try:
+                    d = datetime(current_year, current_month, pending_day).date()
+                    prices[d] = price
+                except ValueError:
+                    pass
+
+                pending_day = None
+
+        return prices, "Castelから取得"
+
+    except Exception:
+        return {}, "取得失敗"
+
+
+def get_ticket_price_from_castel(target_date, price_map):
+    d = target_date.date() if isinstance(target_date, datetime) else target_date
+
+    if d in price_map:
+        return price_map[d], "Castelから取得"
+
+    return None, "価格未掲載"
+
+
+def get_ticket_bonus(price):
+    bonus = 0
+    reasons = []
+
+    if price is None:
+        reasons.append("チケット価格未取得")
+        return bonus, reasons
+
+    if price >= 10900:
+        bonus += 4
+        reasons.append("最高価格帯")
+    elif price >= 9900:
+        bonus += 3
+        reasons.append("高価格帯")
+    elif price >= 8900:
+        bonus += 2
+        reasons.append("やや高価格帯")
+    elif price >= 8400:
+        bonus += 1
+        reasons.append("中価格帯")
+    else:
+        reasons.append("低価格帯")
+
+    return bonus, reasons
+
+
+def get_calendar_bonus(target_date, price):
+    bonus = 0
+    reasons = []
+
+    d = target_date.date() if isinstance(target_date, datetime) else target_date
+    month = d.month
+    day = d.day
+    weekday = d.weekday()
+
+    if weekday >= 5:
+        bonus += 2
+        reasons.append("土日")
+
+    if is_japanese_holiday(d):
+        bonus += 2
+        reasons.append("祝日")
+    elif jpholiday is None:
+        reasons.append("祝日判定なし")
+
+    tomorrow = d + timedelta(days=1)
+
+    if is_japanese_holiday(tomorrow):
+        bonus += 1
+        reasons.append("祝前日")
+
+    if month == 3 and day >= 20:
+        bonus += 3
+        reasons.append("春休み")
+
+    if month == 4 and day <= 7:
+        bonus += 2
+        reasons.append("春休み")
+
+    if (month == 4 and day >= 27) or (month == 5 and day <= 6):
+        bonus += 3
+        reasons.append("GW")
+
+    if (month == 7 and day >= 20) or month == 8:
+        bonus += 3
+        reasons.append("夏休み")
+
+    if month == 8 and 10 <= day <= 18:
+        bonus += 2
+        reasons.append("お盆")
+
+    if month == 9 and day >= 15:
+        bonus += 1
+        reasons.append("ハロウィン前半")
+
+    if month == 10:
+        bonus += 3
+        reasons.append("ハロウィン")
+
+    if month == 11 and day >= 8:
+        bonus += 1
+        reasons.append("クリスマス前半")
+
+    if month == 12 and day <= 25:
+        bonus += 3
+        reasons.append("クリスマス")
+
+    if month == 12 and day >= 26:
+        bonus += 4
+        reasons.append("年末")
+
+    if month == 1 and day <= 5:
+        bonus += 4
+        reasons.append("年始")
+
+    ticket_bonus, ticket_reasons = get_ticket_bonus(price)
+    bonus += ticket_bonus
+    reasons.extend(ticket_reasons)
+
+    return bonus, reasons
+
+
+def load_history(conn):
+    history_df = pd.read_sql_query(
+        "SELECT * FROM wait_times",
+        conn
+    )
+
+    if len(history_df) > 0:
+        history_df["datetime"] = pd.to_datetime(history_df["datetime"])
+        history_df["hour"] = history_df["datetime"].dt.hour
+        history_df["date"] = history_df["datetime"].dt.date
+
+    return history_df
+
+
+def load_prediction_history(conn):
+    prediction_df = pd.read_sql_query(
+        "SELECT * FROM predictions",
+        conn
+    )
+
+    if len(prediction_df) > 0:
+        prediction_df["created_at"] = pd.to_datetime(prediction_df["created_at"])
+
+        if "attraction" not in prediction_df.columns:
+            prediction_df["attraction"] = GLOBAL_PREDICTION_NAME
+
+        prediction_df["attraction"] = prediction_df["attraction"].fillna(
+            GLOBAL_PREDICTION_NAME
+        )
+
+    return prediction_df
+
+
+def save_wait_times(cursor, conn, valid_open_df, temperature, rain_mm):
+    now = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
+
+    if len(valid_open_df) > 0:
+        for _, row in valid_open_df.iterrows():
+            cursor.execute("""
+            INSERT INTO wait_times
+            VALUES (?, ?, ?, ?, ?)
+            """, (
+                now,
+                row["Attraction"],
+                row["Wait"],
+                temperature,
+                rain_mm
+            ))
+
+        conn.commit()
+
+
+def save_prediction_rows(cursor, conn, pred_df, attraction_name):
+    created_at = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
+
+    for _, row in pred_df.iterrows():
+        cursor.execute("""
+        INSERT INTO predictions
+        (
+            created_at,
+            target_hour,
+            predicted_wait,
+            actual_wait,
+            error,
+            attraction
+        )
+        VALUES (?, ?, ?, NULL, NULL, ?)
+        """, (
+            created_at,
+            int(row["Hour"]),
+            float(row["Predicted Wait"]),
+            attraction_name
+        ))
+
+    conn.commit()
+
+
+def update_prediction_feedback(cursor, conn, valid_open_df, avg_wait):
+    now = datetime.now(JST)
+    now_hour = now.hour
+
+    if not is_crowd_hour(now):
+        return
+
+    if len(valid_open_df) == 0:
+        return
+
+    actual_now = float(avg_wait)
+    today_prefix = now.strftime("%Y-%m-%d")
+
+    cursor.execute("""
+    UPDATE predictions
+    SET actual_wait = ?,
+        error = ? - predicted_wait
+    WHERE target_hour = ?
+    AND actual_wait IS NULL
+    AND attraction = ?
+    AND created_at LIKE ?
+    """, (
+        actual_now,
+        actual_now,
+        now_hour,
+        GLOBAL_PREDICTION_NAME,
+        f"{today_prefix}%"
+    ))
+
+    for _, row in valid_open_df.iterrows():
+        attraction = row["Attraction"]
+        actual_wait = float(row["Wait"])
+
+        cursor.execute("""
+        UPDATE predictions
+        SET actual_wait = ?,
+            error = ? - predicted_wait
+        WHERE target_hour = ?
+        AND actual_wait IS NULL
+        AND attraction = ?
+        AND created_at LIKE ?
+        """, (
+            actual_wait,
+            actual_wait,
+            now_hour,
+            attraction,
+            f"{today_prefix}%"
+        ))
+
+    conn.commit()
+
+
+def get_feedback_error(prediction_history, attraction_name=GLOBAL_PREDICTION_NAME):
+    if len(prediction_history) == 0:
+        return 0
+
+    if "attraction" not in prediction_history.columns:
+        return 0
+
+    if "error" not in prediction_history.columns:
+        return 0
+
+    error_df = prediction_history[
+        (prediction_history["attraction"] == attraction_name)
+        &
+        (prediction_history["error"].notna())
     ]
-)
 
-ticket_price_map, ticket_map_source = fetch_castel_ticket_prices()
+    if len(error_df) > 0:
+        return error_df["error"].tail(30).mean()
 
-ticket_price, ticket_source = get_ticket_price_from_castel(
-    datetime.now(JST),
-    ticket_price_map
-)
+    return 0
 
-today_bonus, today_reasons = get_calendar_bonus(
-    datetime.now(JST),
-    ticket_price
-)
 
-temperature, rain_mm, weather_text, hourly_weather, daily_weather = get_weather()
+def get_current_stats(valid_open_df):
+    if len(valid_open_df) > 0:
+        avg_wait = valid_open_df["Wait"].mean()
+        max_wait = valid_open_df["Wait"].max()
+        var_wait = valid_open_df["Wait"].var()
+    else:
+        avg_wait = 0
+        max_wait = 0
+        var_wait = 0
 
-conn, cursor = connect_db(settings["db"])
+    if pd.isna(var_wait):
+        var_wait = 0
 
-try:
-    all_df, target_df = fetch_wait_times(settings)
+    return avg_wait, max_wait, var_wait
 
-except Exception:
-    st.error("待ち時間データ取得失敗")
-    st.stop()
 
-if all_df.empty:
-    st.error("アトラクションのデータが取得できませんでした")
-    st.stop()
+def get_today_stats(history_df, valid_open_df):
+    today = datetime.now(JST).date()
+    history_df = filter_crowd_history(history_df)
 
-valid_all_df = get_valid_open_df(all_df)
-valid_target_df = get_valid_open_df(target_df)
+    if len(history_df) > 0 and "date" in history_df.columns:
+        today_df = history_df[
+            (history_df["date"] == today)
+            &
+            (history_df["wait_time"] > 0)
+        ].copy()
+    else:
+        today_df = pd.DataFrame()
 
-history_df = load_history(conn)
+    if len(today_df) > 0:
+        avg_wait = today_df["wait_time"].mean()
+        max_wait = today_df["wait_time"].max()
+        var_wait = today_df["wait_time"].var()
+        source = "今日9:00以降〜現在までの5大アトラクション平均"
+    elif len(valid_open_df) > 0:
+        avg_wait = valid_open_df["Wait"].mean()
+        max_wait = valid_open_df["Wait"].max()
+        var_wait = valid_open_df["Wait"].var()
+        source = "現在の営業中5大アトラクションデータ"
+    else:
+        avg_wait = 0
+        max_wait = 0
+        var_wait = 0
+        source = "有効データなし"
 
-current_avg_wait, current_max_wait, current_var_wait = get_current_stats(valid_all_df)
+    if pd.isna(var_wait):
+        var_wait = 0
 
-target_history_df = history_df[
-    history_df["attraction"].isin(settings["rides"])
-].copy() if len(history_df) > 0 else history_df
+    return avg_wait, max_wait, var_wait, source
 
-target_history_df = filter_crowd_hours(target_history_df)
 
-avg_wait, max_wait, var_wait, crowd_source = get_today_stats(
-    target_history_df,
-    valid_target_df
-)
+def get_prediction_gap_summary(prediction_history):
+    if len(prediction_history) == 0:
+        return pd.DataFrame([
+            {
+                "理由": "予測データがまだ保存されていません",
+                "件数": 0,
+                "説明": "アプリを営業中に起動して予測を作成すると、次回以降に誤差を記録できます。"
+            }
+        ])
 
-if len(valid_all_df) == 0:
-    st.warning("現在は営業中の有効な待ち時間データがありません。")
+    pending_df = prediction_history[
+        prediction_history["error"].isna()
+    ].copy()
 
-prediction_history = load_prediction_history(conn)
+    if len(pending_df) == 0:
+        return pd.DataFrame([
+            {
+                "理由": "未採点の予測はありません",
+                "件数": 0,
+                "説明": "保存済みの予測には実測値が入り、誤差データが作成されています。"
+            }
+        ])
 
-global_feedback_error = get_feedback_error(
-    prediction_history,
-    GLOBAL_PREDICTION_NAME
-)
+    now = datetime.now(JST)
+    pending_df["created_date"] = pending_df["created_at"].dt.date
 
-update_prediction_feedback(
-    cursor,
-    conn,
+    def classify(row):
+        target_hour = int(row["target_hour"])
+
+        if target_hour < OPEN_HOUR or target_hour >= CROWD_END_HOUR:
+            return "21:00〜翌9:00は混雑指数・誤差更新の対象外"
+
+        if row["created_at"].date() == now.date() and target_hour > now.hour:
+            return "対象時刻がまだ来ていない"
+
+        if row["created_at"].date() == now.date() and target_hour == now.hour:
+            return "現在時刻の実測待ち時間がまだ保存されていない"
+
+        return "対象時刻に営業中の有効な待ち時間データがなかった"
+
+    pending_df["理由"] = pending_df.apply(classify, axis=1)
+
+    summary = pending_df.groupby(["created_date", "理由"]).size().reset_index(name="件数")
+    summary = summary.rename(columns={"created_date": "予測日"})
+    summary["説明"] = summary["理由"].map({
+        "21:00〜翌9:00は混雑指数・誤差更新の対象外": "夜間データは仕様により混雑指数にも予測誤差にも使いません。",
+        "対象時刻がまだ来ていない": "未来の予測なので、対象時刻になってから実測値と照合します。",
+        "現在時刻の実測待ち時間がまだ保存されていない": "アプリの更新タイミングで実測値が入ると誤差を計算します。",
+        "対象時刻に営業中の有効な待ち時間データがなかった": "休止、閉園、通信失敗、または待ち時間0分などで比較できる実測値がありませんでした。"
+    })
+
+    return summary
+
+
+def get_weather_score(weather_text, rain_mm, temperature):
+    score = 0
+
+    if rain_mm > 0:
+        score -= 1
+
+    if temperature >= 30:
+        score -= 1
+
+    if weather_text == "晴れ":
+        score += 1
+
+    return score
+
+
+def get_dpa_score(avg_wait, max_wait):
+    score = 0
+
+    if max_wait >= 180:
+        score += 2
+
+    if avg_wait >= 120:
+        score += 2
+
+    return score
+
+
+def get_crowd_index(avg_wait, max_wait, var_wait, dpa, weather_score, feedback_error, today_bonus):
+    crowd_score = (
+        avg_wait * 0.45
+        + max_wait * 0.35
+        + np.sqrt(var_wait) * 0.1
+        + dpa * 20
+        + weather_score * 5
+        + feedback_error
+        + today_bonus * 8
+    )
+
+    return int(min(10, max(1, round(crowd_score / 25))))
+
+
+def get_level(crowd_10):
+    if crowd_10 >= 9:
+        return "🔴 超混雑", "red"
+    elif crowd_10 >= 6:
+        return "🟠 混雑", "orange"
+    elif crowd_10 >= 3:
+        return "🟡 普通", "gold"
+    else:
+        return "🟢 空いている", "#4ade80"
+
+
+def make_action_advice(
+    crowd_10,
     valid_all_df,
-    current_avg_wait
-)
-
-prediction_history = load_prediction_history(conn)
-
-global_feedback_error = get_feedback_error(
-    prediction_history,
-    GLOBAL_PREDICTION_NAME
-)
-
-dpa = get_dpa_score(avg_wait, max_wait)
-
-weather_score = get_weather_score(
+    valid_target_df,
+    relative_rows,
+    ticket_price,
     weather_text,
     rain_mm,
-    temperature
-)
+):
+    advice = []
 
-crowd_10 = get_crowd_index(
-    avg_wait,
-    max_wait,
-    var_wait,
-    dpa,
-    weather_score,
-    global_feedback_error,
-    today_bonus
-)
-
-relative_rows = []
-
-if len(valid_all_df) > 0 and len(history_df) > 20:
-
-    now_hour = datetime.now(JST).hour
-
-    hist_same_hour = history_df[
-        (history_df["hour"] == now_hour)
-        &
-        (history_df["wait_time"] > 0)
-    ]
-
-    historical_avg = hist_same_hour.groupby(
-        "attraction"
-    )["wait_time"].mean()
-
-    for _, row in valid_all_df.iterrows():
-
-        name = row["Attraction"]
-        wait = row["Wait"]
-
-        if name in historical_avg.index and historical_avg[name] > 0:
-
-            past_avg = historical_avg[name]
-            ratio = wait / past_avg
-
-            relative_rows.append({
-                "name": name,
-                "wait": wait,
-                "avg": round(past_avg, 1),
-                "ratio": round(ratio, 2)
-            })
-
-    relative_rows = sorted(
-        relative_rows,
-        key=lambda x: x["ratio"]
-    )
-
-save_wait_times(
-    cursor,
-    conn,
-    valid_all_df,
-    temperature,
-    rain_mm
-)
-
-history_df = load_history(conn)
-
-if display_mode == "ダッシュボード":
-
-    st.subheader("🌤 現在の天気")
-
-    w1, w2, w3 = st.columns(3)
-
-    with w1:
-        st.metric("天気", weather_text)
-
-    with w2:
-        st.metric("気温", f"{temperature}℃")
-
-    with w3:
-        st.metric("降水量", f"{rain_mm}mm")
-
-    st.subheader("📅 需要補正")
-
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-        st.metric(
-            "チケット価格",
-            "取得不可" if ticket_price is None else f"{ticket_price}円"
-        )
-
-    with c2:
-        st.metric("取得元", ticket_source)
-
-    with c3:
-        st.metric("補正値", today_bonus)
-
-    if len(today_reasons) > 0:
-        st.write("補正理由:", " / ".join(today_reasons))
-
-    st.subheader("🧭 今日のおすすめ行動")
-
-    advice_list = make_action_advice(
-        crowd_10,
-        valid_all_df,
-        valid_target_df,
-        relative_rows,
-        ticket_price,
-        weather_text,
-        rain_mm
-    )
-
-    for advice in advice_list:
-
-        st.markdown(
-            f"""
-            <div class="advice-card">
-            {advice}
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    st.subheader("🎢 5大アトラクション")
-
-    display_df = target_df.copy()
-
-    display_df["Status"] = display_df["Open"].apply(
-        lambda x: "🟢 OPEN" if x else "⚫ CLOSED"
-    )
-
-    st.dataframe(
-        display_df[
-            ["Attraction", "Wait", "Status"]
-        ],
-        use_container_width=True
-    )
-
-    st.subheader("🟢 相対的に空いている")
+    if len(valid_all_df) == 0:
+        advice.append("現在、営業中の有効な待ち時間データがありません。閉園後の可能性があります。")
+        return advice
 
     if len(relative_rows) > 0:
-
-        for r in relative_rows[:5]:
-
-            st.markdown(
-                f"""
-                <div class="rank-card">
-                <b>{r['name']}</b><br>
-                現在 {r['wait']}分<br>
-                同時間帯平均 {r['avg']}分<br>
-                相対値 {r['ratio']}
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
-    m1, m2, m3, m4 = st.columns(4)
-
-    with m1:
-        st.metric("5大平均待ち時間", round(avg_wait, 1))
-
-    with m2:
-        st.metric("5大最大待ち時間", round(max_wait, 1))
-
-    with m3:
-        st.metric("混雑指数", crowd_10)
-
-    with m4:
-        st.metric("5大予測補正", round(global_feedback_error, 1))
-
-    st.caption(
-        "混雑指数は5大アトラクションのみを対象に、9:00〜20:59までの今日の保存データ平均から算出しています。"
-    )
-
-    level, color = get_level(crowd_10)
-
-    st.markdown(
-        f"""
-        <div class="card">
-        <h1 style='color:{color};'>
-        {level}
-        </h1>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.subheader("🤖 5大アトラクションの予想平均待ち時間")
-
-    target_model_df = history_df[
-        history_df["attraction"].isin(settings["rides"])
-    ].copy() if len(history_df) > 0 else history_df
-
-    target_model_df = filter_crowd_hours(target_model_df)
-
-    if len(target_model_df) > 20:
-        model_df = target_model_df[
-            target_model_df["wait_time"] > 0
-        ]
-
-        if len(model_df) > 20:
-            X = pd.DataFrame({
-                "hour": model_df["hour"],
-                "hour2": model_df["hour"] ** 2,
-                "temperature": model_df["temperature"],
-                "rain": model_df["rain"]
-            })
-
-            y = model_df["wait_time"]
-
-            model = LinearRegression()
-            model.fit(X, y)
-
-            future_hours = list(range(OPEN_HOUR, CROWD_END_HOUR))
-
-            future = pd.DataFrame({
-                "hour": future_hours
-            })
-
-            future["hour2"] = future["hour"] ** 2
-            future["temperature"] = temperature
-            future["rain"] = rain_mm
-
-            pred = model.predict(future)
-
-            pred = pred + global_feedback_error
-            pred = pred + today_bonus * 5
-
-            pred = np.clip(pred, 0, None)
-
-            pred_df = pd.DataFrame({
-                "Hour": future_hours,
-                "5大予想平均待ち時間": pred
-            })
-
-            save_df = pred_df.rename(
-                columns={
-                    "5大予想平均待ち時間": "Predicted Wait"
-                }
-            )
-
-            save_prediction_rows(
-                cursor,
-                conn,
-                save_df,
-                GLOBAL_PREDICTION_NAME
-            )
-
-            st.dataframe(
-                pred_df,
-                use_container_width=True
-            )
-
-            fig, ax = plt.subplots(figsize=(10, 5))
-
-            ax.plot(
-                pred_df["Hour"],
-                pred_df["5大予想平均待ち時間"],
-                marker="o"
-            )
-
-            ax.set_ylim(
-                0,
-                graph_ylim(pred_df["5大予想平均待ち時間"].tolist())
-            )
-
-            ax.set_ylabel("Predicted Wait")
-            ax.set_title(f"{park} Major Attractions Average Prediction")
-
-            st.pyplot(fig)
+        best = relative_rows[0]
+        advice.append(
+            f"今は **{best['name']}** が相対的におすすめです。現在{best['wait']}分で、同時間帯平均より低めです。"
+        )
     else:
-        st.info("5大アトラクション平均予測には、9:00〜20:59の履歴データがもう少し必要です。")
-
-    st.subheader("📅 1週間混雑指数予測")
-
-    week_df = make_week_forecast(crowd_10)
-
-    st.dataframe(
-        week_df,
-        use_container_width=True
-    )
-
-    fig_week, ax_week = plt.subplots(figsize=(10, 4))
-
-    ax_week.plot(
-        week_df["Date"],
-        week_df["Crowd Index"],
-        marker="o"
-    )
-
-    ax_week.set_ylim(0, 10)
-    ax_week.set_ylabel("Crowd Index")
-    ax_week.set_title(f"{park} 1 Week Crowd Forecast")
-
-    st.pyplot(fig_week)
-
-elif display_mode == "全アトラクション":
-
-    st.subheader("🎡 全アトラクション待ち時間")
-
-    all_display = all_df.copy()
-
-    all_display["Status"] = all_display["Open"].apply(
-        lambda x: "🟢 OPEN" if x else "⚫ CLOSED"
-    )
-
-    all_display = all_display.sort_values(
-        ["Open", "Wait"],
-        ascending=[False, True]
-    )
-
-    st.dataframe(
-        all_display[
-            ["Attraction", "Wait", "Status"]
-        ],
-        use_container_width=True
-    )
-
-    st.subheader("📈 アトラクション別 履歴グラフ")
-
-    all_attraction_list = sorted(
-        all_df["Attraction"].unique()
-    )
-
-    selected_history_attraction = st.selectbox(
-        "🎢 グラフで見るアトラクションを選択",
-        all_attraction_list
-    )
-
-    graph_mode = st.selectbox(
-        "📊 グラフの種類を選択",
-        [
-            "保存データそのまま",
-            "日付ごとの平均",
-            "時間帯ごとの平均"
-        ]
-    )
-
-    if len(history_df) > 0:
-
-        one_history = history_df[
-            history_df["attraction"]
-            == selected_history_attraction
-        ].copy()
-
-        one_history = one_history[
-            one_history["wait_time"] > 0
-        ]
-
-        one_history = one_history.sort_values(
-            "datetime"
+        sorted_df = valid_all_df.sort_values("Wait")
+        best_row = sorted_df.iloc[0]
+        advice.append(
+            f"今すぐ軽く乗るなら **{best_row['Attraction']}** が候補です。現在{best_row['Wait']}分です。"
         )
 
-        if len(one_history) > 0:
-
-            st.write(
-                f"表示中: {selected_history_attraction}"
-            )
-
-            fig, ax = plt.subplots(
-                figsize=(12, 5)
-            )
-
-            if graph_mode == "保存データそのまま":
-
-                ax.plot(
-                    one_history["datetime"],
-                    one_history["wait_time"],
-                    marker="o"
-                )
-
-                ax.set_xlabel("Time")
-                ax.set_title(
-                    f"{selected_history_attraction} Wait Time History"
-                )
-
-                plt.xticks(
-                    rotation=30,
-                    ha="right"
-                )
-
-                y_values = one_history["wait_time"].tolist()
-
-            elif graph_mode == "日付ごとの平均":
-
-                one_history["date"] = one_history["datetime"].dt.date
-
-                daily_avg = one_history.groupby(
-                    "date"
-                )["wait_time"].mean().reset_index()
-
-                daily_avg["date_label"] = pd.to_datetime(
-                    daily_avg["date"]
-                ).dt.strftime("%m/%d")
-
-                ax.plot(
-                    daily_avg["date_label"],
-                    daily_avg["wait_time"],
-                    marker="o"
-                )
-
-                ax.set_xlabel("Date")
-                ax.set_title(
-                    f"{selected_history_attraction} Daily Average Wait"
-                )
-
-                plt.xticks(
-                    rotation=0,
-                    ha="center"
-                )
-
-                y_values = daily_avg["wait_time"].tolist()
-
-            else:
-
-                hourly_avg = one_history.groupby(
-                    "hour"
-                )["wait_time"].mean().reset_index()
-
-                hourly_avg = hourly_avg[
-                    (hourly_avg["hour"] >= OPEN_HOUR)
-                    &
-                    (hourly_avg["hour"] < CROWD_END_HOUR)
-                ]
-
-                ax.plot(
-                    hourly_avg["hour"],
-                    hourly_avg["wait_time"],
-                    marker="o"
-                )
-
-                ax.set_xticks(range(OPEN_HOUR, CROWD_END_HOUR))
-                ax.set_xlabel("Hour")
-                ax.set_title(
-                    f"{selected_history_attraction} Average Wait by Hour"
-                )
-
-                y_values = hourly_avg["wait_time"].tolist()
-
-            ax.set_ylim(0, graph_ylim(y_values))
-            ax.set_ylabel("Wait Time")
-
-            plt.tight_layout()
-
-            st.pyplot(fig)
-
-            st.subheader("📋 保存履歴")
-
-            history_table = one_history[
-                [
-                    "datetime",
-                    "wait_time",
-                    "temperature",
-                    "rain"
-                ]
-            ].tail(100)
-
-            history_table.columns = [
-                "保存時間",
-                "待ち時間",
-                "気温",
-                "降水量"
-            ]
-
-            st.dataframe(
-                history_table,
-                use_container_width=True
-            )
-
-            st.subheader("📊 統計")
-
-            s1, s2, s3 = st.columns(3)
-
-            with s1:
-                st.metric(
-                    "平均待ち時間",
-                    round(
-                        one_history["wait_time"].mean(),
-                        1
-                    )
-                )
-
-            with s2:
-                st.metric(
-                    "最大待ち時間",
-                    int(
-                        one_history["wait_time"].max()
-                    )
-                )
-
-            with s3:
-                st.metric(
-                    "保存数",
-                    len(one_history)
-                )
-
-        else:
-            st.info(
-                "このアトラクションの有効な履歴データがまだありません。"
-            )
-
+    if crowd_10 >= 8:
+        advice.append("今日はかなり混雑傾向です。人気アトラクションは早めに回るか、DPAの利用を検討してください。")
+    elif crowd_10 >= 5:
+        advice.append("今日は普通〜やや混雑です。待ち時間が伸びる前に人気アトラクションを優先するとよさそうです。")
     else:
-        st.info(
-            "履歴データがまだありません。営業中に起動すると保存されます。"
+        advice.append("今日は比較的動きやすい可能性があります。待ち時間の短いアトラクションをつなぐのがおすすめです。")
+
+    if ticket_price is not None and ticket_price >= 9900:
+        advice.append("チケット価格が高めなので、公式側も需要が高い日として見ている可能性があります。午後の混雑に注意です。")
+
+    if rain_mm > 0 or weather_text == "雨":
+        advice.append("雨の影響で屋外系は空きやすく、屋内系やレストランは混みやすい可能性があります。")
+
+    if len(valid_target_df) > 0:
+        target_sorted = valid_target_df.sort_values("Wait")
+        target_best = target_sorted.iloc[0]
+        advice.append(
+            f"5大アトラクション内なら **{target_best['Attraction']}** が今の候補です。現在{target_best['Wait']}分です。"
         )
 
-elif display_mode == "アトラクション別予測":
+    return advice
 
-    st.subheader("🎢 アトラクション別予測")
 
-    if len(history_df) > 0:
+def predict_dpa_risk(wait, crowd_10, ticket_price, bonus):
+    score = 0
 
-        attraction_list = sorted(
-            history_df["attraction"].unique()
-        )
+    if wait >= 180:
+        score += 4
+    elif wait >= 140:
+        score += 3
+    elif wait >= 100:
+        score += 2
+    elif wait >= 70:
+        score += 1
 
-        selected_attraction = st.selectbox(
-            "🎢 予測するアトラクションを選択",
-            attraction_list
-        )
+    if crowd_10 >= 8:
+        score += 2
+    elif crowd_10 >= 6:
+        score += 1
 
-        attraction_feedback_error = get_feedback_error(
-            prediction_history,
-            selected_attraction
-        )
+    if ticket_price is not None and ticket_price >= 9900:
+        score += 1
 
-        st.metric(
-            "このアトラクションの予測補正",
-            round(attraction_feedback_error, 1)
-        )
+    if bonus >= 6:
+        score += 1
 
-        one_df = history_df[
-            history_df["attraction"]
-            == selected_attraction
-        ].copy()
-
-        one_df = one_df[
-            one_df["wait_time"] > 0
-        ]
-
-        one_df = filter_crowd_hours(one_df)
-
-        if len(one_df) > 10:
-
-            X = pd.DataFrame({
-                "hour": one_df["hour"],
-                "hour2": one_df["hour"] ** 2,
-                "temperature": one_df["temperature"],
-                "rain": one_df["rain"]
-            })
-
-            y = one_df["wait_time"]
-
-            model = LinearRegression()
-
-            model.fit(X, y)
-
-            future_hours = list(range(OPEN_HOUR, CROWD_END_HOUR))
-
-            future = pd.DataFrame({
-                "hour": future_hours
-            })
-
-            future["hour2"] = future["hour"] ** 2
-            future["temperature"] = temperature
-            future["rain"] = rain_mm
-
-            pred = model.predict(future)
-
-            pred = pred + attraction_feedback_error
-            pred = pred + today_bonus * 5
-
-            pred = np.clip(pred, 0, None)
-
-            pred_df = pd.DataFrame({
-                "Hour": future_hours,
-                "Predicted Wait": pred
-            })
-
-            save_prediction_rows(
-                cursor,
-                conn,
-                pred_df,
-                selected_attraction
-            )
-
-            st.dataframe(
-                pred_df,
-                use_container_width=True
-            )
-
-            fig, ax = plt.subplots(
-                figsize=(10, 5)
-            )
-
-            ax.plot(
-                pred_df["Hour"],
-                pred_df["Predicted Wait"],
-                marker="o"
-            )
-
-            ax.set_ylim(
-                0,
-                graph_ylim(pred_df["Predicted Wait"].tolist())
-            )
-
-            ax.set_ylabel("Predicted Wait")
-
-            ax.set_title(
-                f"{selected_attraction} Prediction"
-            )
-
-            st.pyplot(fig)
-
-            if len(prediction_history) > 0:
-                st.subheader("🧠 このアトラクションの予測誤差履歴")
-
-                one_pred_history = prediction_history[
-                    (prediction_history["attraction"] == selected_attraction)
-                    &
-                    (prediction_history["error"].notna())
-                ].copy()
-
-                if len(one_pred_history) > 0:
-                    st.dataframe(
-                        one_pred_history.tail(30),
-                        use_container_width=True
-                    )
-                else:
-                    st.info("このアトラクションの誤差データはまだありません。")
-
-        else:
-            st.info("このアトラクションの履歴がまだ足りません。")
-
+    if score >= 6:
+        return "🔴 売切れリスク高", score
+    elif score >= 3:
+        return "🟠 売切れ注意", score
     else:
-        st.info("履歴データがまだありません。")
-
-elif display_mode == "DPA売切れ予測":
-
-    st.subheader("🎫 DPA売切れ予測")
-
-    dpa_rows = []
-
-    for _, row in valid_target_df.iterrows():
-
-        risk_text, risk_score = predict_dpa_risk(
-            row["Wait"],
-            crowd_10,
-            ticket_price,
-            today_bonus
-        )
-
-        dpa_rows.append({
-            "Attraction": row["Attraction"],
-            "Wait": row["Wait"],
-            "Risk": risk_text,
-            "Risk Score": risk_score
-        })
-
-    dpa_df = pd.DataFrame(dpa_rows)
-
-    if len(dpa_df) > 0:
-
-        dpa_df = dpa_df.sort_values(
-            "Risk Score",
-            ascending=False
-        )
-
-        st.dataframe(
-            dpa_df,
-            use_container_width=True
-        )
-
-    else:
-        st.info("DPA予測に使えるデータがありません。")
-
-elif display_mode == "データ管理":
-
-    st.subheader("🗂 データ管理")
-
-    total_count = len(history_df)
-
-    error_only_df = prediction_history[
-        prediction_history["error"].notna()
-    ].copy() if len(prediction_history) > 0 else pd.DataFrame()
-
-    m1, m2, m3 = st.columns(3)
-
-    with m1:
-        st.metric("保存データ数", total_count)
-
-    with m2:
-        st.metric(
-            "予測データ数",
-            len(prediction_history)
-        )
-
-    with m3:
-        st.metric(
-            "予測誤差データ",
-            len(error_only_df)
-        )
-
-    if len(history_df) > 0:
-
-        st.subheader("アトラクション別保存データ")
-
-        attraction_summary = history_df.groupby(
-            "attraction"
-        )["wait_time"].agg(
-            ["count", "mean", "max"]
-        ).reset_index()
-
-        attraction_summary.columns = [
-            "Attraction",
-            "保存数",
-            "平均待ち時間",
-            "最大待ち時間"
-        ]
-
-        st.dataframe(
-            attraction_summary,
-            use_container_width=True
-        )
-
-    if len(error_only_df) > 0:
-
-        st.subheader("アトラクション別 予測誤差")
-
-        error_summary = error_only_df.groupby(
-            "attraction"
-        )["error"].agg(
-            ["count", "mean", "max", "min"]
-        ).reset_index()
-
-        error_summary.columns = [
-            "Attraction",
-            "誤差データ数",
-            "平均誤差",
-            "最大誤差",
-            "最小誤差"
-        ]
-
-        st.dataframe(
-            error_summary,
-            use_container_width=True
-        )
-
-        st.subheader("最近の予測誤差データ")
-
-        st.dataframe(
-            error_only_df.sort_values(
-                "created_at",
-                ascending=False
-            ).head(100),
-            use_container_width=True
-        )
-
-st.subheader("⚙ システム")
-
-st.write("選択中:", park)
-
-st.write("表示モード:", display_mode)
-
-st.write("保存データ:", len(history_df))
-
-st.write("予測データ:", len(prediction_history))
-
-st.write("5大予測補正:", round(global_feedback_error, 1))
-
-st.write(
-    "最終更新:",
-    datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S") + "（日本時間）"
-)
-
-refresh_seconds = 900
-
-st.caption(
-    f"🔄 {refresh_seconds // 60}分ごと自動更新"
-)
-
-time.sleep(refresh_seconds)
-
-st.rerun()
+        return "🟢 低め", score
