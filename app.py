@@ -1,4 +1,3 @@
-import random
 import os
 import time
 from datetime import datetime, timedelta
@@ -8,13 +7,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import streamlit as st
-from sklearn.linear_model import LinearRegression
 
 from utils import (
     GLOBAL_PREDICTION_NAME,
     PARK_SETTINGS,
     connect_db,
-    fetch_castel_ticket_prices,
+    fetch_ticket_prices,
     fetch_wait_times,
     get_calendar_bonus,
     get_crowd_index,
@@ -28,12 +26,22 @@ from utils import (
     get_valid_open_df,
     get_weather,
     get_weather_score,
+    load_daily_crowd_predictions,
+    load_dpa_sellouts,
     load_history,
     load_prediction_history,
+    make_major_average_prediction,
+    make_week_forecast as build_week_forecast,
     make_action_advice,
+    predict_crowd_index_for_date,
+    predict_dpa_sellout_time,
+    predict_wait_times_for_date,
+    save_daily_crowd_prediction,
+    save_dpa_sellout,
     predict_dpa_risk,
     save_prediction_rows,
     save_wait_times,
+    update_daily_crowd_feedback,
     update_prediction_feedback,
 )
 
@@ -47,6 +55,11 @@ st.set_page_config(
     page_icon="🏰",
     layout="wide"
 )
+
+
+@st.cache_data(ttl=3600)
+def cached_fetch_ticket_prices():
+    return fetch_ticket_prices()
 
 st.markdown("""
 <style>
@@ -173,51 +186,6 @@ def filter_crowd_hours(df):
     ].copy()
 
 
-def make_week_forecast(base_crowd):
-    week_rows = []
-
-    for i in range(7):
-        d = datetime.now(JST) + timedelta(days=i)
-        pred = base_crowd
-
-        weekday = d.weekday()
-        month = d.month
-        day = d.day
-
-        if weekday >= 5:
-            pred += 2
-        elif weekday == 4:
-            pred += 1
-
-        if month == 3 and day >= 20:
-            pred += 2
-
-        if (month == 4 and day >= 27) or (month == 5 and day <= 6):
-            pred += 3
-
-        if (month == 7 and day >= 20) or month == 8:
-            pred += 3
-
-        if month == 10:
-            pred += 3
-
-        if month == 12 and day <= 25:
-            pred += 3
-
-        if (month == 12 and day >= 26) or (month == 1 and day <= 5):
-            pred += 4
-
-        pred += random.randint(-1, 1)
-        pred = max(1, min(10, pred))
-
-        week_rows.append({
-            "Date": d.strftime("%m/%d"),
-            "Crowd Index": pred
-        })
-
-    return pd.DataFrame(week_rows)
-
-
 now_display = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
 
 st.markdown(f"""
@@ -230,7 +198,8 @@ st.markdown(f"""
 
 park = st.selectbox(
     "🏰 パークを選択",
-    ["DisneySea", "Disneyland"]
+    ["DisneySea", "Disneyland"],
+    key="park"
 )
 
 settings = PARK_SETTINGS[park]
@@ -242,11 +211,13 @@ display_mode = st.selectbox(
         "全アトラクション",
         "アトラクション別予測",
         "DPA売切れ予測",
+        "日付指定予測",
         "データ管理"
-    ]
+    ],
+    key="display_mode"
 )
 
-ticket_price_map, ticket_map_source = fetch_castel_ticket_prices()
+ticket_price_map, ticket_map_source = cached_fetch_ticket_prices()
 
 ticket_price, ticket_source = get_ticket_price_from_castel(
     datetime.now(JST),
@@ -296,6 +267,8 @@ if len(valid_all_df) == 0:
     st.warning("現在は営業中の有効な待ち時間データがありません。")
 
 prediction_history = load_prediction_history(conn)
+daily_prediction_history = load_daily_crowd_predictions(conn)
+dpa_sellout_history = load_dpa_sellouts(conn)
 
 global_feedback_error = get_feedback_error(
     prediction_history,
@@ -310,6 +283,15 @@ update_prediction_feedback(
 )
 
 prediction_history = load_prediction_history(conn)
+
+update_daily_crowd_feedback(
+    cursor,
+    conn,
+    history_df,
+    settings
+)
+
+daily_prediction_history = load_daily_crowd_predictions(conn)
 
 global_feedback_error = get_feedback_error(
     prediction_history,
@@ -408,7 +390,7 @@ if display_mode == "ダッシュボード":
         )
 
     with c2:
-        st.metric("取得元", ticket_source)
+        st.metric("取得元", ticket_map_source if ticket_price is not None else ticket_source)
 
     with c3:
         st.metric("補正値", today_bonus)
@@ -505,93 +487,105 @@ if display_mode == "ダッシュボード":
 
     st.subheader("🤖 5大アトラクションの予想平均待ち時間")
 
-    target_model_df = history_df[
-        history_df["attraction"].isin(settings["rides"])
-    ].copy() if len(history_df) > 0 else history_df
+    wait_pred_df = predict_wait_times_for_date(
+        history_df,
+        settings,
+        datetime.now(JST).date(),
+        temperature,
+        rain_mm,
+        prediction_history,
+        ticket_price,
+        valid_target_df
+    )
 
-    target_model_df = filter_crowd_hours(target_model_df)
+    major_pred_df = make_major_average_prediction(wait_pred_df)
+    major_display_df = major_pred_df.rename(
+        columns={"Predicted Wait": "5大予想平均待ち時間"}
+    )
 
-    if len(target_model_df) > 20:
-        model_df = target_model_df[
-            target_model_df["wait_time"] > 0
-        ]
+    if len(major_pred_df) > 0:
+        save_prediction_rows(
+            cursor,
+            conn,
+            major_pred_df,
+            GLOBAL_PREDICTION_NAME
+        )
 
-        if len(model_df) > 20:
-            X = pd.DataFrame({
-                "hour": model_df["hour"],
-                "hour2": model_df["hour"] ** 2,
-                "temperature": model_df["temperature"],
-                "rain": model_df["rain"]
-            })
+        for attraction in settings["rides"]:
+            one_pred_df = wait_pred_df[
+                wait_pred_df["Attraction"] == attraction
+            ][["Hour", "Predicted Wait"]]
 
-            y = model_df["wait_time"]
+            if len(one_pred_df) > 0:
+                save_prediction_rows(
+                    cursor,
+                    conn,
+                    one_pred_df,
+                    attraction
+                )
 
-            model = LinearRegression()
-            model.fit(X, y)
+        st.dataframe(
+            major_display_df,
+            use_container_width=True
+        )
 
-            future_hours = list(range(OPEN_HOUR, CROWD_END_HOUR))
+        st.caption(
+            "朝一の一時的な待ち時間は低い重みで反映し、履歴中央値・曜日・月・時間帯の形・予測誤差を優先しています。"
+        )
 
-            future = pd.DataFrame({
-                "hour": future_hours
-            })
+        fig, ax = plt.subplots(figsize=(10, 5))
 
-            future["hour2"] = future["hour"] ** 2
-            future["temperature"] = temperature
-            future["rain"] = rain_mm
+        ax.plot(
+            major_display_df["Hour"],
+            major_display_df["5大予想平均待ち時間"],
+            marker="o"
+        )
 
-            pred = model.predict(future)
+        ax.set_ylim(
+            0,
+            graph_ylim(major_display_df["5大予想平均待ち時間"].tolist())
+        )
 
-            pred = pred + global_feedback_error
-            pred = pred + today_bonus * 5
+        ax.set_ylabel("Predicted Wait")
+        ax.set_title(f"{park} Major Attractions Average Prediction")
 
-            pred = np.clip(pred, 0, None)
+        st.pyplot(fig)
 
-            pred_df = pd.DataFrame({
-                "Hour": future_hours,
-                "5大予想平均待ち時間": pred
-            })
-
-            save_df = pred_df.rename(
-                columns={
-                    "5大予想平均待ち時間": "Predicted Wait"
-                }
-            )
-
-            save_prediction_rows(
-                cursor,
-                conn,
-                save_df,
-                GLOBAL_PREDICTION_NAME
-            )
-
+        with st.expander("アトラクションごとの予測を見る"):
             st.dataframe(
-                pred_df,
+                wait_pred_df[
+                    ["Attraction", "Hour", "Predicted Wait", "理由"]
+                ],
                 use_container_width=True
             )
-
-            fig, ax = plt.subplots(figsize=(10, 5))
-
-            ax.plot(
-                pred_df["Hour"],
-                pred_df["5大予想平均待ち時間"],
-                marker="o"
-            )
-
-            ax.set_ylim(
-                0,
-                graph_ylim(pred_df["5大予想平均待ち時間"].tolist())
-            )
-
-            ax.set_ylabel("Predicted Wait")
-            ax.set_title(f"{park} Major Attractions Average Prediction")
-
-            st.pyplot(fig)
     else:
         st.info("5大アトラクション平均予測には、9:00〜20:59の履歴データがもう少し必要です。")
 
     st.subheader("📅 1週間混雑指数予測")
 
-    week_df = make_week_forecast(crowd_10)
+    week_df = build_week_forecast(
+        history_df,
+        settings,
+        datetime.now(JST).date(),
+        temperature,
+        rain_mm,
+        prediction_history,
+        daily_prediction_history,
+        ticket_price_map,
+        valid_target_df
+    )
+
+    for _, row in week_df.iterrows():
+        target_date = datetime.strptime(
+            f"{datetime.now(JST).year}/{row['Date']}",
+            "%Y/%m/%d"
+        ).date()
+        save_daily_crowd_prediction(
+            cursor,
+            conn,
+            target_date,
+            row["Crowd Index"]
+        )
 
     st.dataframe(
         week_df,
@@ -869,63 +863,32 @@ elif display_mode == "アトラクション別予測":
             round(attraction_feedback_error, 1)
         )
 
-        one_df = history_df[
-            history_df["attraction"]
-            == selected_attraction
+        pred_all_df = predict_wait_times_for_date(
+            history_df,
+            settings,
+            datetime.now(JST).date(),
+            temperature,
+            rain_mm,
+            prediction_history,
+            ticket_price,
+            valid_target_df
+        )
+
+        pred_df = pred_all_df[
+            pred_all_df["Attraction"] == selected_attraction
         ].copy()
 
-        one_df = one_df[
-            one_df["wait_time"] > 0
-        ]
-
-        one_df = filter_crowd_hours(one_df)
-
-        if len(one_df) > 10:
-
-            X = pd.DataFrame({
-                "hour": one_df["hour"],
-                "hour2": one_df["hour"] ** 2,
-                "temperature": one_df["temperature"],
-                "rain": one_df["rain"]
-            })
-
-            y = one_df["wait_time"]
-
-            model = LinearRegression()
-
-            model.fit(X, y)
-
-            future_hours = list(range(OPEN_HOUR, CROWD_END_HOUR))
-
-            future = pd.DataFrame({
-                "hour": future_hours
-            })
-
-            future["hour2"] = future["hour"] ** 2
-            future["temperature"] = temperature
-            future["rain"] = rain_mm
-
-            pred = model.predict(future)
-
-            pred = pred + attraction_feedback_error
-            pred = pred + today_bonus * 5
-
-            pred = np.clip(pred, 0, None)
-
-            pred_df = pd.DataFrame({
-                "Hour": future_hours,
-                "Predicted Wait": pred
-            })
+        if len(pred_df) > 0:
 
             save_prediction_rows(
                 cursor,
                 conn,
-                pred_df,
+                pred_df[["Hour", "Predicted Wait"]],
                 selected_attraction
             )
 
             st.dataframe(
-                pred_df,
+                pred_df[["Hour", "Predicted Wait", "理由"]],
                 use_container_width=True
             )
 
@@ -983,19 +946,14 @@ elif display_mode == "DPA売切れ予測":
 
     for _, row in valid_target_df.iterrows():
 
-        risk_text, risk_score = predict_dpa_risk(
+        dpa_rows.append(predict_dpa_sellout_time(
+            row["Attraction"],
             row["Wait"],
             crowd_10,
             ticket_price,
-            today_bonus
-        )
-
-        dpa_rows.append({
-            "Attraction": row["Attraction"],
-            "Wait": row["Wait"],
-            "Risk": risk_text,
-            "Risk Score": risk_score
-        })
+            today_bonus,
+            dpa_sellout_history
+        ))
 
     dpa_df = pd.DataFrame(dpa_rows)
 
@@ -1011,8 +969,157 @@ elif display_mode == "DPA売切れ予測":
             use_container_width=True
         )
 
+        st.caption("DPAの実売切れデータは公式APIから直接取れていないため、下の欄で分かった売切れ時刻を保存すると次回以降の時刻予測に使います。")
+
     else:
         st.info("DPA予測に使えるデータがありません。")
+
+    st.subheader("DPA売切れ時刻の保存")
+
+    with st.form("dpa_sellout_form"):
+        sellout_attraction = st.selectbox(
+            "売切れを確認したアトラクション",
+            settings["rides"]
+        )
+        sellout_hour = st.slider(
+            "売切れ時刻",
+            min_value=9.5,
+            max_value=20.5,
+            value=14.0,
+            step=0.25
+        )
+        submitted = st.form_submit_button("保存")
+
+        if submitted:
+            save_dpa_sellout(
+                cursor,
+                conn,
+                sellout_attraction,
+                sellout_hour,
+                "manual"
+            )
+            st.success("DPA売切れ時刻を保存しました。")
+
+    if len(dpa_sellout_history) > 0:
+        st.subheader("保存済みDPA売切れ履歴")
+        st.dataframe(
+            dpa_sellout_history.sort_values(
+                "observed_at",
+                ascending=False
+            ).head(50),
+            use_container_width=True
+        )
+
+elif display_mode == "日付指定予測":
+
+    st.subheader("📆 日付・天気から予測")
+
+    target_date = st.date_input(
+        "予測する日付",
+        value=datetime.now(JST).date(),
+        min_value=datetime.now(JST).date(),
+        max_value=datetime.now(JST).date() + timedelta(days=30)
+    )
+
+    input_weather = st.selectbox(
+        "天気",
+        ["晴れ", "くもり", "雨"]
+    )
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+        input_temperature = st.number_input(
+            "気温",
+            min_value=-5.0,
+            max_value=40.0,
+            value=float(temperature),
+            step=0.5
+        )
+
+    with c2:
+        input_rain = st.number_input(
+            "降水量(mm)",
+            min_value=0.0,
+            max_value=80.0,
+            value=1.0 if input_weather == "雨" else 0.0,
+            step=0.5
+        )
+
+    target_ticket_price, target_ticket_source = get_ticket_price_from_castel(
+        target_date,
+        ticket_price_map
+    )
+
+    target_crowd, target_wait_df, target_reasons = predict_crowd_index_for_date(
+        history_df,
+        settings,
+        target_date,
+        input_temperature,
+        input_rain,
+        prediction_history,
+        daily_prediction_history,
+        target_ticket_price,
+        valid_target_df if target_date == datetime.now(JST).date() else None
+    )
+
+    level, color = get_level(target_crowd)
+
+    m1, m2, m3 = st.columns(3)
+
+    with m1:
+        st.metric("予測混雑指数", target_crowd)
+
+    with m2:
+        st.metric(
+            "5大予想平均待ち時間",
+            round(target_wait_df["Predicted Wait"].mean(), 1) if len(target_wait_df) > 0 else 0
+        )
+
+    with m3:
+        st.metric(
+            "チケット価格",
+            "未取得" if target_ticket_price is None else f"{target_ticket_price}円"
+        )
+
+    st.markdown(
+        f"<div class='card'><h2 style='color:{color};'>{level}</h2></div>",
+        unsafe_allow_html=True
+    )
+
+    st.write("価格取得元:", target_ticket_source)
+    st.write("主な理由:", " / ".join(target_reasons))
+
+    st.subheader("時間帯別・アトラクション別待ち時間予測")
+
+    st.dataframe(
+        target_wait_df,
+        use_container_width=True
+    )
+
+    dpa_rows = []
+
+    latest_by_attraction = target_wait_df.groupby("Attraction")["Predicted Wait"].max().reset_index()
+
+    for _, row in latest_by_attraction.iterrows():
+        dpa_rows.append(predict_dpa_sellout_time(
+            row["Attraction"],
+            row["Predicted Wait"],
+            target_crowd,
+            target_ticket_price,
+            get_calendar_bonus(target_date, target_ticket_price)[0],
+            dpa_sellout_history
+        ))
+
+    st.subheader("DPA売切れ予測")
+
+    st.dataframe(
+        pd.DataFrame(dpa_rows).sort_values(
+            "Risk Score",
+            ascending=False
+        ),
+        use_container_width=True
+    )
 
 elif display_mode == "データ管理":
 
@@ -1039,6 +1146,20 @@ elif display_mode == "データ管理":
         st.metric(
             "予測誤差データ",
             len(error_only_df)
+        )
+
+    m4, m5 = st.columns(2)
+
+    with m4:
+        st.metric(
+            "日別混雑指数予測",
+            len(daily_prediction_history)
+        )
+
+    with m5:
+        st.metric(
+            "DPA売切れ履歴",
+            len(dpa_sellout_history)
         )
 
     if len(history_df) > 0:
@@ -1102,6 +1223,26 @@ elif display_mode == "データ管理":
         get_prediction_gap_summary(prediction_history),
         use_container_width=True
     )
+
+    if len(daily_prediction_history) > 0:
+        st.subheader("日別混雑指数の予測誤差")
+        st.dataframe(
+            daily_prediction_history.sort_values(
+                "created_at",
+                ascending=False
+            ).head(100),
+            use_container_width=True
+        )
+
+    if len(dpa_sellout_history) > 0:
+        st.subheader("DPA売切れ時刻履歴")
+        st.dataframe(
+            dpa_sellout_history.sort_values(
+                "observed_at",
+                ascending=False
+            ).head(100),
+            use_container_width=True
+        )
 
 st.subheader("⚙ システム")
 
