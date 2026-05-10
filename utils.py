@@ -3526,20 +3526,33 @@ def _low_wait_slots(wait_prediction_df, limit=3):
     return sorted(rows, key=lambda x: x["wait"])[:limit]
 
 
+
 def _short_attraction_name(name):
     replacements = {
-        "Soaring: Fantastic Flight": "Soaring",
-        "Tower of Terror": "Tower of Terror",
-        "Toy Story Mania!": "Toy Story",
-        "Journey to the Center of the Earth": "Journey",
-        "Anna and Elsa's Frozen Journey": "Frozen Journey",
-        "Enchanted Tale of Beauty and the Beast": "Beauty and Beast",
-        "The Happy Ride with Baymax": "Baymax",
-        "Monsters, Inc. Ride & Go Seek!": "Monsters Inc.",
-        "Pooh's Hunny Hunt": "Pooh",
-        "Splash Mountain": "Splash",
+        "Soaring: Fantastic Flight": "\u30bd\u30a2\u30ea\u30f3",
+        "Tower of Terror": "\u30bf\u30ef\u30c6\u30e9",
+        "Toy Story Mania!": "\u30c8\u30a4\u30de\u30cb",
+        "Journey to the Center of the Earth": "\u30bb\u30f3\u30bf\u30fc",
+        "Anna and Elsa's Frozen Journey": "\u30a2\u30ca\u96ea",
+        "Enchanted Tale of Beauty and the Beast": "\u7f8e\u5973\u3068\u91ce\u7363",
+        "The Happy Ride with Baymax": "\u30d9\u30a4\u30de\u30c3\u30af\u30b9",
+        "Monsters, Inc. Ride & Go Seek!": "\u30e2\u30f3\u30b9\u30bf\u30fc\u30ba\u30a4\u30f3\u30af",
+        "Pooh's Hunny Hunt": "\u30d7\u30fc\u3055\u3093",
+        "Splash Mountain": "\u30b9\u30d7\u30e9\u30c3\u30b7\u30e5",
     }
-    return replacements.get(str(name), str(name).replace("TM", "").replace("?", ""))
+    value = replacements.get(str(name), str(name).replace("TM", "").replace("?", ""))
+    return value.encode("ascii").decode("unicode_escape") if "\\u" in value else value
+
+
+def _x_level_text(crowd_index):
+    value = float(crowd_index)
+    if value >= 9:
+        return _u(r"\U0001f534 \u8d85\u6df7\u96d1")
+    if value >= 6:
+        return _u(r"\U0001f7e0 \u6df7\u96d1")
+    if value >= 3:
+        return _u(r"\U0001f7e1 \u666e\u901a")
+    return _u(r"\U0001f7e2 \u7a7a\u3044\u3066\u3044\u308b")
 
 
 def _truncate_text(text, limit):
@@ -3549,7 +3562,23 @@ def _truncate_text(text, limit):
 
 
 def _u(text):
-    return text.encode("ascii").decode("unicode_escape")
+    try:
+        return text.encode("ascii").decode("unicode_escape")
+    except UnicodeEncodeError:
+        return text
+
+
+def _major_attraction_names(wait_prediction_df):
+    if wait_prediction_df is None or len(wait_prediction_df) == 0 or "Attraction" not in wait_prediction_df.columns:
+        return ""
+    names = []
+    for name in wait_prediction_df["Attraction"].dropna().tolist():
+        short = _short_attraction_name(name)
+        if short not in names:
+            names.append(short)
+        if len(names) >= 5:
+            break
+    return _u(r"\u3001").join(names)
 
 
 def make_x_post_summary(
@@ -3567,50 +3596,47 @@ def make_x_post_summary(
         df = df[df["Predicted Wait"].notna()].copy()
 
     avg_wait = float(df["Predicted Wait"].mean()) if len(df) > 0 and "Predicted Wait" in df.columns else 0
-    quiet_hour = None
-    quiet_wait = None
     peak_hour = None
     peak_wait = None
-
     if len(df) > 0 and {"Hour", "Predicted Wait"}.issubset(df.columns):
         hourly = df.groupby("Hour")["Predicted Wait"].mean()
         if len(hourly) > 0:
-            quiet_hour = int(hourly.idxmin())
-            quiet_wait = float(hourly.min())
             peak_hour = int(hourly.idxmax())
             peak_wait = float(hourly.max())
 
-    if quiet_hour is not None and peak_hour is not None:
+    names_text = _major_attraction_names(df)
+    level_text = _x_level_text(crowd_index)
+    if names_text and peak_hour is not None:
         overview = (
-            f"{_u('\\u3010')}{park} {_u('\\u660e\\u65e5')}{date_text}{_u('\\u4e88\\u60f3\\u3011')}"
-            f"{_u('\\u6df7\\u96d1\\u6307\\u6570')}{format_crowd_index(crowd_index)}/10{_u('\\u3002')}"
-            f"{_u('\\u4e3b\\u89815\\u65bd\\u8a2d\\u306f\\u5e73\\u5747')}{avg_wait:.0f}{_u('\\u5206\\u524d\\u5f8c\\u3002')}"
-            f"{_u('\\u7a7a\\u304d\\u3084\\u3059\\u3044\\u306e\\u306f')}{quiet_hour}{_u('\\u6642\\u53f0')}({quiet_wait:.0f}{_u('\\u5206')}){_u('\\u3001')}"
-            f"{_u('\\u4f38\\u3073\\u3084\\u3059\\u3044\\u306e\\u306f')}{peak_hour}{_u('\\u6642\\u53f0')}({peak_wait:.0f}{_u('\\u5206')}){_u('\\u3002')}"
+            f"{_u('\\u3010')}{park} {date_text}{_u('\\u306e\\u6df7\\u96d1\\u4e88\\u6e2c\\u3011')}"
+            f"{_u('\\u6df7\\u96d1\\u6307\\u6570')}{format_crowd_index(crowd_index)}/10{_u('\\uff08')}{level_text}{_u('\\uff09\\u3002')}"
+            f"5{_u('\\u5927\\u5e73\\u5747\\uff08')}{names_text}{_u('\\uff09\\u306f\\u7d04')}{avg_wait:.0f}{_u('\\u5206\\u3001')}"
+            f"{_u('\\u30d4\\u30fc\\u30af\\u306f')}{peak_hour}{_u('\\u6642\\u53f0')}({peak_wait:.0f}{_u('\\u5206\\u524d\\u5f8c\\uff09\\u3002')}"
         )
     else:
         overview = (
-            f"{_u('\\u3010')}{park} {_u('\\u660e\\u65e5')}{date_text}{_u('\\u4e88\\u60f3\\u3011')}"
-            f"{_u('\\u6df7\\u96d1\\u6307\\u6570')}{format_crowd_index(crowd_index)}/10{_u('\\u3002')}"
-            + _u("\\u6642\\u9593\\u5e2f\\u5225\\u306e\\u7d30\\u304b\\u3044\\u50be\\u5411\\u306f\\u30c7\\u30fc\\u30bf\\u84c4\\u7a4d\\u4e2d\\u3067\\u3059\\u3002")
+            f"{_u('\\u3010')}{park} {date_text}{_u('\\u306e\\u6df7\\u96d1\\u4e88\\u6e2c\\u3011')}"
+            f"{_u('\\u6df7\\u96d1\\u6307\\u6570')}{format_crowd_index(crowd_index)}/10{_u('\\uff08')}{level_text}{_u('\\uff09\\u3002')}"
+            + _u("\u6642\u9593\u5e2f\u5225\u306e\u8a73\u7d30\u306f\u30c7\u30fc\u30bf\u84c4\u7a4d\u4e2d\u3067\u3059\u3002")
         )
 
     slots = _low_wait_slots(df, limit=3)
     if slots:
-        details = []
-        for slot in slots[:3]:
-            name = _short_attraction_name(slot["attraction"])
-            details.append(f"{name}:{slot['hour']}{_u('\\u6642\\u53f0')}{slot['wait']:.0f}{_u('\\u5206')}")
-        detail_text = _u("\\u72d9\\u3044\\u76ee\\u2192") + _u("\\u3001").join(details) + _u("\\u3002")
-        if slots[0].get("peak_hour") is not None:
-            first = slots[0]
-            detail_text += (
-                f"{_short_attraction_name(first['attraction'])}"
-                f"{_u('\\u306f\\u30d4\\u30fc\\u30af')}{first['peak_hour']}{_u('\\u6642\\u53f0')}"
-                f"{first['peak_wait']:.0f}{_u('\\u5206\\u4e88\\u60f3\\u3002')}"
-            )
+        first = slots[0]
+        first_name = _short_attraction_name(first["attraction"])
+        detail_text = (
+            f"{first_name}{_u('\\u306f')}{first['hour']}{_u('\\u6642\\u306b')}{first['wait']:.0f}{_u('\\u5206\\u4e88\\u6e2c\\u3002')}"
+        )
+        if len(slots) > 1:
+            detail_text += _u("\u307b\u304b\u306e\u72d9\u3044\u76ee\u306f")
+            detail_text += _u("\u3001").join([
+                f"{_short_attraction_name(s['attraction'])}{s['hour']}{_u('\\u6642')}{s['wait']:.0f}{_u('\\u5206')}"
+                for s in slots[1:3]
+            ])
+            detail_text += _u("\u3002")
+        detail_text += _u("\u304a\u3059\u3059\u3081\u306f\u5348\u524d\u306b\u4eba\u6c17\u65bd\u8a2d\u30921\u3064\u62bc\u3055\u3048\u3001\u5915\u65b9\u4ee5\u964d\u306b\u4e0b\u304c\u308b\u5019\u88dc\u3092\u62fe\u3046\u52d5\u304d\u3002")
     else:
-        detail_text = _u("\\u30a2\\u30c8\\u30e9\\u30af\\u30b7\\u30e7\\u30f3\\u5225\\u306e\\u72d9\\u3044\\u76ee\\u306f\\u30c7\\u30fc\\u30bf\\u84c4\\u7a4d\\u4e2d\\u3002\\u4eba\\u6c17\\u65bd\\u8a2d\\u306f\\u5348\\u524d\\u306b1\\u3064\\u62bc\\u3055\\u3048\\u308b\\u52d5\\u304d\\u304c\\u304a\\u3059\\u3059\\u3081\\u3002")
+        detail_text = _u("\u30a2\u30c8\u30e9\u30af\u30b7\u30e7\u30f3\u5225\u306e\u8a73\u7d30\u306f\u30c7\u30fc\u30bf\u84c4\u7a4d\u4e2d\u3002\u304a\u3059\u3059\u3081\u306f\u5348\u524d\u306b\u4eba\u6c17\u65bd\u8a2d\u30921\u3064\u62bc\u3055\u3048\u308b\u52d5\u304d\u3002")
 
     return _truncate_text(overview, 140) + "\n" + _truncate_text(detail_text, 140)
 
