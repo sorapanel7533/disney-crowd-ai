@@ -11,6 +11,7 @@ import streamlit as st
 from utils import (
     GLOBAL_PREDICTION_NAME,
     PARK_SETTINGS,
+    auto_fetch_dpa_if_needed,
     connect_db,
     clear_dpa_sellouts,
     fetch_ticket_prices,
@@ -30,7 +31,9 @@ from utils import (
     get_weather,
     get_weather_score,
     load_daily_crowd_predictions,
+    load_dpa_fetch_logs,
     load_dpa_sellouts,
+    log_dpa_fetch,
     load_history,
     load_prediction_history,
     make_major_average_prediction,
@@ -278,6 +281,14 @@ if len(valid_all_df) == 0:
 prediction_history = load_prediction_history(conn)
 daily_prediction_history = load_daily_crowd_predictions(conn)
 dpa_sellout_history = load_dpa_sellouts(conn)
+dpa_auto_fetch_result = auto_fetch_dpa_if_needed(
+    cursor,
+    conn,
+    settings,
+    park
+)
+dpa_sellout_history = load_dpa_sellouts(conn)
+dpa_fetch_logs = load_dpa_fetch_logs(conn)
 
 global_feedback_error = get_feedback_error(
     prediction_history,
@@ -957,10 +968,38 @@ elif display_mode == "DPA売切れ予測":
         "urtripのDPA欄から、今日の発行状況と過去の発行終了確認時刻を読み込みます。保存時は同じ日付・アトラクション・取得元の古い行を置き換えます。"
     )
 
+    if dpa_auto_fetch_result["status"] == "success":
+        st.success(
+            f"DPA auto fetch: saved {dpa_auto_fetch_result['saved_count']} rows. "
+            f"{dpa_auto_fetch_result['message']}"
+        )
+    elif dpa_auto_fetch_result["status"] == "skipped":
+        st.info(
+            f"DPA auto fetch: already checked today. "
+            f"{dpa_auto_fetch_result['message']}"
+        )
+    else:
+        st.warning(
+            f"DPA auto fetch failed: {dpa_auto_fetch_result['message']}"
+        )
+
+    if len(dpa_fetch_logs) > 0:
+        latest_dpa_fetch = dpa_fetch_logs.sort_values(
+            "fetched_at",
+            ascending=False
+        ).iloc[0]
+        st.caption(
+            "Latest DPA fetch: "
+            f"{latest_dpa_fetch['fetched_at']} / "
+            f"{latest_dpa_fetch.get('status', '')} / "
+            f"{latest_dpa_fetch.get('saved_count', 0)} rows"
+        )
+
     col_fetch, col_clear = st.columns(2)
 
     with col_fetch:
         if st.button("urtripから取得して保存"):
+            cached_fetch_urtrip_dpa_sellouts.clear()
             scraped_df, scrape_message = cached_fetch_urtrip_dpa_sellouts(park)
 
             if len(scraped_df) > 0:
@@ -971,12 +1010,32 @@ elif display_mode == "DPA売切れ予測":
                     "urtrip"
                 )
                 dpa_sellout_history = load_dpa_sellouts(conn)
+                log_dpa_fetch(
+                    cursor,
+                    conn,
+                    park,
+                    "urtrip",
+                    "manual_success",
+                    scrape_message,
+                    saved_count
+                )
+                dpa_fetch_logs = load_dpa_fetch_logs(conn)
                 st.success(f"{scrape_message} / 保存 {saved_count}件")
                 st.dataframe(
                     scraped_df,
                     use_container_width=True
                 )
             else:
+                log_dpa_fetch(
+                    cursor,
+                    conn,
+                    park,
+                    "urtrip",
+                    "manual_failed",
+                    scrape_message,
+                    0
+                )
+                dpa_fetch_logs = load_dpa_fetch_logs(conn)
                 st.warning(scrape_message)
 
     with col_clear:
@@ -1215,6 +1274,8 @@ elif display_mode == "データ管理":
             "DPA売切れ履歴",
             len(dpa_sellout_history)
         )
+
+    st.metric("DPA fetch logs", len(dpa_fetch_logs))
 
     if len(history_df) > 0:
 
