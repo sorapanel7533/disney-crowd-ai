@@ -21,7 +21,16 @@ PARK_SETTINGS = {
     "DisneySea": {
         "url": "https://queue-times.com/parks/275/queue_times.json",
         "urtrip_url": "https://urtrip.jp/tds-attraction-waitingtime-realtime/#pass_status",
-        "show_url": "https://www.tokyodisneyresort.jp/en/tds/show.html",
+        "show_url": "https://www.tokyodisneyresort.jp/tds/daily/calendar.html",
+        "show_urls": [
+            "https://www.tokyodisneyresort.jp/tds/daily/calendar.html",
+            "https://www.tokyodisneyresort.jp/tds/realtime",
+            "https://www.tokyodisneyresort.jp/tds/show/schedule/967/",
+            "https://www.tokyodisneyresort.jp/tds/show/schedule/7801/",
+            "https://www.tokyodisneyresort.jp/tds/show/schedule/7602/",
+            "https://www.tokyodisneyresort.jp/tds/show/schedule/7604/",
+            "https://www.tokyodisneyresort.jp/tds/show/schedule/7405/"
+        ],
         "db": "disneysea.db",
         "rides": [
             "Journey to the Center of the Earth",
@@ -43,7 +52,18 @@ PARK_SETTINGS = {
     "Disneyland": {
         "url": "https://queue-times.com/parks/274/queue_times.json",
         "urtrip_url": "https://urtrip.jp/tdl-attraction-waitingtime-realtime/#pass_status",
-        "show_url": "https://www.tokyodisneyresort.jp/en/tdl/show.html",
+        "show_url": "https://www.tokyodisneyresort.jp/tdl/daily/calendar.html",
+        "show_urls": [
+            "https://www.tokyodisneyresort.jp/tdl/daily/calendar.html",
+            "https://www.tokyodisneyresort.jp/tdl/realtime",
+            "https://www.tokyodisneyresort.jp/tdl/show/schedule/7800/",
+            "https://www.tokyodisneyresort.jp/tdl/show/schedule/913/",
+            "https://www.tokyodisneyresort.jp/tdl/show/schedule/895/",
+            "https://www.tokyodisneyresort.jp/tdl/show/schedule/7000/",
+            "https://www.tokyodisneyresort.jp/tdl/show/schedule/7202/",
+            "https://www.tokyodisneyresort.jp/tdl/show/schedule/7002/",
+            "https://www.tokyodisneyresort.jp/tdl/show/schedule/985/"
+        ],
         "db": "disneyland.db",
         "rides": [
             "Enchanted Tale of Beauty and the Beast",
@@ -1604,71 +1624,196 @@ def _clean_show_name(value):
     return text
 
 
-def fetch_official_show_schedule(settings, target_date=None):
-    target_date = target_date or datetime.now(JST).date()
-    url = settings.get("show_url", "")
-    if not url:
-        return pd.DataFrame(), "ショースケジュールURLが設定されていません"
 
-    try:
-        res = requests.get(
-            url,
-            headers={"User-Agent": "Mozilla/5.0"},
-            timeout=18,
-        )
-        res.raise_for_status()
-    except Exception as exc:
-        return pd.DataFrame(), f"公式ショーページ取得失敗: {exc}"
+def _known_show_schedule_fallback(park, target_date):
+    rows = []
 
-    html = res.text
+    def add(name, times, category="???", note="??????????????????????"):
+        for show_time in times:
+            rows.append({
+                "target_date": target_date,
+                "show_name": name,
+                "show_time": show_time,
+                "category": category,
+                "source": "official-monthly-schedule-fallback",
+                "note": note,
+            })
+
+    if target_date.year != 2026 or target_date.month != 5:
+        return pd.DataFrame()
+
+    day = target_date.day
+    late_month = day >= 17
+
+    if park == "DisneySea":
+        add("??????????????????", ["19:30" if late_month else "19:15"])
+        add("??????????????", ["20:30" if late_month else "20:15"])
+        add("??????????????", ["11:00", "12:25", "13:50", "15:55", "17:20"])
+        add("???????????", ["13:00", "14:45", "17:05", "18:50"] if late_month else ["12:50", "14:35", "16:55", "18:40"])
+        if day != 22:
+            add("?????????????????", ["20:15", "20:40", "20:55"] if late_month else ["20:00", "20:25", "20:50"])
+        if day <= 16:
+            add("??????????????????????", ["11:30", "14:00", "16:00"])
+    elif park == "Disneyland":
+        if day >= 17:
+            add("??????????????????", ["13:00"], "????")
+            add("?????????????????", ["15:40"], "????")
+            add("Reach for the Stars", ["20:50"])
+            add("??????????????????????????????", ["19:30"], "????")
+            add("??????????????", ["20:30"])
+            add("??????????????????", ["12:30", "13:45", "15:00", "16:50", "18:05"])
+        else:
+            add("?????????????????", ["15:00"], "????")
+            add("Reach for the Stars", ["20:35"])
+            add("??????????????????????????????", ["19:15"], "????")
+            add("??????????????", ["20:15"])
+            add("???????????????????", ["10:55", "12:20", "13:45", "15:50", "17:15"])
+            add("??????????????????", ["11:40", "12:55", "14:10", "16:00", "17:15"])
+
+    return pd.DataFrame(rows)
+
+
+def _show_name_from_url(url):
+    name_map = {
+        "967": "??????????????????",
+        "7801": "??????????????",
+        "7602": "??????????????",
+        "7604": "???????????",
+        "7405": "?????????????????",
+        "7800": "??????????????",
+        "913": "??????????????????????????????",
+        "895": "???????????????????",
+        "7000": "??????????????????",
+        "7202": "Reach for the Stars",
+        "7002": "?????????????????",
+        "985": "??????????????????",
+    }
+    for key, value in name_map.items():
+        if f"/{key}" in str(url):
+            return value
+    return ""
+
+
+def _parse_monthly_show_page(html, url, target_date):
+    show_name = _show_name_from_url(url)
+    if not show_name:
+        return []
+
     text = re.sub(r"<script.*?</script>", " ", html, flags=re.S | re.I)
     text = re.sub(r"<style.*?</style>", " ", text, flags=re.S | re.I)
     text = re.sub(r"<[^>]+>", "\n", text)
-    lines = [_clean_show_name(line) for line in text.splitlines()]
-    lines = [line for line in lines if line]
+    text = unescape(text).replace("\u00a0", " ")
+    lines = [re.sub(r"\s+", " ", line).strip() for line in text.splitlines() if line.strip()]
+    day_pattern = re.compile(rf"^{target_date.day}\s*\([^)]*\)\s*(?:\|| )\s*(.+)$")
+    rows = []
+    for line in lines:
+        match = day_pattern.search(line)
+        if not match:
+            continue
+        value = match.group(1)
+        if "??" in value or "Rest" in value:
+            continue
+        times = re.findall(r"\d{1,2}:\d{2}\s*(?:a\.m\.|p\.m\.|am|pm)?", value, re.I)
+        for show_time in times:
+            rows.append({
+                "target_date": target_date,
+                "show_name": show_name,
+                "show_time": show_time.replace("a.m.", "am").replace("p.m.", "pm"),
+                "category": "????" if "????" in show_name else "???",
+                "source": url,
+                "note": "????????????????",
+            })
+    return rows
 
+
+def _parse_daily_show_page(html, url, target_date):
+    text = re.sub(r"<script.*?</script>", " ", html, flags=re.S | re.I)
+    text = re.sub(r"<style.*?</style>", " ", text, flags=re.S | re.I)
+    text = re.sub(r"<[^>]+>", "\n", text)
+    text = unescape(text).replace("\u00a0", " ")
+    lines = [re.sub(r"\s+", " ", line).strip() for line in text.splitlines() if line.strip()]
     rows = []
     seen = set()
     time_pattern = re.compile(r"\d{1,2}:\d{2}\s*(?:a\.m\.|p\.m\.|am|pm)?", re.I)
+    stop_words = ["?????????????", "????", "???????", "?????", "????"]
 
-    for idx, line in enumerate(lines):
+    in_show_section = False
+    for line in lines:
+        if "????/???" in line or "Parades and Shows" in line:
+            in_show_section = True
+            continue
+        if in_show_section and any(word in line for word in stop_words):
+            break
+        if not in_show_section:
+            continue
         times = time_pattern.findall(line)
         if not times:
             continue
-
-        name = ""
-        for back in range(idx - 1, max(-1, idx - 8), -1):
-            candidate = _clean_show_name(lines[back])
-            if candidate and not time_pattern.search(candidate):
-                name = candidate
-                break
-
+        name = time_pattern.sub("", line)
+        name = re.sub(r"????????????????|?????????|?????|NEW", "", name)
+        name = re.sub(r"\s*/\s*", " / ", name).strip(" ?/")
         if not name:
-            name = "ショー/パレード"
-
-        category = "パレード" if "parade" in name.lower() or "パレード" in name else "ショー"
+            continue
         for show_time in times:
-            hour_value = _parse_show_time_to_hour(show_time)
-            if hour_value is None or hour_value < 6 or hour_value > 23:
-                continue
             key = (name, show_time)
             if key in seen:
                 continue
             seen.add(key)
             rows.append({
                 "target_date": target_date,
-                "show_name": name,
-                "show_time": show_time.replace("\u00a0", " "),
-                "category": category,
+                "show_name": name[:80],
+                "show_time": show_time,
+                "category": "????" if "????" in name else "???",
                 "source": url,
-                "note": "公式ショーページから自動抽出",
+                "note": "?????????????",
             })
+    return rows
+
+
+def fetch_official_show_schedule(settings, target_date=None):
+    target_date = target_date or datetime.now(JST).date()
+    urls = settings.get("show_urls") or [settings.get("show_url", "")]
+    urls = [url for url in urls if url]
+    if not urls:
+        return pd.DataFrame(), "?????????URL??????????"
+
+    rows = []
+    messages = []
+    failed_count = 0
+    for url in urls:
+        try:
+            res = requests.get(
+                url,
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=4,
+            )
+            res.raise_for_status()
+        except Exception as exc:
+            failed_count += 1
+            messages.append(f"{url}: {exc}")
+            if failed_count >= 2 and not rows:
+                break
+            continue
+
+        if "/show/schedule/" in url:
+            rows.extend(_parse_monthly_show_page(res.text, url, target_date))
+        else:
+            rows.extend(_parse_daily_show_page(res.text, url, target_date))
 
     if not rows:
-        return pd.DataFrame(), "公式ページから今日のショー時刻を抽出できませんでした"
+        fallback_df = _known_show_schedule_fallback(settings.get("park", ""), target_date)
+        if len(fallback_df) == 0:
+            # PARK_SETTINGS is keyed by park name, so infer from url when settings lacks park.
+            park_guess = "DisneySea" if "tds" in " ".join(urls) else "Disneyland"
+            fallback_df = _known_show_schedule_fallback(park_guess, target_date)
+        if len(fallback_df) > 0:
+            return fallback_df, f"??????????????????????????????????????: {len(fallback_df)}?"
+        return pd.DataFrame(), "????????????????: " + " / ".join(messages[:2])
 
-    return pd.DataFrame(rows).sort_values("show_time"), f"公式ページから{len(rows)}件取得"
-
+    df = pd.DataFrame(rows).drop_duplicates(["show_name", "show_time"], keep="first")
+    df["_hour"] = df["show_time"].apply(_parse_show_time_to_hour)
+    df = df[df["_hour"].notna()].sort_values("_hour").drop(columns=["_hour"])
+    return df.reset_index(drop=True), f"??????{len(df)}???"
 
 def save_show_schedule_rows(cursor, conn, park, show_df, target_date=None):
     if show_df is None or len(show_df) == 0:
@@ -3334,6 +3479,34 @@ def format_crowd_index(value):
         return "0.0"
 
 
+
+def _low_wait_slots(wait_prediction_df, limit=3):
+    if wait_prediction_df is None or len(wait_prediction_df) == 0:
+        return []
+    required = {"Attraction", "Hour", "Predicted Wait"}
+    if not required.issubset(wait_prediction_df.columns):
+        return []
+
+    df = wait_prediction_df.copy()
+    df = df[df["Predicted Wait"].notna()].copy()
+    if len(df) == 0:
+        return []
+
+    rows = []
+    for attraction, group in df.groupby("Attraction"):
+        best = group.sort_values("Predicted Wait").head(1)
+        if len(best) == 0:
+            continue
+        row = best.iloc[0]
+        rows.append({
+            "attraction": str(attraction),
+            "hour": int(row["Hour"]),
+            "wait": float(row["Predicted Wait"]),
+        })
+
+    return sorted(rows, key=lambda x: x["wait"])[:limit]
+
+
 def make_x_post_summary(
     park,
     target_date,
@@ -3343,38 +3516,38 @@ def make_x_post_summary(
     ticket_price=None,
     reasons=None,
 ):
-    reasons = reasons or []
     date_text = target_date.strftime("%m/%d") if hasattr(target_date, "strftime") else str(target_date)
     level, _ = get_level(float(crowd_index))
+    slots = _low_wait_slots(wait_prediction_df, limit=3)
 
-    avg_wait = 0
-    peak_hour = None
-    peak_wait = None
-    if wait_prediction_df is not None and len(wait_prediction_df) > 0 and "Predicted Wait" in wait_prediction_df.columns:
-        avg_wait = float(wait_prediction_df["Predicted Wait"].mean())
-        if "Hour" in wait_prediction_df.columns:
-            hourly = wait_prediction_df.groupby("Hour")["Predicted Wait"].mean()
-            if len(hourly) > 0:
-                peak_hour = int(hourly.idxmax())
-                peak_wait = float(hourly.max())
+    if slots:
+        slot_text = "?".join([
+            f"{s['hour']}???{s['attraction']}({s['wait']:.0f}???)"
+            for s in slots[:2]
+        ])
+        extra = f"????{slot_text}?"
+    else:
+        extra = "????????????????"
 
-    weather_part = f"天気:{weather_source}" if weather_source else "天気:未取得"
-    price_part = "価格:未取得" if ticket_price is None or pd.isna(ticket_price) else f"価格:{int(ticket_price)}円"
-    peak_part = f"ピークは{peak_hour}時台({peak_wait:.0f}分前後)" if peak_hour is not None else "ピーク時間はデータ不足"
-    reason_part = "、".join([str(r) for r in reasons[:2]]) if reasons else "履歴・曜日・天気・価格から推定"
+    avoid_text = ""
+    if wait_prediction_df is not None and len(wait_prediction_df) > 0 and {"Hour", "Predicted Wait"}.issubset(wait_prediction_df.columns):
+        hourly = wait_prediction_df.groupby("Hour")["Predicted Wait"].mean()
+        if len(hourly) > 0:
+            peak_hour = int(hourly.idxmax())
+            avoid_text = f"{peak_hour}????????????????"
 
     text = (
-        f"【{park} 明日{date_text}の混雑予測】"
-        f"混雑指数{format_crowd_index(crowd_index)}/10（{level}）。"
-        f"5大平均は約{avg_wait:.0f}分、{peak_part}。"
-        f"{weather_part}、{price_part}。"
-        f"理由:{reason_part}。朝の人気施設とDPAは早め判断がおすすめ。"
+        f"?{park} ??{date_text}??????"
+        f"????{format_crowd_index(crowd_index)}/10?{level}??"
+        f"{extra}{avoid_text}"
+        "???????????1??????????????????????????"
     )
 
     if len(text) > 200:
         text = text[:197] + "..."
 
     return text
+
 def get_crowd_index(avg_wait, max_wait, var_wait, dpa, weather_score, feedback_error, today_bonus):
     crowd_score = (
         avg_wait * 0.45
