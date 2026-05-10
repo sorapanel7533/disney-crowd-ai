@@ -324,6 +324,16 @@ def graph_ylim(values):
     return 200
 
 
+
+def safe_sort_head(df, sort_column, n=100, ascending=False):
+    if df is None or len(df) == 0:
+        return pd.DataFrame()
+
+    display_df = df.copy()
+    if sort_column in display_df.columns:
+        display_df = display_df.sort_values(sort_column, ascending=ascending)
+
+    return display_df.head(n)
 def filter_crowd_hours(df):
     if len(df) == 0 or "hour" not in df.columns:
         return df
@@ -820,6 +830,7 @@ if display_mode == "ダッシュボード":
     else:
         st.info("5大アトラクション平均予測には、9:00〜20:59の履歴データがもう少し必要です。")
 
+
     st.subheader("📅 1週間混雑指数予測")
 
     week_df = build_week_forecast(
@@ -863,30 +874,6 @@ if display_mode == "ダッシュボード":
     ax_week.set_title(f"{park} 1 Week Crowd Forecast")
 
     st.pyplot(fig_week)
-
-    st.subheader("🧠 予測誤差データの状態")
-
-    error_only_df = prediction_history[
-        prediction_history["error"].notna()
-    ].copy() if len(prediction_history) > 0 else pd.DataFrame()
-
-
-    if len(error_only_df) > 0:
-        st.caption("予測時刻に実測待ち時間が取得できたものは、予測誤差として保存されています。")
-        st.dataframe(
-            error_only_df[
-                error_only_df["attraction"] == GLOBAL_PREDICTION_NAME
-            ].sort_values("created_at", ascending=False).head(10),
-            use_container_width=True
-        )
-    else:
-        st.info("予測誤差データはまだありません。理由の内訳を下に表示します。")
-
-    st.dataframe(
-        get_prediction_gap_summary(prediction_history),
-        use_container_width=True
-    )
-
 elif display_mode == "全アトラクション":
 
     st.subheader("🎡 全アトラクション待ち時間")
@@ -1656,7 +1643,7 @@ elif display_mode == "データ管理":
         st.markdown("#### 営業時間データ")
         if len(park_hours_df) > 0:
             st.dataframe(
-                park_hours_df.sort_values("date", ascending=False).head(100),
+                safe_sort_head(park_hours_df, "date", 100, ascending=False),
                 use_container_width=True
             )
         else:
@@ -1665,7 +1652,7 @@ elif display_mode == "データ管理":
         st.markdown("#### イベント・休暇シグナル")
         if len(event_signals) > 0:
             st.dataframe(
-                event_signals.sort_values("date", ascending=False).head(100),
+                safe_sort_head(event_signals, "date", 100, ascending=False),
                 use_container_width=True
             )
         else:
@@ -1674,10 +1661,7 @@ elif display_mode == "データ管理":
         st.markdown("#### アトラクション営業状態履歴")
         if len(attraction_status_snapshots) > 0:
             st.dataframe(
-                attraction_status_snapshots.sort_values(
-                    "observed_at",
-                    ascending=False
-                ).head(100),
+                safe_sort_head(attraction_status_snapshots, "observed_at", 100, ascending=False),
                 use_container_width=True
             )
         else:
@@ -1686,10 +1670,7 @@ elif display_mode == "データ管理":
         st.markdown("#### 保存済みDPA売切れ履歴")
         if len(dpa_sellout_history) > 0:
             st.dataframe(
-                dpa_sellout_history.sort_values(
-                    "observed_at",
-                    ascending=False
-                ).head(100),
+                safe_sort_head(dpa_sellout_history, "observed_at", 100, ascending=False),
                 use_container_width=True
             )
         else:
@@ -1757,30 +1738,21 @@ elif display_mode == "データ管理":
 
     if len(data_fetch_logs) > 0:
         st.dataframe(
-            data_fetch_logs.sort_values(
-                "fetched_at",
-                ascending=False
-            ).head(100),
+            safe_sort_head(data_fetch_logs, "fetched_at", 100, ascending=False),
             use_container_width=True
         )
 
     if len(weather_snapshots) > 0:
         st.subheader("天気スナップショット")
         st.dataframe(
-            weather_snapshots.sort_values(
-                "observed_at",
-                ascending=False
-            ).head(100),
+            safe_sort_head(weather_snapshots, "observed_at", 100, ascending=False),
             use_container_width=True
         )
 
     if len(ticket_price_snapshots) > 0:
         st.subheader("チケット価格スナップショット")
         st.dataframe(
-            ticket_price_snapshots.sort_values(
-                "observed_at",
-                ascending=False
-            ).head(100),
+            safe_sort_head(ticket_price_snapshots, "observed_at", 100, ascending=False),
             use_container_width=True
         )
 
@@ -1810,10 +1782,7 @@ elif display_mode == "データ管理":
         st.subheader("最近の予測誤差データ")
 
         st.dataframe(
-            error_only_df.sort_values(
-                "created_at",
-                ascending=False
-            ).head(100),
+            safe_sort_head(error_only_df, "created_at", 100, ascending=False),
             use_container_width=True
         )
 
@@ -1827,10 +1796,7 @@ elif display_mode == "データ管理":
     if len(daily_prediction_history) > 0:
         st.subheader("日別混雑指数の予測誤差")
         st.dataframe(
-            daily_prediction_history.sort_values(
-                "created_at",
-                ascending=False
-            ).head(100),
+            safe_sort_head(daily_prediction_history, "created_at", 100, ascending=False),
             use_container_width=True
         )
 
