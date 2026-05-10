@@ -152,6 +152,18 @@ def connect_db(db_name):
     )
     """)
 
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS dpa_fetch_logs (
+        fetched_at TEXT,
+        target_date TEXT,
+        park TEXT,
+        source TEXT,
+        status TEXT,
+        message TEXT,
+        saved_count INTEGER
+    )
+    """)
+
     conn.commit()
 
     cursor.execute("PRAGMA table_info(predictions)")
@@ -841,6 +853,129 @@ def load_dpa_sellouts(conn):
         sellout_df["target_date"] = pd.to_datetime(sellout_df["target_date"]).dt.date
 
     return sellout_df
+
+
+def load_dpa_fetch_logs(conn):
+    try:
+        log_df = pd.read_sql_query(
+            "SELECT * FROM dpa_fetch_logs",
+            conn
+        )
+    except Exception:
+        return pd.DataFrame()
+
+    if len(log_df) > 0:
+        log_df["fetched_at"] = pd.to_datetime(log_df["fetched_at"])
+        log_df["target_date"] = pd.to_datetime(log_df["target_date"]).dt.date
+
+    return log_df
+
+
+def log_dpa_fetch(cursor, conn, park, source, status, message, saved_count=0, target_date=None):
+    now = datetime.now(JST)
+    target_date = target_date or now.date()
+    target_date_text = target_date.strftime("%Y-%m-%d") if hasattr(target_date, "strftime") else str(target_date)
+
+    cursor.execute("""
+    INSERT INTO dpa_fetch_logs
+    (
+        fetched_at,
+        target_date,
+        park,
+        source,
+        status,
+        message,
+        saved_count
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        now.strftime("%Y-%m-%d %H:%M:%S"),
+        target_date_text,
+        park,
+        source,
+        status,
+        str(message),
+        int(saved_count)
+    ))
+    conn.commit()
+
+
+def should_auto_fetch_dpa(fetch_logs, park, source="urtrip", target_date=None):
+    target_date = target_date or datetime.now(JST).date()
+
+    if len(fetch_logs) == 0:
+        return True
+
+    if "target_date" not in fetch_logs.columns:
+        return True
+
+    today_logs = fetch_logs[
+        (fetch_logs["target_date"] == target_date)
+        & (fetch_logs.get("park", "") == park)
+        & (fetch_logs.get("source", "") == source)
+    ]
+
+    return len(today_logs) == 0
+
+
+def auto_fetch_dpa_if_needed(cursor, conn, settings, park):
+    today = datetime.now(JST).date()
+    logs = load_dpa_fetch_logs(conn)
+
+    if not should_auto_fetch_dpa(logs, park, "urtrip", today):
+        latest = logs[
+            (logs["target_date"] == today)
+            & (logs.get("park", "") == park)
+            & (logs.get("source", "") == "urtrip")
+        ].sort_values("fetched_at", ascending=False).iloc[0]
+
+        return {
+            "status": "skipped",
+            "message": f"today already checked: {latest.get('message', '')}",
+            "saved_count": int(latest.get("saved_count", 0) or 0),
+        }
+
+    scraped_df, message = fetch_urtrip_dpa_sellouts(settings)
+
+    if len(scraped_df) == 0:
+        log_dpa_fetch(
+            cursor,
+            conn,
+            park,
+            "urtrip",
+            "failed",
+            message,
+            0,
+            today
+        )
+        return {
+            "status": "failed",
+            "message": message,
+            "saved_count": 0,
+        }
+
+    saved_count = save_dpa_sellout_rows(
+        cursor,
+        conn,
+        scraped_df,
+        "urtrip"
+    )
+    log_dpa_fetch(
+        cursor,
+        conn,
+        park,
+        "urtrip",
+        "success" if saved_count > 0 else "empty",
+        message,
+        saved_count,
+        today
+    )
+
+    return {
+        "status": "success" if saved_count > 0 else "empty",
+        "message": message,
+        "saved_count": saved_count,
+    }
 
 
 def save_dpa_sellout(cursor, conn, attraction, sellout_hour, source="manual", target_date=None):
