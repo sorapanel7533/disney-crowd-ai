@@ -4,13 +4,18 @@ from datetime import datetime, timedelta
 from html import unescape
 from zoneinfo import ZoneInfo
 
-import jpholiday
 import numpy as np
 import pandas as pd
 import requests
 
+try:
+    import jpholiday
+except ImportError:
+    jpholiday = None
 
 JST = ZoneInfo("Asia/Tokyo")
+OPEN_HOUR = 9
+CROWD_END_HOUR = 21
 
 PARK_SETTINGS = {
     "DisneySea": {
@@ -39,6 +44,36 @@ PARK_SETTINGS = {
 
 CASTEL_TICKET_URL = "https://castel.jp/p/7339"
 GLOBAL_PREDICTION_NAME = "__ALL__"
+
+
+def is_crowd_hour(dt):
+    return OPEN_HOUR <= dt.hour < CROWD_END_HOUR
+
+
+def is_japanese_holiday(d):
+    if jpholiday is None:
+        return False
+
+    return jpholiday.is_holiday(d)
+
+
+def filter_crowd_history(df):
+    if len(df) == 0:
+        return df
+
+    filtered_df = df.copy()
+
+    if "hour" not in filtered_df.columns and "datetime" in filtered_df.columns:
+        filtered_df["hour"] = pd.to_datetime(filtered_df["datetime"]).dt.hour
+
+    if "hour" not in filtered_df.columns:
+        return filtered_df
+
+    return filtered_df[
+        (filtered_df["hour"] >= OPEN_HOUR)
+        &
+        (filtered_df["hour"] < CROWD_END_HOUR)
+    ].copy()
 
 
 def connect_db(db_name):
@@ -277,13 +312,15 @@ def get_calendar_bonus(target_date, price):
         bonus += 2
         reasons.append("土日")
 
-    if jpholiday.is_holiday(d):
+    if is_japanese_holiday(d):
         bonus += 2
         reasons.append("祝日")
+    elif jpholiday is None:
+        reasons.append("祝日判定なし")
 
     tomorrow = d + timedelta(days=1)
 
-    if jpholiday.is_holiday(tomorrow):
+    if is_japanese_holiday(tomorrow):
         bonus += 1
         reasons.append("祝前日")
 
@@ -416,12 +453,17 @@ def save_prediction_rows(cursor, conn, pred_df, attraction_name):
 
 
 def update_prediction_feedback(cursor, conn, valid_open_df, avg_wait):
-    now_hour = datetime.now(JST).hour
+    now = datetime.now(JST)
+    now_hour = now.hour
+
+    if not is_crowd_hour(now):
+        return
 
     if len(valid_open_df) == 0:
         return
 
     actual_now = float(avg_wait)
+    today_prefix = now.strftime("%Y-%m-%d")
 
     cursor.execute("""
     UPDATE predictions
@@ -430,11 +472,13 @@ def update_prediction_feedback(cursor, conn, valid_open_df, avg_wait):
     WHERE target_hour = ?
     AND actual_wait IS NULL
     AND attraction = ?
+    AND created_at LIKE ?
     """, (
         actual_now,
         actual_now,
         now_hour,
-        GLOBAL_PREDICTION_NAME
+        GLOBAL_PREDICTION_NAME,
+        f"{today_prefix}%"
     ))
 
     for _, row in valid_open_df.iterrows():
@@ -448,11 +492,13 @@ def update_prediction_feedback(cursor, conn, valid_open_df, avg_wait):
         WHERE target_hour = ?
         AND actual_wait IS NULL
         AND attraction = ?
+        AND created_at LIKE ?
         """, (
             actual_wait,
             actual_wait,
             now_hour,
-            attraction
+            attraction,
+            f"{today_prefix}%"
         ))
 
     conn.commit()
@@ -498,6 +544,7 @@ def get_current_stats(valid_open_df):
 
 def get_today_stats(history_df, valid_open_df):
     today = datetime.now(JST).date()
+    history_df = filter_crowd_history(history_df)
 
     if len(history_df) > 0 and "date" in history_df.columns:
         today_df = history_df[
@@ -512,12 +559,12 @@ def get_today_stats(history_df, valid_open_df):
         avg_wait = today_df["wait_time"].mean()
         max_wait = today_df["wait_time"].max()
         var_wait = today_df["wait_time"].var()
-        source = "今日の開園後〜現在までの全アトラクション平均"
+        source = "今日9:00以降〜現在までの5大アトラクション平均"
     elif len(valid_open_df) > 0:
         avg_wait = valid_open_df["Wait"].mean()
         max_wait = valid_open_df["Wait"].max()
         var_wait = valid_open_df["Wait"].var()
-        source = "現在の営業中全アトラクションデータ"
+        source = "現在の営業中5大アトラクションデータ"
     else:
         avg_wait = 0
         max_wait = 0
@@ -528,6 +575,60 @@ def get_today_stats(history_df, valid_open_df):
         var_wait = 0
 
     return avg_wait, max_wait, var_wait, source
+
+
+def get_prediction_gap_summary(prediction_history):
+    if len(prediction_history) == 0:
+        return pd.DataFrame([
+            {
+                "理由": "予測データがまだ保存されていません",
+                "件数": 0,
+                "説明": "アプリを営業中に起動して予測を作成すると、次回以降に誤差を記録できます。"
+            }
+        ])
+
+    pending_df = prediction_history[
+        prediction_history["error"].isna()
+    ].copy()
+
+    if len(pending_df) == 0:
+        return pd.DataFrame([
+            {
+                "理由": "未採点の予測はありません",
+                "件数": 0,
+                "説明": "保存済みの予測には実測値が入り、誤差データが作成されています。"
+            }
+        ])
+
+    now = datetime.now(JST)
+    pending_df["created_date"] = pending_df["created_at"].dt.date
+
+    def classify(row):
+        target_hour = int(row["target_hour"])
+
+        if target_hour < OPEN_HOUR or target_hour >= CROWD_END_HOUR:
+            return "21:00〜翌9:00は混雑指数・誤差更新の対象外"
+
+        if row["created_at"].date() == now.date() and target_hour > now.hour:
+            return "対象時刻がまだ来ていない"
+
+        if row["created_at"].date() == now.date() and target_hour == now.hour:
+            return "現在時刻の実測待ち時間がまだ保存されていない"
+
+        return "対象時刻に営業中の有効な待ち時間データがなかった"
+
+    pending_df["理由"] = pending_df.apply(classify, axis=1)
+
+    summary = pending_df.groupby(["created_date", "理由"]).size().reset_index(name="件数")
+    summary = summary.rename(columns={"created_date": "予測日"})
+    summary["説明"] = summary["理由"].map({
+        "21:00〜翌9:00は混雑指数・誤差更新の対象外": "夜間データは仕様により混雑指数にも予測誤差にも使いません。",
+        "対象時刻がまだ来ていない": "未来の予測なので、対象時刻になってから実測値と照合します。",
+        "現在時刻の実測待ち時間がまだ保存されていない": "アプリの更新タイミングで実測値が入ると誤差を計算します。",
+        "対象時刻に営業中の有効な待ち時間データがなかった": "休止、閉園、通信失敗、または待ち時間0分などで比較できる実測値がありませんでした。"
+    })
+
+    return summary
 
 
 def get_weather_score(weather_text, rain_mm, temperature):
