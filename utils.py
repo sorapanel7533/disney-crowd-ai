@@ -21,6 +21,7 @@ PARK_SETTINGS = {
     "DisneySea": {
         "url": "https://queue-times.com/parks/275/queue_times.json",
         "urtrip_url": "https://urtrip.jp/tds-attraction-waitingtime-realtime/#pass_status",
+        "show_url": "https://www.tokyodisneyresort.jp/en/tds/show.html",
         "db": "disneysea.db",
         "rides": [
             "Journey to the Center of the Earth",
@@ -42,6 +43,7 @@ PARK_SETTINGS = {
     "Disneyland": {
         "url": "https://queue-times.com/parks/274/queue_times.json",
         "urtrip_url": "https://urtrip.jp/tdl-attraction-waitingtime-realtime/#pass_status",
+        "show_url": "https://www.tokyodisneyresort.jp/en/tdl/show.html",
         "db": "disneyland.db",
         "rides": [
             "Enchanted Tale of Beauty and the Beast",
@@ -234,6 +236,34 @@ def connect_db(db_name):
         bonus REAL,
         source TEXT,
         note TEXT
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS show_schedules (
+        observed_at TEXT,
+        target_date TEXT,
+        park TEXT,
+        show_name TEXT,
+        show_time TEXT,
+        category TEXT,
+        source TEXT,
+        note TEXT
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS show_wait_context (
+        observed_at TEXT,
+        target_date TEXT,
+        park TEXT,
+        show_name TEXT,
+        show_time TEXT,
+        minutes_to_show REAL,
+        avg_major_wait REAL,
+        max_major_wait REAL,
+        open_major_count INTEGER,
+        source TEXT
     )
     """)
 
@@ -1542,6 +1572,232 @@ def get_forecast_weather_for_date(daily_weather, target_date, fallback_temperatu
     return float(forecast_temperature), float(forecast_rain), "日別天気予報を使用"
 
 
+
+def _parse_show_time_to_hour(show_time):
+    text = str(show_time).strip().lower().replace("\u00a0", " ")
+    match = re.search(r"(\d{1,2}):(\d{2})\s*(a\.m\.|p\.m\.|am|pm)?", text)
+    if not match:
+        return None
+
+    hour = int(match.group(1))
+    minute = int(match.group(2))
+    suffix = match.group(3) or ""
+
+    if "p" in suffix and hour < 12:
+        hour += 12
+    if "a" in suffix and hour == 12:
+        hour = 0
+
+    return hour + minute / 60
+
+
+def _clean_show_name(value):
+    text = re.sub(r"\s+", " ", unescape(str(value))).strip()
+    skip_words = [
+        "operation", "schedule", "duration", "about", "search", "filter",
+        "previous month", "next month", "disney premier access", "休止", "運営"
+    ]
+    if not text or len(text) > 90:
+        return ""
+    if any(word in text.lower() for word in skip_words):
+        return ""
+    return text
+
+
+def fetch_official_show_schedule(settings, target_date=None):
+    target_date = target_date or datetime.now(JST).date()
+    url = settings.get("show_url", "")
+    if not url:
+        return pd.DataFrame(), "ショースケジュールURLが設定されていません"
+
+    try:
+        res = requests.get(
+            url,
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=18,
+        )
+        res.raise_for_status()
+    except Exception as exc:
+        return pd.DataFrame(), f"公式ショーページ取得失敗: {exc}"
+
+    html = res.text
+    text = re.sub(r"<script.*?</script>", " ", html, flags=re.S | re.I)
+    text = re.sub(r"<style.*?</style>", " ", text, flags=re.S | re.I)
+    text = re.sub(r"<[^>]+>", "\n", text)
+    lines = [_clean_show_name(line) for line in text.splitlines()]
+    lines = [line for line in lines if line]
+
+    rows = []
+    seen = set()
+    time_pattern = re.compile(r"\d{1,2}:\d{2}\s*(?:a\.m\.|p\.m\.|am|pm)?", re.I)
+
+    for idx, line in enumerate(lines):
+        times = time_pattern.findall(line)
+        if not times:
+            continue
+
+        name = ""
+        for back in range(idx - 1, max(-1, idx - 8), -1):
+            candidate = _clean_show_name(lines[back])
+            if candidate and not time_pattern.search(candidate):
+                name = candidate
+                break
+
+        if not name:
+            name = "ショー/パレード"
+
+        category = "パレード" if "parade" in name.lower() or "パレード" in name else "ショー"
+        for show_time in times:
+            hour_value = _parse_show_time_to_hour(show_time)
+            if hour_value is None or hour_value < 6 or hour_value > 23:
+                continue
+            key = (name, show_time)
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append({
+                "target_date": target_date,
+                "show_name": name,
+                "show_time": show_time.replace("\u00a0", " "),
+                "category": category,
+                "source": url,
+                "note": "公式ショーページから自動抽出",
+            })
+
+    if not rows:
+        return pd.DataFrame(), "公式ページから今日のショー時刻を抽出できませんでした"
+
+    return pd.DataFrame(rows).sort_values("show_time"), f"公式ページから{len(rows)}件取得"
+
+
+def save_show_schedule_rows(cursor, conn, park, show_df, target_date=None):
+    if show_df is None or len(show_df) == 0:
+        return 0
+
+    target_date = target_date or datetime.now(JST).date()
+    cursor.execute(
+        "DELETE FROM show_schedules WHERE target_date = ? AND park = ?",
+        (str(target_date), park)
+    )
+
+    saved = 0
+    observed_at = datetime.now(JST).isoformat()
+    for _, row in show_df.iterrows():
+        cursor.execute("""
+        INSERT INTO show_schedules
+        (observed_at, target_date, park, show_name, show_time, category, source, note)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            observed_at,
+            str(row.get("target_date", target_date)),
+            park,
+            str(row.get("show_name", "")),
+            str(row.get("show_time", "")),
+            str(row.get("category", "ショー")),
+            str(row.get("source", "official")),
+            str(row.get("note", "")),
+        ))
+        saved += 1
+
+    conn.commit()
+    return saved
+
+
+def load_show_schedules(conn):
+    try:
+        return pd.read_sql_query("SELECT * FROM show_schedules", conn)
+    except Exception:
+        return pd.DataFrame()
+
+
+def save_show_wait_context(cursor, conn, park, show_df, current_target_df):
+    if show_df is None or len(show_df) == 0 or current_target_df is None or len(current_target_df) == 0:
+        return 0
+
+    now = datetime.now(JST)
+    valid_df = current_target_df[(current_target_df["Open"] == True) & (current_target_df["Wait"] > 0)].copy()
+    if len(valid_df) == 0:
+        return 0
+
+    avg_wait = float(valid_df["Wait"].mean())
+    max_wait = float(valid_df["Wait"].max())
+    open_count = int(len(valid_df))
+    saved = 0
+
+    for _, row in show_df.iterrows():
+        hour_value = _parse_show_time_to_hour(row.get("show_time", ""))
+        if hour_value is None:
+            continue
+        show_dt = datetime.combine(now.date(), datetime.min.time(), tzinfo=JST) + timedelta(hours=hour_value)
+        minutes_to_show = (show_dt - now).total_seconds() / 60
+        if -180 <= minutes_to_show <= 360:
+            cursor.execute("""
+            INSERT INTO show_wait_context
+            (observed_at, target_date, park, show_name, show_time, minutes_to_show,
+             avg_major_wait, max_major_wait, open_major_count, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                now.isoformat(),
+                str(now.date()),
+                park,
+                str(row.get("show_name", "")),
+                str(row.get("show_time", "")),
+                round(minutes_to_show, 1),
+                round(avg_wait, 1),
+                round(max_wait, 1),
+                open_count,
+                "show_wait_context",
+            ))
+            saved += 1
+
+    conn.commit()
+    return saved
+
+
+def load_show_wait_context(conn):
+    try:
+        return pd.read_sql_query("SELECT * FROM show_wait_context", conn)
+    except Exception:
+        return pd.DataFrame()
+
+
+def get_show_wait_insights(show_wait_context):
+    if show_wait_context is None or len(show_wait_context) == 0:
+        return pd.DataFrame([{
+            "分析": "データ不足",
+            "内容": "ショー時刻と待ち時間の関係データはまだありません。自動取得後に蓄積されます。",
+        }])
+
+    df = show_wait_context.copy()
+    if "minutes_to_show" not in df.columns or "avg_major_wait" not in df.columns:
+        return pd.DataFrame([{"分析": "列不足", "内容": "分析に必要な列がまだありません。"}])
+
+    df["minutes_to_show"] = pd.to_numeric(df["minutes_to_show"], errors="coerce")
+    df["avg_major_wait"] = pd.to_numeric(df["avg_major_wait"], errors="coerce")
+    df = df.dropna(subset=["minutes_to_show", "avg_major_wait"])
+
+    if len(df) < 5:
+        return pd.DataFrame([{
+            "分析": "蓄積中",
+            "内容": f"現在{len(df)}件です。傾向を見るにはもう少し記録が必要です。",
+        }])
+
+    before = df[(df["minutes_to_show"] >= 0) & (df["minutes_to_show"] <= 90)]
+    after = df[(df["minutes_to_show"] < 0) & (df["minutes_to_show"] >= -90)]
+    rows = []
+
+    if len(before) > 0:
+        rows.append({
+            "分析": "ショー前90分",
+            "内容": f"5大平均待ち時間は約{before['avg_major_wait'].mean():.1f}分です。",
+        })
+    if len(after) > 0:
+        rows.append({
+            "分析": "ショー後90分",
+            "内容": f"5大平均待ち時間は約{after['avg_major_wait'].mean():.1f}分です。",
+        })
+
+    return pd.DataFrame(rows) if rows else pd.DataFrame([{"分析": "蓄積中", "内容": "ショー前後の比較対象がまだ不足しています。"}])
 def auto_collect_prediction_context(cursor, conn, park):
     logs = load_data_fetch_logs(conn)
     today = datetime.now(JST).date()
@@ -1581,6 +1837,23 @@ def auto_collect_prediction_context(cursor, conn, park):
     else:
         results.append("イベントシグナルは確認済み")
 
+
+    if should_fetch_data_today(logs, park, "show_schedules", today):
+        show_df, show_message = fetch_official_show_schedule(PARK_SETTINGS.get(park, {}), today)
+        saved_count = save_show_schedule_rows(cursor, conn, park, show_df, today)
+        log_data_fetch(
+            cursor,
+            conn,
+            park,
+            "show_schedules",
+            "success" if saved_count > 0 else "empty",
+            show_message,
+            saved_count,
+            today
+        )
+        results.append(f"ショー時刻を{saved_count}件保存")
+    else:
+        results.append("ショー時刻は確認済み")
     return results
 
 
@@ -2762,6 +3035,165 @@ def get_historical_crowd_rank(history_df, settings, lookback_days=30):
     return {"message": f"今日は過去{len(daily_avg)}日中 上位{100 - percentile:.0f}%の混雑です。{level}", "percentile": round(percentile, 1), "today_avg": round(today_avg, 1), "days": int(len(daily_avg)), "level": level}
 
 
+
+def get_prediction_risk_diagnosis(
+    history_df,
+    prediction_history,
+    current_df,
+    settings,
+    ticket_price=None,
+    weather_source="",
+):
+    rows = []
+    now = datetime.now(JST)
+
+    def add(item, status, detail, severity):
+        rows.append({
+            "診断項目": item,
+            "状態": status,
+            "理由": detail,
+            "重要度": severity,
+        })
+
+    if len(history_df) == 0:
+        add("履歴データ", "不足", "待ち時間履歴がまだありません。予測は標準値に近くなります。", "高")
+    else:
+        model_df = history_df.copy()
+        if "attraction" in model_df.columns:
+            model_df = model_df[model_df["attraction"].isin(settings["rides"])].copy()
+        model_df = filter_crowd_history(model_df)
+        days = model_df["date"].nunique() if len(model_df) > 0 and "date" in model_df.columns else 0
+        ride_count = model_df["attraction"].nunique() if len(model_df) > 0 and "attraction" in model_df.columns else 0
+        if days < 7:
+            add("履歴データ", "少ない", f"5大アトラクションの有効履歴が{days}日分です。曜日傾向が弱くなります。", "高")
+        elif days < 21:
+            add("履歴データ", "やや少ない", f"有効履歴は{days}日分です。季節差やイベント差はまだ弱めです。", "中")
+        else:
+            add("履歴データ", "良好", f"有効履歴は{days}日分あります。", "低")
+
+        if ride_count < len(settings["rides"]):
+            add("5大アトラクション網羅", "不足", f"{ride_count}/{len(settings['rides'])}施設分だけ履歴があります。", "中")
+        else:
+            add("5大アトラクション網羅", "良好", "5大アトラクションの履歴がそろっています。", "低")
+
+    if len(current_df) == 0:
+        add("現在値", "未取得", "現在の待ち時間が取れていません。今日の補正が弱くなります。", "中")
+    else:
+        current_major = current_df[current_df["Attraction"].isin(settings["rides"])] if "Attraction" in current_df.columns else pd.DataFrame()
+        open_major = current_major[(current_major["Open"] == True) & (current_major["Wait"] > 0)] if len(current_major) > 0 else pd.DataFrame()
+        if len(open_major) < max(3, len(settings["rides"]) - 1):
+            add("現在値", "一部不足", f"現在取得できている5大アトラクションは{len(open_major)}件です。", "中")
+        else:
+            add("現在値", "良好", "現在の5大アトラクション待ち時間を補正に使えます。", "低")
+
+        if len(history_df) > 0 and "hour" in history_df.columns and len(open_major) > 0:
+            hist = history_df[history_df["attraction"].isin(settings["rides"])].copy()
+            hist = filter_crowd_history(hist)
+            same_hour = hist[hist["hour"] == now.hour] if len(hist) > 0 else pd.DataFrame()
+            if len(same_hour) >= 10:
+                current_avg = float(open_major["Wait"].mean())
+                baseline = float(same_hour["wait_time"].median())
+                diff = current_avg - baseline
+                if abs(diff) >= 30:
+                    add("今日の異常度", "大きい", f"同時間帯の中央値より約{diff:+.0f}分ずれています。通常日と違う可能性があります。", "高")
+                elif abs(diff) >= 15:
+                    add("今日の異常度", "やや大きい", f"同時間帯の中央値より約{diff:+.0f}分ずれています。", "中")
+                else:
+                    add("今日の異常度", "通常範囲", "同時間帯の過去傾向から大きく外れていません。", "低")
+
+    if len(prediction_history) == 0 or "error" not in prediction_history.columns:
+        add("誤差学習", "未蓄積", "予測と実測の差がまだ学習できていません。", "高")
+    else:
+        err = prediction_history[prediction_history["error"].notna()].copy()
+        if len(err) < 20:
+            add("誤差学習", "少ない", f"誤差データは{len(err)}件です。補正はまだ弱めです。", "中")
+        else:
+            recent_mae = float(err["error"].abs().tail(80).mean())
+            if recent_mae >= 30:
+                add("誤差学習", "要注意", f"最近の平均誤差が約{recent_mae:.1f}分です。予測幅を広めに見てください。", "高")
+            elif recent_mae >= 18:
+                add("誤差学習", "注意", f"最近の平均誤差が約{recent_mae:.1f}分です。", "中")
+            else:
+                add("誤差学習", "良好", f"最近の平均誤差は約{recent_mae:.1f}分です。", "低")
+
+    if ticket_price is None or pd.isna(ticket_price):
+        add("チケット価格", "未取得", "価格シグナルが使えません。休日・繁忙日の判定が少し弱くなります。", "中")
+    elif float(ticket_price) >= 10900:
+        add("チケット価格", "高価格日", f"チケット価格が{int(ticket_price)}円です。混雑寄りのシグナルです。", "中")
+    else:
+        add("チケット価格", "取得済み", f"チケット価格は{int(ticket_price)}円です。", "低")
+
+    if not ("日別" in str(weather_source) or "予報" in str(weather_source)):
+        add("天気", "現在値寄り", "対象日の天気予報ではなく、現在天気を使っている可能性があります。", "中")
+    else:
+        add("天気", "取得済み", "天気シグナルを予測に使えます。", "低")
+
+    return pd.DataFrame(rows)
+
+
+def get_guest_action_plan(wait_prediction_df, crowd_index=None, ticket_price=None):
+    if len(wait_prediction_df) == 0 or "Predicted Wait" not in wait_prediction_df.columns:
+        return pd.DataFrame([{
+            "優先度": "確認",
+            "おすすめ": "予測データ不足",
+            "理由": "時間帯別の待ち時間予測がまだ作成できません。",
+        }])
+
+    df = wait_prediction_df.copy()
+    df = df[df["Predicted Wait"].notna()].copy()
+    if len(df) == 0:
+        return pd.DataFrame([{
+            "優先度": "確認",
+            "おすすめ": "予測データ不足",
+            "理由": "有効な予測値がありません。",
+        }])
+
+    hourly = df.groupby("Hour")["Predicted Wait"].mean().sort_values()
+    rows = []
+
+    if len(hourly) > 0:
+        best_hour = int(hourly.index[0])
+        best_wait = float(hourly.iloc[0])
+        rows.append({
+            "優先度": "高",
+            "おすすめ": f"{best_hour}:00台を狙う",
+            "理由": f"5大アトラクション平均が約{best_wait:.0f}分で、予測上いちばん軽い時間帯です。",
+        })
+
+    if len(hourly) >= 3:
+        peak_hour = int(hourly.index[-1])
+        peak_wait = float(hourly.iloc[-1])
+        rows.append({
+            "優先度": "高",
+            "おすすめ": f"{peak_hour}:00台は避ける",
+            "理由": f"平均待ち時間が約{peak_wait:.0f}分まで上がる予測です。",
+        })
+
+    peak_by_ride = df.groupby("Attraction")["Predicted Wait"].max().sort_values(ascending=False)
+    if len(peak_by_ride) > 0:
+        ride = str(peak_by_ride.index[0])
+        wait = float(peak_by_ride.iloc[0])
+        rows.append({
+            "優先度": "中",
+            "おすすめ": f"{ride}は早めに判断",
+            "理由": f"最大で約{wait:.0f}分まで伸びる予測です。DPAや朝の優先利用を検討してください。",
+        })
+
+    if crowd_index is not None and crowd_index >= 7:
+        rows.append({
+            "優先度": "高",
+            "おすすめ": "休憩と食事を前倒し",
+            "理由": "混雑指数が高めです。昼前後の待ち時間増加を避けると動きやすくなります。",
+        })
+
+    if ticket_price is not None and not pd.isna(ticket_price) and float(ticket_price) >= 10900:
+        rows.append({
+            "優先度": "中",
+            "おすすめ": "人気施設は後回しにしすぎない",
+            "理由": "高価格日は来園需要が強い日として扱っています。",
+        })
+
+    return pd.DataFrame(rows)
 def get_current_stats(valid_open_df):
     if len(valid_open_df) > 0:
         avg_wait = valid_open_df["Wait"].mean()
@@ -2894,6 +3326,55 @@ def get_dpa_score(avg_wait, max_wait):
     return score
 
 
+
+def format_crowd_index(value):
+    try:
+        return f"{float(value):.1f}"
+    except Exception:
+        return "0.0"
+
+
+def make_x_post_summary(
+    park,
+    target_date,
+    crowd_index,
+    wait_prediction_df,
+    weather_source="",
+    ticket_price=None,
+    reasons=None,
+):
+    reasons = reasons or []
+    date_text = target_date.strftime("%m/%d") if hasattr(target_date, "strftime") else str(target_date)
+    level, _ = get_level(float(crowd_index))
+
+    avg_wait = 0
+    peak_hour = None
+    peak_wait = None
+    if wait_prediction_df is not None and len(wait_prediction_df) > 0 and "Predicted Wait" in wait_prediction_df.columns:
+        avg_wait = float(wait_prediction_df["Predicted Wait"].mean())
+        if "Hour" in wait_prediction_df.columns:
+            hourly = wait_prediction_df.groupby("Hour")["Predicted Wait"].mean()
+            if len(hourly) > 0:
+                peak_hour = int(hourly.idxmax())
+                peak_wait = float(hourly.max())
+
+    weather_part = f"天気:{weather_source}" if weather_source else "天気:未取得"
+    price_part = "価格:未取得" if ticket_price is None or pd.isna(ticket_price) else f"価格:{int(ticket_price)}円"
+    peak_part = f"ピークは{peak_hour}時台({peak_wait:.0f}分前後)" if peak_hour is not None else "ピーク時間はデータ不足"
+    reason_part = "、".join([str(r) for r in reasons[:2]]) if reasons else "履歴・曜日・天気・価格から推定"
+
+    text = (
+        f"【{park} 明日{date_text}の混雑予測】"
+        f"混雑指数{format_crowd_index(crowd_index)}/10（{level}）。"
+        f"5大平均は約{avg_wait:.0f}分、{peak_part}。"
+        f"{weather_part}、{price_part}。"
+        f"理由:{reason_part}。朝の人気施設とDPAは早め判断がおすすめ。"
+    )
+
+    if len(text) > 200:
+        text = text[:197] + "..."
+
+    return text
 def get_crowd_index(avg_wait, max_wait, var_wait, dpa, weather_score, feedback_error, today_bonus):
     crowd_score = (
         avg_wait * 0.45
@@ -2905,7 +3386,7 @@ def get_crowd_index(avg_wait, max_wait, var_wait, dpa, weather_score, feedback_e
         + today_bonus * 8
     )
 
-    return int(min(10, max(1, round(crowd_score / 25))))
+    return round(min(10, max(1, crowd_score / 25)), 1)
 
 
 def get_level(crowd_10):
