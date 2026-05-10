@@ -12,11 +12,14 @@ from utils import (
     GLOBAL_PREDICTION_NAME,
     PARK_SETTINGS,
     connect_db,
+    clear_dpa_sellouts,
     fetch_ticket_prices,
+    fetch_urtrip_dpa_sellouts,
     fetch_wait_times,
     get_calendar_bonus,
     get_crowd_index,
     get_current_stats,
+    get_data_quality_report,
     get_dpa_score,
     get_feedback_error,
     get_level,
@@ -38,6 +41,7 @@ from utils import (
     predict_wait_times_for_date,
     save_daily_crowd_prediction,
     save_dpa_sellout,
+    save_dpa_sellout_rows,
     predict_dpa_risk,
     save_prediction_rows,
     save_wait_times,
@@ -60,6 +64,11 @@ st.set_page_config(
 @st.cache_data(ttl=3600)
 def cached_fetch_ticket_prices():
     return fetch_ticket_prices()
+
+
+@st.cache_data(ttl=900)
+def cached_fetch_urtrip_dpa_sellouts(park_name):
+    return fetch_urtrip_dpa_sellouts(PARK_SETTINGS[park_name])
 
 st.markdown("""
 <style>
@@ -942,6 +951,40 @@ elif display_mode == "DPA売切れ予測":
 
     st.subheader("🎫 DPA売切れ予測")
 
+    st.subheader("外部サイトからDPA売切れ時刻を取得")
+
+    st.caption(
+        "urtripのDPA欄から、今日の発行状況と過去の発行終了確認時刻を読み込みます。保存時は同じ日付・アトラクション・取得元の古い行を置き換えます。"
+    )
+
+    col_fetch, col_clear = st.columns(2)
+
+    with col_fetch:
+        if st.button("urtripから取得して保存"):
+            scraped_df, scrape_message = cached_fetch_urtrip_dpa_sellouts(park)
+
+            if len(scraped_df) > 0:
+                saved_count = save_dpa_sellout_rows(
+                    cursor,
+                    conn,
+                    scraped_df,
+                    "urtrip"
+                )
+                dpa_sellout_history = load_dpa_sellouts(conn)
+                st.success(f"{scrape_message} / 保存 {saved_count}件")
+                st.dataframe(
+                    scraped_df,
+                    use_container_width=True
+                )
+            else:
+                st.warning(scrape_message)
+
+    with col_clear:
+        if st.button("DPA売切れ履歴を全削除"):
+            clear_dpa_sellouts(cursor, conn)
+            dpa_sellout_history = load_dpa_sellouts(conn)
+            st.success("DPA売切れ履歴を削除しました。")
+
     dpa_rows = []
 
     for _, row in valid_target_df.iterrows():
@@ -1090,6 +1133,17 @@ elif display_mode == "日付指定予測":
     st.write("価格取得元:", target_ticket_source)
     st.write("主な理由:", " / ".join(target_reasons))
 
+    st.subheader("予測データの健全性")
+    st.dataframe(
+        get_data_quality_report(
+            history_df,
+            prediction_history,
+            dpa_sellout_history,
+            settings
+        ),
+        use_container_width=True
+    )
+
     st.subheader("時間帯別・アトラクション別待ち時間予測")
 
     st.dataframe(
@@ -1183,6 +1237,18 @@ elif display_mode == "データ管理":
             attraction_summary,
             use_container_width=True
         )
+
+    st.subheader("予測データの健全性")
+
+    st.dataframe(
+        get_data_quality_report(
+            history_df,
+            prediction_history,
+            dpa_sellout_history,
+            settings
+        ),
+        use_container_width=True
+    )
 
     if len(error_only_df) > 0:
 
