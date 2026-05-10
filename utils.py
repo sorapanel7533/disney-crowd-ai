@@ -2289,6 +2289,7 @@ def make_week_forecast(
     event_signals=None,
     park_hours_df=None,
     park=None,
+    daily_weather=None,
 ):
     rows = []
 
