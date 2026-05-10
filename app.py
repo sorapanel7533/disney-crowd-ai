@@ -27,6 +27,8 @@ from utils import (
     get_feedback_error,
     get_forecast_weather_for_date,
     get_level,
+    format_crowd_index,
+    make_x_post_summary,
     get_next_feature_plan,
     get_attraction_status_summary,
     get_event_bonus,
@@ -36,6 +38,12 @@ from utils import (
     get_prediction_confidence,
     get_area_crowd_map,
     get_emptying_candidates,
+    get_guest_action_plan,
+    get_prediction_risk_diagnosis,
+    get_show_wait_insights,
+    load_show_schedules,
+    load_show_wait_context,
+    save_show_wait_context,
     get_historical_crowd_rank,
     get_prediction_gap_summary,
     get_wait_trend,
@@ -412,6 +420,8 @@ weather_snapshots = load_weather_snapshots(conn)
 ticket_price_snapshots = load_ticket_price_snapshots(conn)
 park_hours_df = load_park_hours(conn)
 event_signals = load_event_signals(conn)
+show_schedules = load_show_schedules(conn)
+show_wait_context = load_show_wait_context(conn)
 
 try:
     all_df, target_df = fetch_wait_times(settings)
@@ -435,6 +445,11 @@ attraction_status_snapshots = load_attraction_status_snapshots(conn)
 
 valid_all_df = get_valid_open_df(all_df)
 valid_target_df = get_valid_open_df(target_df)
+today_show_schedules = show_schedules[
+    show_schedules.get("target_date", "") == str(datetime.now(JST).date())
+].copy() if len(show_schedules) > 0 else pd.DataFrame()
+save_show_wait_context(cursor, conn, park, today_show_schedules, valid_target_df)
+show_wait_context = load_show_wait_context(conn)
 
 history_df = load_history(conn)
 
@@ -673,7 +688,7 @@ if display_mode == "ダッシュボード":
         st.metric("5大最大待ち時間", round(max_wait, 1))
 
     with m3:
-        st.metric("混雑指数", crowd_10)
+        st.metric("混雑指数", format_crowd_index(crowd_10))
 
     with m4:
         st.metric("5大予測補正", round(global_feedback_error, 1))
@@ -711,6 +726,23 @@ if display_mode == "ダッシュボード":
         unsafe_allow_html=True
     )
 
+
+    st.subheader("🎭 今日のショー/パレード")
+    if len(today_show_schedules) > 0:
+        st.dataframe(
+            safe_sort_head(today_show_schedules, "show_time", 30, ascending=True)[
+                ["show_time", "show_name", "category", "note"]
+            ] if set(["show_time", "show_name", "category", "note"]).issubset(today_show_schedules.columns) else today_show_schedules,
+            use_container_width=True
+        )
+    else:
+        st.info("今日のショー/パレード時刻はまだ取得できていません。公式ページ取得に失敗した場合も、アプリはそのまま動きます。")
+
+    st.subheader("🎯 ショー前後の待ち時間メモ")
+    st.dataframe(
+        get_show_wait_insights(show_wait_context),
+        use_container_width=True
+    )
     st.subheader("🤖 5大アトラクションの予想平均待ち時間")
 
     st.subheader("今後空き始めそうな候補")
@@ -796,6 +828,48 @@ if display_mode == "ダッシュボード":
                     attraction
                 )
 
+
+        tomorrow_date = datetime.now(JST).date() + timedelta(days=1)
+        tomorrow_ticket_price, _ = get_ticket_price_from_castel(
+            tomorrow_date,
+            ticket_price_map
+        )
+        tomorrow_temperature, tomorrow_rain, tomorrow_weather_source = get_forecast_weather_for_date(
+            daily_weather,
+            tomorrow_date,
+            temperature,
+            rain_mm
+        )
+        tomorrow_crowd, tomorrow_wait_df, tomorrow_reasons = predict_crowd_index_for_date(
+            history_df,
+            settings,
+            tomorrow_date,
+            tomorrow_temperature,
+            tomorrow_rain,
+            prediction_history,
+            daily_prediction_history,
+            tomorrow_ticket_price,
+            None,
+            event_signals,
+            park_hours_df,
+            park
+        )
+        x_post_text = make_x_post_summary(
+            park,
+            tomorrow_date,
+            tomorrow_crowd,
+            tomorrow_wait_df,
+            tomorrow_weather_source,
+            tomorrow_ticket_price,
+            tomorrow_reasons
+        )
+        st.subheader("📝 21時投稿用 X文面")
+        st.text_area(
+            "明日の混雑予測投稿文（約200字）",
+            x_post_text,
+            height=130
+        )
+        st.caption("毎日21時にこの文面をXへ投稿する想定です。天気・価格・履歴・誤差補正から翌日分を作成します。")
         st.subheader("予測の注意点")
         st.dataframe(
             get_prediction_alerts(
@@ -830,6 +904,29 @@ if display_mode == "ダッシュボード":
     else:
         st.info("5大アトラクション平均予測には、9:00〜20:59の履歴データがもう少し必要です。")
 
+
+    st.subheader("🧭 今日のおすすめ行動プラン")
+    st.dataframe(
+        get_guest_action_plan(
+            wait_pred_df,
+            crowd_10,
+            ticket_price
+        ),
+        use_container_width=True
+    )
+
+    st.subheader("🩺 予測リスク診断")
+    st.dataframe(
+        get_prediction_risk_diagnosis(
+            history_df,
+            prediction_history,
+            valid_target_df,
+            settings,
+            ticket_price,
+            weather_text
+        ),
+        use_container_width=True
+    )
 
     st.subheader("📅 1週間混雑指数予測")
 
@@ -1465,7 +1562,7 @@ elif display_mode == "日付指定予測":
     m1, m2, m3 = st.columns(3)
 
     with m1:
-        st.metric("予測混雑指数", target_crowd)
+        st.metric("予測混雑指数", format_crowd_index(target_crowd))
 
     with m2:
         st.metric(
@@ -1490,6 +1587,29 @@ elif display_mode == "日付指定予測":
     st.write("価格取得元:", target_ticket_source)
     st.write("主な理由:", " / ".join(target_reasons))
 
+
+    st.subheader("🧭 この日のおすすめ行動プラン")
+    st.dataframe(
+        get_guest_action_plan(
+            target_wait_df,
+            target_crowd,
+            target_ticket_price
+        ),
+        use_container_width=True
+    )
+
+    st.subheader("🩺 この日の予測リスク診断")
+    st.dataframe(
+        get_prediction_risk_diagnosis(
+            history_df,
+            prediction_history,
+            valid_target_df if target_date == datetime.now(JST).date() else pd.DataFrame(),
+            settings,
+            target_ticket_price,
+            "手入力/日付指定"
+        ),
+        use_container_width=True
+    )
     st.subheader("予測データの健全性")
     st.dataframe(
         get_data_quality_report(
@@ -1667,6 +1787,24 @@ elif display_mode == "データ管理":
         else:
             st.info("アトラクション営業状態履歴はまだ保存されていません。")
 
+
+        st.markdown("#### ショー/パレード時刻履歴")
+        if len(show_schedules) > 0:
+            st.dataframe(
+                safe_sort_head(show_schedules, "observed_at", 100, ascending=False),
+                use_container_width=True
+            )
+        else:
+            st.info("ショー/パレード時刻履歴はまだ保存されていません。")
+
+        st.markdown("#### ショー前後の待ち時間関係データ")
+        if len(show_wait_context) > 0:
+            st.dataframe(
+                safe_sort_head(show_wait_context, "observed_at", 100, ascending=False),
+                use_container_width=True
+            )
+        else:
+            st.info("ショー前後の待ち時間関係データはまだ保存されていません。")
         st.markdown("#### 保存済みDPA売切れ履歴")
         if len(dpa_sellout_history) > 0:
             st.dataframe(
