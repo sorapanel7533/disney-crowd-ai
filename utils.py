@@ -1516,6 +1516,32 @@ def get_event_bonus(event_signals, target_date, park=None):
     return bonus, reasons
 
 
+def get_forecast_weather_for_date(daily_weather, target_date, fallback_temperature, fallback_rain):
+    d = target_date.date() if isinstance(target_date, datetime) else target_date
+
+    if daily_weather is None or len(daily_weather) == 0 or "time" not in daily_weather.columns:
+        return fallback_temperature, fallback_rain, "現在天気を使用"
+
+    weather_df = daily_weather.copy()
+    weather_df["forecast_date"] = pd.to_datetime(weather_df["time"]).dt.date
+    rows = weather_df[weather_df["forecast_date"] == d]
+
+    if len(rows) == 0:
+        return fallback_temperature, fallback_rain, "日別天気予報なし。現在天気を使用"
+
+    row = rows.iloc[0]
+    forecast_temperature = row.get("temperature_2m_max", fallback_temperature)
+    forecast_rain = row.get("precipitation_sum", fallback_rain)
+
+    if pd.isna(forecast_temperature):
+        forecast_temperature = fallback_temperature
+
+    if pd.isna(forecast_rain):
+        forecast_rain = fallback_rain
+
+    return float(forecast_temperature), float(forecast_rain), "日別天気予報を使用"
+
+
 def auto_collect_prediction_context(cursor, conn, park):
     logs = load_data_fetch_logs(conn)
     today = datetime.now(JST).date()
@@ -2191,6 +2217,7 @@ def predict_crowd_index_for_date(
     event_signals=None,
     park_hours_df=None,
     park=None,
+    daily_weather=None,
 ):
     wait_df = predict_wait_times_for_date(
         history_df,
@@ -2268,12 +2295,18 @@ def make_week_forecast(
     for i in range(7):
         d = start_date + timedelta(days=i)
         ticket_price, ticket_source = get_ticket_price_from_castel(d, ticket_price_map)
+        forecast_temperature, forecast_rain, weather_source = get_forecast_weather_for_date(
+            daily_weather,
+            d,
+            temperature,
+            rain_mm
+        )
         crowd_index, wait_df, reasons = predict_crowd_index_for_date(
             history_df,
             settings,
             d,
-            temperature,
-            rain_mm,
+            forecast_temperature,
+            forecast_rain,
             prediction_history,
             daily_prediction_history,
             ticket_price,
@@ -2286,6 +2319,9 @@ def make_week_forecast(
         rows.append({
             "Date": d.strftime("%m/%d"),
             "Crowd Index": crowd_index,
+            "予報気温": round(forecast_temperature, 1),
+            "予報降水量": round(forecast_rain, 1),
+            "天気取得元": weather_source,
             "5大平均待ち時間": round(wait_df["Predicted Wait"].mean(), 1) if len(wait_df) > 0 else 0,
             "チケット価格": "未取得" if ticket_price is None else ticket_price,
             "主な理由": " / ".join(reasons[:4]),
