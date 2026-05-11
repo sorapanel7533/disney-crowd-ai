@@ -3598,6 +3598,42 @@ def _major_attraction_names(wait_prediction_df):
     return _u(r"\u3001").join(names)
 
 
+def _x_pick_text(profile, include_particle=False):
+    name = _short_attraction_name(profile.get("attraction", ""))
+    hour = int(profile.get("hour", 0))
+    wait = float(profile.get("wait", 0))
+    if include_particle:
+        return f"{name}は{hour}時に{wait:.0f}分予測"
+    return f"{name}{hour}時{wait:.0f}分"
+
+
+def _fit_x_post_text(line1, main_text, other_text):
+    ending = "おすすめは午前に人気施設を1つ押さえ、夕方以降に下がる候補を拾う動き。"
+    line2 = main_text
+    if other_text:
+        line2 += f"ほかの狙い目は{other_text}。"
+    line2 += ending
+    text = f"{line1}\n{line2}"
+
+    if len(text) <= 280:
+        return text
+
+    if other_text and "、" in other_text:
+        first_other = other_text.split("、")[0]
+        line2 = f"{main_text}ほかの狙い目は{first_other}。{ending}"
+        text = f"{line1}\n{line2}"
+        if len(text) <= 280:
+            return text
+
+    line2 = f"{main_text}{ending}"
+    text = f"{line1}\n{line2}"
+    if len(text) <= 280:
+        return text
+
+    keep = max(0, 280 - len(line2) - 2)
+    return f"{line1[:keep]}…\n{line2}"
+
+
 def make_x_post_summary(
     park,
     target_date,
@@ -3612,59 +3648,47 @@ def make_x_post_summary(
     if len(df) > 0 and "Predicted Wait" in df.columns:
         df = df[df["Predicted Wait"].notna()].copy()
 
-    avg_wait = float(df["Predicted Wait"].mean()) if len(df) > 0 and "Predicted Wait" in df.columns else 0
-    peak_hour = None
-    peak_wait = None
-    if len(df) > 0 and {"Hour", "Predicted Wait"}.issubset(df.columns):
-        hourly = df.groupby("Hour")["Predicted Wait"].mean()
-        if len(hourly) > 0:
-            peak_hour = int(hourly.idxmax())
-            peak_wait = float(hourly.max())
-
-    names_text = _major_attraction_names(df)
     level_text = _x_level_text(crowd_index)
-    if names_text and peak_hour is not None:
-        overview = (
-            f"{_u('\\u3010')}{park} {date_text}{_u('\\u306e\\u6df7\\u96d1\\u4e88\\u6e2c\\u3011')}"
-            f"{_u('\\u6df7\\u96d1\\u6307\\u6570')}{format_crowd_index(crowd_index)}/10{_u('\\uff08')}{level_text}{_u('\\uff09\\u3002')}"
-            f"5{_u('\\u5927\\u5e73\\u5747\\uff08')}{names_text}{_u('\\uff09\\u306f\\u7d04')}{avg_wait:.0f}{_u('\\u5206\\u3001')}"
-            f"{_u('\\u30d4\\u30fc\\u30af\\u306f')}{peak_hour}{_u('\\u6642\\u53f0')}({peak_wait:.0f}{_u('\\u5206\\u524d\\u5f8c\\uff09\\u3002')}"
+    title = f"【{park} {date_text}の混雑予測】混雑指数{format_crowd_index(crowd_index)}/10（{level_text}）。"
+    ending = "おすすめは午前に人気施設を1つ押さえ、夕方以降に下がる候補を拾う動き。"
+
+    required_columns = {"Attraction", "Hour", "Predicted Wait"}
+    if len(df) == 0 or not required_columns.issubset(df.columns):
+        return _fit_x_post_text(
+            title + "予測データが不足しているため、5大平均とピーク時間帯は計算中です。",
+            "狙い目はデータ蓄積後に表示します。",
+            ""
         )
-    else:
-        overview = (
-            f"{_u('\\u3010')}{park} {date_text}{_u('\\u306e\\u6df7\\u96d1\\u4e88\\u6e2c\\u3011')}"
-            f"{_u('\\u6df7\\u96d1\\u6307\\u6570')}{format_crowd_index(crowd_index)}/10{_u('\\uff08')}{level_text}{_u('\\uff09\\u3002')}"
-            + _u("\u6642\u9593\u5e2f\u5225\u306e\u8a73\u7d30\u306f\u30c7\u30fc\u30bf\u84c4\u7a4d\u4e2d\u3067\u3059\u3002")
+
+    avg_wait = float(df["Predicted Wait"].mean())
+    hourly = df.groupby("Hour")["Predicted Wait"].mean()
+    peak_hour = int(hourly.idxmax()) if len(hourly) > 0 else None
+    peak_wait = float(hourly.max()) if len(hourly) > 0 else 0
+    names_text = _major_attraction_names(df)
+
+    if not names_text or peak_hour is None:
+        return _fit_x_post_text(
+            title + "予測データが不足しているため、5大平均とピーク時間帯は計算中です。",
+            "狙い目はデータ蓄積後に表示します。",
+            ""
         )
+
+    line1 = (
+        f"{title}"
+        f"5大平均（{names_text}）は約{avg_wait:.0f}分、"
+        f"ピークは{peak_hour}時台({peak_wait:.0f}分前後）。"
+    )
 
     profiles = _attraction_prediction_profiles(df, limit=5)
-    if profiles:
-        pick_parts = []
-        for profile in profiles[:4]:
-            pick_parts.append(
-                f"{_short_attraction_name(profile['attraction'])}{profile['hour']}{_u('\\u6642')}{profile['wait']:.0f}{_u('\\u5206')}"
-            )
-        detail_text = _u(r"\u72d9\u3044\u76ee:") + _u(r"\u3001").join(pick_parts) + _u(r"\u3002")
+    if not profiles:
+        return f"{line1}\n予測データが不足しているため、狙い目は計算中です。{ending}"[:280]
 
-        surge_candidates = [p for p in profiles if p.get("surge_hour") is not None and p.get("surge_delta", 0) >= 10]
-        if surge_candidates:
-            surge = sorted(surge_candidates, key=lambda x: x["surge_delta"], reverse=True)[0]
-            detail_text += (
-                f"{_short_attraction_name(surge['attraction'])}"
-                f"{_u('\\u306f')}{surge['surge_hour']}{_u('\\u6642\\u53f0\\u306b')}{surge['surge_delta']:.0f}"
-                f"{_u('\\u5206\\u307b\\u3069\\u6025\\u306b\\u4f38\\u3073\\u308b\\u50be\\u5411\\u3002')}"
-            )
-        else:
-            peak = sorted(profiles, key=lambda x: x["peak_wait"], reverse=True)[0]
-            detail_text += (
-                f"{_short_attraction_name(peak['attraction'])}"
-                f"{_u('\\u306f\\u30d4\\u30fc\\u30af')}{peak['peak_hour']}{_u('\\u6642\\u53f0')}"
-                f"{peak['peak_wait']:.0f}{_u('\\u5206\\u4e88\\u60f3\\u3002')}"
-            )
-    else:
-        detail_text = _u("\u30a2\u30c8\u30e9\u30af\u30b7\u30e7\u30f3\u5225\u306e\u8a73\u7d30\u306f\u30c7\u30fc\u30bf\u84c4\u7a4d\u4e2d\u3002\u304a\u3059\u3059\u3081\u306f\u5348\u524d\u306b\u4eba\u6c17\u65bd\u8a2d\u30921\u3064\u62bc\u3055\u3048\u308b\u52d5\u304d\u3002")
+    main_pick = profiles[0]
+    other_picks = profiles[1:3]
+    main_text = _x_pick_text(main_pick, include_particle=True) + "。"
+    other_text = "、".join(_x_pick_text(profile) for profile in other_picks)
 
-    return _truncate_text(overview, 150) + "\n" + _truncate_text(detail_text, 170)
+    return _fit_x_post_text(line1, main_text, other_text)
 
 def get_crowd_index(avg_wait, max_wait, var_wait, dpa, weather_score, feedback_error, today_bonus):
     crowd_score = (
