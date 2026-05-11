@@ -909,6 +909,67 @@ def save_daily_crowd_prediction(cursor, conn, target_date, predicted_crowd_index
     conn.commit()
 
 
+def get_locked_daily_prediction(conn, target_date):
+    if conn is None:
+        return None
+
+    target_date_text = target_date.strftime("%Y-%m-%d")
+    try:
+        row = pd.read_sql_query(
+            """
+            SELECT predicted_crowd_index
+            FROM daily_crowd_predictions
+            WHERE target_date = ?
+            ORDER BY created_at ASC
+            LIMIT 1
+            """,
+            conn,
+            params=(target_date_text,)
+        )
+    except Exception:
+        return None
+
+    if len(row) == 0:
+        return None
+
+    value = row.iloc[0].get("predicted_crowd_index")
+    if value is None or pd.isna(value):
+        return None
+
+    return float(value)
+
+
+def save_locked_daily_prediction(cursor, conn, target_date, predicted_crowd_index):
+    if cursor is None or conn is None:
+        return False
+
+    existing = get_locked_daily_prediction(conn, target_date)
+    if existing is not None:
+        return False
+
+    created_at = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
+    target_date_text = target_date.strftime("%Y-%m-%d")
+
+    cursor.execute("""
+    INSERT INTO daily_crowd_predictions
+    (
+        created_at,
+        target_date,
+        predicted_crowd_index,
+        actual_crowd_index,
+        error
+    )
+    VALUES (?, ?, ?, NULL, NULL)
+    """, (
+        created_at,
+        target_date_text,
+        float(predicted_crowd_index)
+    ))
+
+    conn.commit()
+    return True
+
+
 def update_daily_crowd_feedback(cursor, conn, history_df, settings):
     if len(history_df) == 0:
         return
@@ -1619,16 +1680,63 @@ def _clean_show_name(value):
     ]
     if not text or len(text) > 90:
         return ""
+    if _is_broken_show_text(text):
+        return ""
     if any(word in text.lower() for word in skip_words):
         return ""
     return text
+
+
+def _is_broken_show_text(value):
+    text = str(value or "").strip()
+    if not text:
+        return True
+    broken_markers = ["???", "????", "\ufffd", "譁", "縺", "繝", "豌", "髯", "螟", "莠"]
+    return any(marker in text for marker in broken_markers)
+
+
+def _safe_show_text(value, fallback):
+    text = str(value or "").strip()
+    if _is_broken_show_text(text):
+        return fallback
+    return text
+
+
+def _sanitize_show_rows(show_df, fallback_name="ショー/パレード（時刻のみ）"):
+    if show_df is None or len(show_df) == 0:
+        return pd.DataFrame()
+
+    df = show_df.copy()
+    if "show_name" in df.columns:
+        df["show_name"] = df["show_name"].apply(lambda x: _safe_show_text(x, fallback_name))
+    if "category" in df.columns:
+        df["category"] = df["category"].apply(lambda x: _safe_show_text(x, "ショー/パレード"))
+    if "note" in df.columns:
+        df["note"] = df["note"].apply(lambda x: _safe_show_text(x, "公式または推定時刻"))
+    return df
+
+
+SHOW_NAME_BY_ID = {
+    "967": "ビリーヴ！〜シー・オブ・ドリームス〜",
+    "7801": "ディズニー・ライト・ザ・ナイト",
+    "7602": "ビッグバンドビート〜ア・スペシャルトリート〜",
+    "7604": "ジャンボリミッキー！レッツ・ダンス！",
+    "7405": "スカイ・フル・オブ・カラーズ",
+    "7800": "ディズニー・ライト・ザ・ナイト",
+    "913": "エレクトリカルパレード・ドリームライツ",
+    "895": "ミッキーのマジカルミュージックワールド",
+    "7000": "クラブマウスビート",
+    "7202": "Reach for the Stars",
+    "7002": "ディズニー・ハーモニー・イン・カラー",
+    "985": "ジャンボリミッキー！レッツ・ダンス！",
+}
 
 
 
 def _known_show_schedule_fallback(park, target_date):
     rows = []
 
-    def add(name, times, category="???", note="??????????????????????"):
+    def add(name, times, category="ショー/パレード", note="公式ページ取得失敗時の推定時刻"):
         for show_time in times:
             rows.append({
                 "target_date": target_date,
@@ -1646,49 +1754,35 @@ def _known_show_schedule_fallback(park, target_date):
     late_month = day >= 17
 
     if park == "DisneySea":
-        add("??????????????????", ["19:30" if late_month else "19:15"])
-        add("??????????????", ["20:30" if late_month else "20:15"])
-        add("??????????????", ["11:00", "12:25", "13:50", "15:55", "17:20"])
-        add("???????????", ["13:00", "14:45", "17:05", "18:50"] if late_month else ["12:50", "14:35", "16:55", "18:40"])
+        add("ビリーヴ！〜シー・オブ・ドリームス〜", ["19:30" if late_month else "19:15"])
+        add("ディズニー・ライト・ザ・ナイト", ["20:30" if late_month else "20:15"])
+        add("ビッグバンドビート〜ア・スペシャルトリート〜", ["11:00", "12:25", "13:50", "15:55", "17:20"])
+        add("ジャンボリミッキー！レッツ・ダンス！", ["13:00", "14:45", "17:05", "18:50"] if late_month else ["12:50", "14:35", "16:55", "18:40"])
         if day != 22:
-            add("?????????????????", ["20:15", "20:40", "20:55"] if late_month else ["20:00", "20:25", "20:50"])
+            add("スカイ・フル・オブ・カラーズ", ["20:15", "20:40", "20:55"] if late_month else ["20:00", "20:25", "20:50"])
         if day <= 16:
-            add("??????????????????????", ["11:30", "14:00", "16:00"])
+            add("ドックサイド・ダイナー周辺ショー", ["11:30", "14:00", "16:00"])
     elif park == "Disneyland":
         if day >= 17:
-            add("??????????????????", ["13:00"], "????")
-            add("?????????????????", ["15:40"], "????")
+            add("ディズニー・ハーモニー・イン・カラー", ["13:00"], "パレード")
+            add("季節のパレード", ["15:40"], "パレード")
             add("Reach for the Stars", ["20:50"])
-            add("??????????????????????????????", ["19:30"], "????")
-            add("??????????????", ["20:30"])
-            add("??????????????????", ["12:30", "13:45", "15:00", "16:50", "18:05"])
+            add("エレクトリカルパレード・ドリームライツ", ["19:30"], "パレード")
+            add("ディズニー・ライト・ザ・ナイト", ["20:30"])
+            add("クラブマウスビート", ["12:30", "13:45", "15:00", "16:50", "18:05"])
         else:
-            add("?????????????????", ["15:00"], "????")
+            add("ディズニー・ハーモニー・イン・カラー", ["15:00"], "パレード")
             add("Reach for the Stars", ["20:35"])
-            add("??????????????????????????????", ["19:15"], "????")
-            add("??????????????", ["20:15"])
-            add("???????????????????", ["10:55", "12:20", "13:45", "15:50", "17:15"])
-            add("??????????????????", ["11:40", "12:55", "14:10", "16:00", "17:15"])
+            add("エレクトリカルパレード・ドリームライツ", ["19:15"], "パレード")
+            add("ディズニー・ライト・ザ・ナイト", ["20:15"])
+            add("ミッキーのマジカルミュージックワールド", ["10:55", "12:20", "13:45", "15:50", "17:15"])
+            add("クラブマウスビート", ["11:40", "12:55", "14:10", "16:00", "17:15"])
 
-    return pd.DataFrame(rows)
+    return _sanitize_show_rows(pd.DataFrame(rows))
 
 
 def _show_name_from_url(url):
-    name_map = {
-        "967": "??????????????????",
-        "7801": "??????????????",
-        "7602": "??????????????",
-        "7604": "???????????",
-        "7405": "?????????????????",
-        "7800": "??????????????",
-        "913": "??????????????????????????????",
-        "895": "???????????????????",
-        "7000": "??????????????????",
-        "7202": "Reach for the Stars",
-        "7002": "?????????????????",
-        "985": "??????????????????",
-    }
-    for key, value in name_map.items():
+    for key, value in SHOW_NAME_BY_ID.items():
         if f"/{key}" in str(url):
             return value
     return ""
@@ -1719,9 +1813,9 @@ def _parse_monthly_show_page(html, url, target_date):
                 "target_date": target_date,
                 "show_name": show_name,
                 "show_time": show_time.replace("a.m.", "am").replace("p.m.", "pm"),
-                "category": "????" if "????" in show_name else "???",
+                "category": "ショー/パレード",
                 "source": url,
-                "note": "????????????????",
+                "note": "公式月間スケジュールから取得",
             })
     return rows
 
@@ -1735,11 +1829,11 @@ def _parse_daily_show_page(html, url, target_date):
     rows = []
     seen = set()
     time_pattern = re.compile(r"\d{1,2}:\d{2}\s*(?:a\.m\.|p\.m\.|am|pm)?", re.I)
-    stop_words = ["?????????????", "????", "???????", "?????", "????"]
+    stop_words = ["アトラクション", "レストラン", "ショップ", "休止", "運営時間"]
 
     in_show_section = False
     for line in lines:
-        if "????/???" in line or "Parades and Shows" in line:
+        if "ショー/パレード" in line or "Parades and Shows" in line:
             in_show_section = True
             continue
         if in_show_section and any(word in line for word in stop_words):
@@ -1750,8 +1844,9 @@ def _parse_daily_show_page(html, url, target_date):
         if not times:
             continue
         name = time_pattern.sub("", line)
-        name = re.sub(r"????????????????|?????????|?????|NEW", "", name)
+        name = re.sub(r"エントリー受付|ディズニー・プレミアアクセス|NEW", "", name)
         name = re.sub(r"\s*/\s*", " / ", name).strip(" ?/")
+        name = _clean_show_name(name)
         if not name:
             continue
         for show_time in times:
@@ -1763,9 +1858,9 @@ def _parse_daily_show_page(html, url, target_date):
                 "target_date": target_date,
                 "show_name": name[:80],
                 "show_time": show_time,
-                "category": "????" if "????" in name else "???",
+                "category": "ショー/パレード",
                 "source": url,
-                "note": "?????????????",
+                "note": "公式日別ページから取得",
             })
     return rows
 
@@ -1775,7 +1870,7 @@ def fetch_official_show_schedule(settings, target_date=None):
     urls = settings.get("show_urls") or [settings.get("show_url", "")]
     urls = [url for url in urls if url]
     if not urls:
-        return pd.DataFrame(), "?????????URL??????????"
+        return pd.DataFrame(), "ショー/パレード取得URLが設定されていません"
 
     rows = []
     messages = []
@@ -1787,6 +1882,8 @@ def fetch_official_show_schedule(settings, target_date=None):
                 headers={"User-Agent": "Mozilla/5.0"},
                 timeout=4,
             )
+            if not res.encoding or res.encoding.lower() in ("iso-8859-1", "ascii"):
+                res.encoding = res.apparent_encoding or "utf-8"
             res.raise_for_status()
         except Exception as exc:
             failed_count += 1
@@ -1807,13 +1904,16 @@ def fetch_official_show_schedule(settings, target_date=None):
             park_guess = "DisneySea" if "tds" in " ".join(urls) else "Disneyland"
             fallback_df = _known_show_schedule_fallback(park_guess, target_date)
         if len(fallback_df) > 0:
-            return fallback_df, f"??????????????????????????????????????: {len(fallback_df)}?"
-        return pd.DataFrame(), "????????????????: " + " / ".join(messages[:2])
+            return fallback_df, f"公式取得失敗のため推定ショー時刻を表示: {len(fallback_df)}件"
+        return pd.DataFrame(), "今日のショー/パレード時刻は取得できませんでした"
 
     df = pd.DataFrame(rows).drop_duplicates(["show_name", "show_time"], keep="first")
+    df = _sanitize_show_rows(df)
     df["_hour"] = df["show_time"].apply(_parse_show_time_to_hour)
     df = df[df["_hour"].notna()].sort_values("_hour").drop(columns=["_hour"])
-    return df.reset_index(drop=True), f"??????{len(df)}???"
+    if len(df) == 0:
+        return pd.DataFrame(), "今日のショー/パレード時刻は取得できませんでした"
+    return df.reset_index(drop=True), f"公式ショー/パレード時刻を{len(df)}件取得"
 
 def save_show_schedule_rows(cursor, conn, park, show_df, target_date=None):
     if show_df is None or len(show_df) == 0:
@@ -1827,6 +1927,7 @@ def save_show_schedule_rows(cursor, conn, park, show_df, target_date=None):
 
     saved = 0
     observed_at = datetime.now(JST).isoformat()
+    show_df = _sanitize_show_rows(show_df)
     for _, row in show_df.iterrows():
         cursor.execute("""
         INSERT INTO show_schedules
@@ -1850,7 +1951,7 @@ def save_show_schedule_rows(cursor, conn, park, show_df, target_date=None):
 
 def load_show_schedules(conn):
     try:
-        return pd.read_sql_query("SELECT * FROM show_schedules", conn)
+        return _sanitize_show_rows(pd.read_sql_query("SELECT * FROM show_schedules", conn))
     except Exception:
         return pd.DataFrame()
 
@@ -1962,9 +2063,9 @@ def auto_collect_prediction_context(cursor, conn, park):
             saved_count,
             today
         )
-        results.append(f"?????{saved_count}???")
+        results.append(f"営業時間を{saved_count}件保存")
     else:
-        results.append("?????????")
+        results.append("営業時間は確認済み")
 
     if should_fetch_data_today(logs, park, "event_signals", today):
         event_df = build_event_signal_rows(park)
@@ -1975,13 +2076,13 @@ def auto_collect_prediction_context(cursor, conn, park):
             park,
             "event_signals",
             "success" if saved_count > 0 else "empty",
-            "??/?????????",
+            "イベント/休暇シグナル",
             saved_count,
             today
         )
-        results.append(f"?????????{saved_count}???")
+        results.append(f"イベント/休暇シグナルを{saved_count}件保存")
     else:
-        results.append("?????????????")
+        results.append("イベント/休暇シグナルは確認済み")
 
     existing_show_df = load_show_schedules(conn)
     has_today_shows = False
@@ -2008,9 +2109,9 @@ def auto_collect_prediction_context(cursor, conn, park):
             saved_count,
             today
         )
-        results.append(f"??????{saved_count}???")
+        results.append(f"ショー/パレード時刻を{saved_count}件保存")
     else:
-        results.append("??????????")
+        results.append("ショー/パレード時刻は確認済み")
 
     return results
 
@@ -2720,11 +2821,15 @@ def make_week_forecast(
     park_hours_df=None,
     park=None,
     daily_weather=None,
+    cursor=None,
+    conn=None,
+    use_live_current_data=False,
 ):
     rows = []
 
     for i in range(7):
         d = start_date + timedelta(days=i)
+        locked_value = get_locked_daily_prediction(conn, d) if conn is not None else None
         ticket_price, ticket_source = get_ticket_price_from_castel(d, ticket_price_map)
         forecast_temperature, forecast_rain, weather_source = get_forecast_weather_for_date(
             daily_weather,
@@ -2732,24 +2837,44 @@ def make_week_forecast(
             temperature,
             rain_mm
         )
-        crowd_index, wait_df, reasons = predict_crowd_index_for_date(
-            history_df,
-            settings,
-            d,
-            forecast_temperature,
-            forecast_rain,
-            prediction_history,
-            daily_prediction_history,
-            ticket_price,
-            current_target_df if d == datetime.now(JST).date() else None,
-            event_signals,
-            park_hours_df,
-            park,
-        )
+        live_df = current_target_df if use_live_current_data and d == datetime.now(JST).date() else None
+
+        if locked_value is not None:
+            crowd_index = locked_value
+            wait_df = predict_wait_times_for_date(
+                history_df,
+                settings,
+                d,
+                forecast_temperature,
+                forecast_rain,
+                prediction_history,
+                ticket_price,
+                None,
+            )
+            reasons = ["保存済みの日別固定予測を使用"]
+            prediction_source = "保存済み"
+        else:
+            crowd_index, wait_df, reasons = predict_crowd_index_for_date(
+                history_df,
+                settings,
+                d,
+                forecast_temperature,
+                forecast_rain,
+                prediction_history,
+                daily_prediction_history,
+                ticket_price,
+                live_df,
+                event_signals,
+                park_hours_df,
+                park,
+            )
+            save_locked_daily_prediction(cursor, conn, d, crowd_index)
+            prediction_source = "新規固定保存" if conn is not None else "一時予測"
 
         rows.append({
             "Date": d.strftime("%m/%d"),
-            "Crowd Index": crowd_index,
+            "Crowd Index": round(float(crowd_index), 1),
+            "予測種別": prediction_source,
             "予報気温": round(forecast_temperature, 1),
             "予報降水量": round(forecast_rain, 1),
             "天気取得元": weather_source,
@@ -2760,6 +2885,11 @@ def make_week_forecast(
         })
 
     return pd.DataFrame(rows)
+
+
+def make_locked_week_forecast(*args, **kwargs):
+    kwargs["use_live_current_data"] = False
+    return make_week_forecast(*args, **kwargs)
 
 
 def predict_dpa_sellout_time(attraction, wait, crowd_10, ticket_price, bonus, dpa_sellout_history):
