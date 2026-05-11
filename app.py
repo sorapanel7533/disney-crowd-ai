@@ -65,7 +65,7 @@ from utils import (
     load_history,
     load_prediction_history,
     make_major_average_prediction,
-    make_week_forecast as build_week_forecast,
+    make_locked_week_forecast as build_week_forecast,
     make_action_advice,
     predict_crowd_index_for_date,
     predict_dpa_sellout_time,
@@ -200,6 +200,34 @@ CUSTOM_CSS = (
     "    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.07);\n"
     "    color: #1d1d1f;\n"
     "}\n"
+    ".compact-grid {\n"
+    "    display: grid;\n"
+    "    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));\n"
+    "    gap: 8px;\n"
+    "    margin: 4px 0 12px;\n"
+    "}\n"
+    ".compact-card {\n"
+    "    background: rgba(255, 255, 255, 0.94);\n"
+    "    border: 1px solid rgba(60, 60, 67, 0.12);\n"
+    "    border-radius: 14px;\n"
+    "    padding: 8px 10px;\n"
+    "    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);\n"
+    "    min-height: 54px;\n"
+    "}\n"
+    ".compact-label {\n"
+    "    color: #6e6e73 !important;\n"
+    "    font-size: 12px;\n"
+    "    font-weight: 700;\n"
+    "    line-height: 1.15;\n"
+    "}\n"
+    ".compact-value {\n"
+    "    color: #1d1d1f !important;\n"
+    "    font-size: 14px;\n"
+    "    font-weight: 750;\n"
+    "    line-height: 1.25;\n"
+    "    margin-top: 3px;\n"
+    "    word-break: break-word;\n"
+    "}\n"
     "div[data-baseweb=\"select\"] {\n"
     "    background: rgba(255, 255, 255, 0.96) !important;\n"
     "    border-radius: 18px !important;\n"
@@ -331,6 +359,19 @@ def graph_ylim(values):
 
     return 200
 
+
+
+def compact_card_grid(items):
+    html = ['<div class="compact-grid">']
+    for label, value in items:
+        html.append(
+            '<div class="compact-card">'
+            f'<div class="compact-label">{label}</div>'
+            f'<div class="compact-value">{value}</div>'
+            '</div>'
+        )
+    html.append("</div>")
+    st.markdown("".join(html), unsafe_allow_html=True)
 
 
 def safe_sort_head(df, sort_column, n=100, ascending=False):
@@ -593,32 +634,19 @@ if display_mode == "ダッシュボード":
 
     st.subheader("🌤 現在の天気")
 
-    w1, w2, w3 = st.columns(3)
-
-    with w1:
-        st.metric("天気", weather_text)
-
-    with w2:
-        st.metric("気温", f"{temperature}℃")
-
-    with w3:
-        st.metric("降水量", f"{rain_mm}mm")
+    compact_card_grid([
+        ("天気", weather_text),
+        ("気温", f"{temperature}℃"),
+        ("降水量", f"{rain_mm}mm"),
+    ])
 
     st.subheader("📅 需要補正")
 
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-        st.metric(
-            "チケット価格",
-            "取得不可" if ticket_price is None else f"{ticket_price}円"
-        )
-
-    with c2:
-        st.metric("取得元", ticket_map_source if ticket_price is not None else ticket_source)
-
-    with c3:
-        st.metric("補正値", today_bonus)
+    compact_card_grid([
+        ("チケット価格", "取得不可" if ticket_price is None else f"{ticket_price}円"),
+        ("取得元", ticket_map_source if ticket_price is not None else ticket_source),
+        ("補正値", today_bonus),
+    ])
 
     if len(today_reasons) > 0:
         st.write("補正理由:", " / ".join(today_reasons))
@@ -950,20 +978,11 @@ if display_mode == "ダッシュボード":
         event_signals,
         park_hours_df,
         park,
-        daily_weather
+        daily_weather,
+        cursor=cursor,
+        conn=conn,
+        use_live_current_data=False
     )
-
-    for _, row in week_df.iterrows():
-        target_date = datetime.strptime(
-            f"{datetime.now(JST).year}/{row['Date']}",
-            "%Y/%m/%d"
-        ).date()
-        save_daily_crowd_prediction(
-            cursor,
-            conn,
-            target_date,
-            row["Crowd Index"]
-        )
 
     fig_week, ax_week = plt.subplots(figsize=(10, 4))
 
@@ -1758,7 +1777,10 @@ elif display_mode == "データ管理":
                 event_signals,
                 park_hours_df,
                 park,
-                daily_weather
+                daily_weather,
+                cursor=cursor,
+                conn=conn,
+                use_live_current_data=False
             )
             if len(management_week_df) > 0:
                 st.dataframe(management_week_df, use_container_width=True)
