@@ -85,6 +85,26 @@ OFFICIAL_TICKET_URL = "https://www.tokyodisneyresort.co.jp/en/ticket/index.html"
 OFFICIAL_CALENDAR_URL = "https://www.tokyodisneyresort.jp/en/tdr/calendar.html"
 GLOBAL_PREDICTION_NAME = "__ALL__"
 MAJOR_AVERAGE_NAME = "__MAJOR_5_AVERAGE__"
+PARK_CROWD_BASELINES = {
+    "DisneySea": {
+        "avg_wait_normal": 24,
+        "top_quartile_wait_normal": 58,
+        "max_wait_normal": 125,
+        "std_wait_normal": 32,
+        "park_bias": 1.0,
+        "score_offset": -2.0,
+        "demand_scale": 0.12,
+    },
+    "Disneyland": {
+        "avg_wait_normal": 22,
+        "top_quartile_wait_normal": 52,
+        "max_wait_normal": 115,
+        "std_wait_normal": 30,
+        "park_bias": 0.0,
+        "score_offset": -2.0,
+        "demand_scale": 0.12,
+    },
+}
 HOUR_PROFILE = {
     9: 0.82,
     10: 0.96,
@@ -289,6 +309,18 @@ def connect_db(db_name):
 
     conn.commit()
 
+    cursor.execute("PRAGMA table_info(wait_times)")
+    wait_columns = [row[1] for row in cursor.fetchall()]
+    if "is_open" not in wait_columns:
+        cursor.execute("ALTER TABLE wait_times ADD COLUMN is_open INTEGER DEFAULT 1")
+        conn.commit()
+    if "park" not in wait_columns:
+        cursor.execute("ALTER TABLE wait_times ADD COLUMN park TEXT")
+        conn.commit()
+    if "source" not in wait_columns:
+        cursor.execute("ALTER TABLE wait_times ADD COLUMN source TEXT DEFAULT 'queue-times'")
+        conn.commit()
+
     cursor.execute("PRAGMA table_info(predictions)")
     columns = [row[1] for row in cursor.fetchall()]
 
@@ -299,6 +331,19 @@ def connect_db(db_name):
         SET attraction = ?
         WHERE attraction IS NULL
         """, (GLOBAL_PREDICTION_NAME,))
+        conn.commit()
+
+    if "target_minute" not in columns:
+        cursor.execute("ALTER TABLE predictions ADD COLUMN target_minute INTEGER DEFAULT 0")
+        conn.commit()
+
+    if "target_time" not in columns:
+        cursor.execute("ALTER TABLE predictions ADD COLUMN target_time TEXT")
+        cursor.execute("""
+        UPDATE predictions
+        SET target_time = printf('%02d:00', target_hour)
+        WHERE target_time IS NULL
+        """)
         conn.commit()
 
     return conn, cursor
@@ -709,6 +754,9 @@ def load_history(conn):
         history_df["datetime"] = pd.to_datetime(history_df["datetime"])
         history_df["hour"] = history_df["datetime"].dt.hour
         history_df["date"] = history_df["datetime"].dt.date
+        if "is_open" not in history_df.columns:
+            history_df["is_open"] = 1
+        history_df["is_open"] = pd.to_numeric(history_df["is_open"], errors="coerce").fillna(1).astype(int)
 
     return history_df
 
@@ -732,20 +780,28 @@ def load_prediction_history(conn):
     return prediction_df
 
 
-def save_wait_times(cursor, conn, valid_open_df, temperature, rain_mm):
+def save_wait_times(cursor, conn, wait_df, temperature, rain_mm, park=None):
     now = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
 
-    if len(valid_open_df) > 0:
-        for _, row in valid_open_df.iterrows():
+    if len(wait_df) > 0:
+        for _, row in wait_df.iterrows():
+            wait_value = pd.to_numeric(row.get("Wait", 0), errors="coerce")
+            if pd.isna(wait_value):
+                wait_value = 0
+            is_open = 1 if bool(row.get("Open", False)) else 0
             cursor.execute("""
             INSERT INTO wait_times
-            VALUES (?, ?, ?, ?, ?)
+            (datetime, attraction, wait_time, temperature, rain, is_open, park, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 now,
-                row["Attraction"],
-                row["Wait"],
+                str(row.get("Attraction", "")),
+                int(wait_value),
                 temperature,
-                rain_mm
+                rain_mm,
+                is_open,
+                park,
+                "queue-times",
             ))
 
         conn.commit()
@@ -755,20 +811,27 @@ def save_prediction_rows(cursor, conn, pred_df, attraction_name):
     created_at = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
 
     for _, row in pred_df.iterrows():
+        hour = int(row.get("Hour", 0))
+        minute = int(row.get("Minute", 0)) if not pd.isna(row.get("Minute", 0)) else 0
+        target_time = str(row.get("TimeLabel", f"{hour:02d}:{minute:02d}"))
         cursor.execute("""
         INSERT INTO predictions
         (
             created_at,
             target_hour,
+            target_minute,
+            target_time,
             predicted_wait,
             actual_wait,
             error,
             attraction
         )
-        VALUES (?, ?, ?, NULL, NULL, ?)
+        VALUES (?, ?, ?, ?, ?, NULL, NULL, ?)
         """, (
             created_at,
-            int(row["Hour"]),
+            hour,
+            minute,
+            target_time,
             float(row["Predicted Wait"]),
             attraction_name
         ))
@@ -779,6 +842,8 @@ def save_prediction_rows(cursor, conn, pred_df, attraction_name):
 def update_prediction_feedback(cursor, conn, valid_open_df, avg_wait):
     now = datetime.now(JST)
     now_hour = now.hour
+    now_minute = (now.minute // 15) * 15
+    now_time = f"{now_hour:02d}:{now_minute:02d}"
 
     if not is_crowd_hour(now):
         return
@@ -794,6 +859,7 @@ def update_prediction_feedback(cursor, conn, valid_open_df, avg_wait):
     SET actual_wait = ?,
         error = ? - predicted_wait
     WHERE target_hour = ?
+    AND COALESCE(target_minute, 0) = ?
     AND actual_wait IS NULL
     AND attraction = ?
     AND created_at LIKE ?
@@ -801,6 +867,7 @@ def update_prediction_feedback(cursor, conn, valid_open_df, avg_wait):
         actual_now,
         actual_now,
         now_hour,
+        now_minute,
         GLOBAL_PREDICTION_NAME,
         f"{today_prefix}%"
     ))
@@ -814,6 +881,7 @@ def update_prediction_feedback(cursor, conn, valid_open_df, avg_wait):
         SET actual_wait = ?,
             error = ? - predicted_wait
         WHERE target_hour = ?
+        AND COALESCE(target_minute, 0) = ?
         AND actual_wait IS NULL
         AND attraction = ?
         AND created_at LIKE ?
@@ -821,6 +889,7 @@ def update_prediction_feedback(cursor, conn, valid_open_df, avg_wait):
             actual_wait,
             actual_wait,
             now_hour,
+            now_minute,
             attraction,
             f"{today_prefix}%"
         ))
@@ -909,16 +978,73 @@ def save_daily_crowd_prediction(cursor, conn, target_date, predicted_crowd_index
     conn.commit()
 
 
-def update_daily_crowd_feedback(cursor, conn, history_df, settings):
-    if len(history_df) == 0:
+def get_locked_daily_prediction(conn, target_date):
+    if conn is None:
+        return None
+
+    target_date_text = target_date.strftime("%Y-%m-%d")
+    try:
+        row = pd.read_sql_query(
+            """
+            SELECT predicted_crowd_index
+            FROM daily_crowd_predictions
+            WHERE target_date = ?
+            ORDER BY created_at ASC
+            LIMIT 1
+            """,
+            conn,
+            params=(target_date_text,)
+        )
+    except Exception:
+        return None
+
+    if len(row) == 0:
+        return None
+
+    value = row.iloc[0].get("predicted_crowd_index")
+    if value is None or pd.isna(value):
+        return None
+
+    return float(value)
+
+
+def save_locked_daily_prediction(cursor, conn, target_date, predicted_crowd_index):
+    if cursor is None or conn is None:
+        return False
+
+    existing = get_locked_daily_prediction(conn, target_date)
+    if existing is not None:
+        return False
+
+    created_at = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
+    target_date_text = target_date.strftime("%Y-%m-%d")
+
+    cursor.execute("""
+    INSERT INTO daily_crowd_predictions
+    (
+        created_at,
+        target_date,
+        predicted_crowd_index,
+        actual_crowd_index,
+        error
+    )
+    VALUES (?, ?, ?, NULL, NULL)
+    """, (
+        created_at,
+        target_date_text,
+        float(predicted_crowd_index)
+    ))
+
+    conn.commit()
+    return True
+
+
+def update_daily_crowd_feedback(cursor, conn, history_df, settings, park=None):
+    if history_df is None or len(history_df) == 0:
         return
 
     today = datetime.now(JST).date()
-    target_history = history_df[
-        history_df["attraction"].isin(settings["rides"])
-    ].copy()
-    target_history = filter_crowd_history(target_history)
-
+    target_history = filter_crowd_history(history_df.copy())
     if len(target_history) == 0:
         return
 
@@ -931,33 +1057,35 @@ def update_daily_crowd_feedback(cursor, conn, history_df, settings):
 
     for rowid, target_date_text in rows:
         target_day = datetime.strptime(target_date_text, "%Y-%m-%d").date()
-
-        if target_day > today:
+        if target_day >= today:
             continue
 
         day_df = target_history[
             (target_history["date"] == target_day)
             & (target_history["wait_time"] > 0)
         ].copy()
-
-        if len(day_df) == 0:
+        if "attraction" in day_df.columns:
+            day_df = day_df[day_df["attraction"].isin(settings.get("rides", []))].copy()
+        if len(day_df) < 24:
+            continue
+        if "attraction" in day_df.columns and day_df["attraction"].nunique() < 3:
             continue
 
-        avg_wait = day_df["wait_time"].mean()
-        max_wait = day_df["wait_time"].max()
-        var_wait = day_df["wait_time"].var()
+        stats = get_all_attraction_crowd_stats(None, day_df, target_day)
+        if stats["sample_count"] < 24 or stats["open_count"] < 3:
+            continue
 
-        if pd.isna(var_wait):
-            var_wait = 0
-
-        actual_index = get_crowd_index(
-            avg_wait,
-            max_wait,
-            var_wait,
-            get_dpa_score(avg_wait, max_wait),
+        actual_index = get_crowd_index_for_park(
+            park or settings.get("park", "DisneySea"),
+            stats["avg_wait"],
+            stats["max_wait"],
+            stats["top_quartile_wait"],
+            stats["std_wait"],
+            stats["open_count"],
+            stats["closed_count"],
             0,
             0,
-            0
+            0,
         )
 
         cursor.execute("""
@@ -972,7 +1100,6 @@ def update_daily_crowd_feedback(cursor, conn, history_df, settings):
         ))
 
     conn.commit()
-
 
 def load_dpa_sellouts(conn):
     try:
@@ -1265,9 +1392,9 @@ def get_attraction_status_summary(status_df, settings):
 
     return pd.DataFrame([
         {
-            "項目": "5大アトラクション休止数",
+            "項目": "人気主要アトラクション休止数",
             "状態": f"{major_closed}件",
-            "説明": "5大内の休止が多いと、他施設へ待ち時間が集中しやすくなります。"
+            "説明": "人気主要5施設内の休止が多いと、他施設へ待ち時間が集中しやすくなります。"
         },
         {
             "項目": "全体休止数",
@@ -1429,6 +1556,39 @@ def load_park_hours(conn):
         df["target_date"] = pd.to_datetime(df["target_date"]).dt.date
 
     return df
+
+
+def get_today_park_hours(park_hours_df, park, target_date):
+    d = target_date.date() if isinstance(target_date, datetime) else target_date
+    if park_hours_df is None or len(park_hours_df) == 0:
+        return 9.0, 21.0, "推定営業時間"
+
+    rows = park_hours_df.copy()
+    if "target_date" in rows.columns:
+        rows = rows[rows["target_date"] == d]
+    elif "date" in rows.columns:
+        rows = rows[pd.to_datetime(rows["date"]).dt.date == d]
+
+    if "park" in rows.columns and park:
+        park_rows = rows[rows["park"] == park]
+        if len(park_rows) > 0:
+            rows = park_rows
+
+    if len(rows) == 0:
+        return 9.0, 21.0, "推定営業時間"
+
+    if "observed_at" in rows.columns:
+        rows = rows.sort_values("observed_at", ascending=False)
+    row = rows.iloc[0]
+    open_hour = float(row.get("open_hour", 9.0) or 9.0)
+    close_hour = float(row.get("close_hour", 21.0) or 21.0)
+    return open_hour, close_hour, "公式営業時間"
+
+
+def is_park_open_now(park_hours_df, park, now):
+    open_hour, close_hour, source = get_today_park_hours(park_hours_df, park, now.date())
+    current_hour = now.hour + now.minute / 60
+    return open_hour <= current_hour < close_hour, open_hour, close_hour, source
 
 
 def get_park_hours_bonus(park_hours_df, target_date):
@@ -1619,76 +1779,65 @@ def _clean_show_name(value):
     ]
     if not text or len(text) > 90:
         return ""
+    if _is_broken_show_text(text):
+        return ""
     if any(word in text.lower() for word in skip_words):
         return ""
     return text
 
 
+def _is_broken_show_text(value):
+    text = str(value or "").strip()
+    if not text:
+        return True
+    broken_markers = ["???", "????", "\ufffd", "譁", "縺", "繝", "豌", "髯", "螟", "莠"]
+    return any(marker in text for marker in broken_markers)
 
-def _known_show_schedule_fallback(park, target_date):
-    rows = []
 
-    def add(name, times, category="???", note="??????????????????????"):
-        for show_time in times:
-            rows.append({
-                "target_date": target_date,
-                "show_name": name,
-                "show_time": show_time,
-                "category": category,
-                "source": "official-monthly-schedule-fallback",
-                "note": note,
-            })
+def _safe_show_text(value, fallback):
+    text = str(value or "").strip()
+    if _is_broken_show_text(text):
+        return fallback
+    return text
 
-    if target_date.year != 2026 or target_date.month != 5:
+
+def _sanitize_show_rows(show_df, fallback_name="ショー/パレード（時刻のみ）"):
+    if show_df is None or len(show_df) == 0:
         return pd.DataFrame()
 
-    day = target_date.day
-    late_month = day >= 17
+    df = show_df.copy()
+    if "show_name" in df.columns:
+        df["show_name"] = df["show_name"].apply(lambda x: _safe_show_text(x, fallback_name))
+    if "category" in df.columns:
+        df["category"] = df["category"].apply(lambda x: _safe_show_text(x, "ショー/パレード"))
+    if "note" in df.columns:
+        df["note"] = df["note"].apply(lambda x: _safe_show_text(x, "公式または推定時刻"))
+    return df
 
-    if park == "DisneySea":
-        add("??????????????????", ["19:30" if late_month else "19:15"])
-        add("??????????????", ["20:30" if late_month else "20:15"])
-        add("??????????????", ["11:00", "12:25", "13:50", "15:55", "17:20"])
-        add("???????????", ["13:00", "14:45", "17:05", "18:50"] if late_month else ["12:50", "14:35", "16:55", "18:40"])
-        if day != 22:
-            add("?????????????????", ["20:15", "20:40", "20:55"] if late_month else ["20:00", "20:25", "20:50"])
-        if day <= 16:
-            add("??????????????????????", ["11:30", "14:00", "16:00"])
-    elif park == "Disneyland":
-        if day >= 17:
-            add("??????????????????", ["13:00"], "????")
-            add("?????????????????", ["15:40"], "????")
-            add("Reach for the Stars", ["20:50"])
-            add("??????????????????????????????", ["19:30"], "????")
-            add("??????????????", ["20:30"])
-            add("??????????????????", ["12:30", "13:45", "15:00", "16:50", "18:05"])
-        else:
-            add("?????????????????", ["15:00"], "????")
-            add("Reach for the Stars", ["20:35"])
-            add("??????????????????????????????", ["19:15"], "????")
-            add("??????????????", ["20:15"])
-            add("???????????????????", ["10:55", "12:20", "13:45", "15:50", "17:15"])
-            add("??????????????????", ["11:40", "12:55", "14:10", "16:00", "17:15"])
 
-    return pd.DataFrame(rows)
+SHOW_NAME_BY_ID = {
+    "967": "ビリーヴ！〜シー・オブ・ドリームス〜",
+    "7801": "ディズニー・ライト・ザ・ナイト",
+    "7602": "ビッグバンドビート〜ア・スペシャルトリート〜",
+    "7604": "ジャンボリミッキー！レッツ・ダンス！",
+    "7405": "スカイ・フル・オブ・カラーズ",
+    "7800": "ディズニー・ライト・ザ・ナイト",
+    "913": "エレクトリカルパレード・ドリームライツ",
+    "895": "ミッキーのマジカルミュージックワールド",
+    "7000": "クラブマウスビート",
+    "7202": "Reach for the Stars",
+    "7002": "ディズニー・ハーモニー・イン・カラー",
+    "985": "ジャンボリミッキー！レッツ・ダンス！",
+}
+
+
+
+def _known_show_schedule_fallback(park, target_date):
+    return pd.DataFrame()
 
 
 def _show_name_from_url(url):
-    name_map = {
-        "967": "??????????????????",
-        "7801": "??????????????",
-        "7602": "??????????????",
-        "7604": "???????????",
-        "7405": "?????????????????",
-        "7800": "??????????????",
-        "913": "??????????????????????????????",
-        "895": "???????????????????",
-        "7000": "??????????????????",
-        "7202": "Reach for the Stars",
-        "7002": "?????????????????",
-        "985": "??????????????????",
-    }
-    for key, value in name_map.items():
+    for key, value in SHOW_NAME_BY_ID.items():
         if f"/{key}" in str(url):
             return value
     return ""
@@ -1719,9 +1868,9 @@ def _parse_monthly_show_page(html, url, target_date):
                 "target_date": target_date,
                 "show_name": show_name,
                 "show_time": show_time.replace("a.m.", "am").replace("p.m.", "pm"),
-                "category": "????" if "????" in show_name else "???",
+                "category": "ショー/パレード",
                 "source": url,
-                "note": "????????????????",
+                "note": "公式月間スケジュールから取得",
             })
     return rows
 
@@ -1735,11 +1884,11 @@ def _parse_daily_show_page(html, url, target_date):
     rows = []
     seen = set()
     time_pattern = re.compile(r"\d{1,2}:\d{2}\s*(?:a\.m\.|p\.m\.|am|pm)?", re.I)
-    stop_words = ["?????????????", "????", "???????", "?????", "????"]
+    stop_words = ["アトラクション", "レストラン", "ショップ", "休止", "運営時間"]
 
     in_show_section = False
     for line in lines:
-        if "????/???" in line or "Parades and Shows" in line:
+        if "ショー/パレード" in line or "Parades and Shows" in line:
             in_show_section = True
             continue
         if in_show_section and any(word in line for word in stop_words):
@@ -1750,8 +1899,9 @@ def _parse_daily_show_page(html, url, target_date):
         if not times:
             continue
         name = time_pattern.sub("", line)
-        name = re.sub(r"????????????????|?????????|?????|NEW", "", name)
+        name = re.sub(r"エントリー受付|ディズニー・プレミアアクセス|NEW", "", name)
         name = re.sub(r"\s*/\s*", " / ", name).strip(" ?/")
+        name = _clean_show_name(name)
         if not name:
             continue
         for show_time in times:
@@ -1763,9 +1913,9 @@ def _parse_daily_show_page(html, url, target_date):
                 "target_date": target_date,
                 "show_name": name[:80],
                 "show_time": show_time,
-                "category": "????" if "????" in name else "???",
+                "category": "ショー/パレード",
                 "source": url,
-                "note": "?????????????",
+                "note": "公式日別ページから取得",
             })
     return rows
 
@@ -1775,7 +1925,7 @@ def fetch_official_show_schedule(settings, target_date=None):
     urls = settings.get("show_urls") or [settings.get("show_url", "")]
     urls = [url for url in urls if url]
     if not urls:
-        return pd.DataFrame(), "?????????URL??????????"
+        return pd.DataFrame(), "ショー/パレード取得URLが設定されていません"
 
     rows = []
     messages = []
@@ -1787,6 +1937,8 @@ def fetch_official_show_schedule(settings, target_date=None):
                 headers={"User-Agent": "Mozilla/5.0"},
                 timeout=4,
             )
+            if not res.encoding or res.encoding.lower() in ("iso-8859-1", "ascii"):
+                res.encoding = res.apparent_encoding or "utf-8"
             res.raise_for_status()
         except Exception as exc:
             failed_count += 1
@@ -1801,19 +1953,15 @@ def fetch_official_show_schedule(settings, target_date=None):
             rows.extend(_parse_daily_show_page(res.text, url, target_date))
 
     if not rows:
-        fallback_df = _known_show_schedule_fallback(settings.get("park", ""), target_date)
-        if len(fallback_df) == 0:
-            # PARK_SETTINGS is keyed by park name, so infer from url when settings lacks park.
-            park_guess = "DisneySea" if "tds" in " ".join(urls) else "Disneyland"
-            fallback_df = _known_show_schedule_fallback(park_guess, target_date)
-        if len(fallback_df) > 0:
-            return fallback_df, f"??????????????????????????????????????: {len(fallback_df)}?"
-        return pd.DataFrame(), "????????????????: " + " / ".join(messages[:2])
+        return pd.DataFrame(), "公式ショー時刻を取得できませんでした"
 
     df = pd.DataFrame(rows).drop_duplicates(["show_name", "show_time"], keep="first")
+    df = _sanitize_show_rows(df)
     df["_hour"] = df["show_time"].apply(_parse_show_time_to_hour)
     df = df[df["_hour"].notna()].sort_values("_hour").drop(columns=["_hour"])
-    return df.reset_index(drop=True), f"??????{len(df)}???"
+    if len(df) == 0:
+        return pd.DataFrame(), "公式ショー時刻を取得できませんでした"
+    return df.reset_index(drop=True), f"公式ショー/パレード時刻を{len(df)}件取得"
 
 def save_show_schedule_rows(cursor, conn, park, show_df, target_date=None):
     if show_df is None or len(show_df) == 0:
@@ -1827,6 +1975,7 @@ def save_show_schedule_rows(cursor, conn, park, show_df, target_date=None):
 
     saved = 0
     observed_at = datetime.now(JST).isoformat()
+    show_df = _sanitize_show_rows(show_df)
     for _, row in show_df.iterrows():
         cursor.execute("""
         INSERT INTO show_schedules
@@ -1850,7 +1999,7 @@ def save_show_schedule_rows(cursor, conn, park, show_df, target_date=None):
 
 def load_show_schedules(conn):
     try:
-        return pd.read_sql_query("SELECT * FROM show_schedules", conn)
+        return _sanitize_show_rows(pd.read_sql_query("SELECT * FROM show_schedules", conn))
     except Exception:
         return pd.DataFrame()
 
@@ -1934,12 +2083,12 @@ def get_show_wait_insights(show_wait_context):
     if len(before) > 0:
         rows.append({
             "分析": "ショー前90分",
-            "内容": f"5大平均待ち時間は約{before['avg_major_wait'].mean():.1f}分です。",
+            "内容": f"人気主要アトラクション平均待ち時間は約{before['avg_major_wait'].mean():.1f}分です。",
         })
     if len(after) > 0:
         rows.append({
             "分析": "ショー後90分",
-            "内容": f"5大平均待ち時間は約{after['avg_major_wait'].mean():.1f}分です。",
+            "内容": f"人気主要アトラクション平均待ち時間は約{after['avg_major_wait'].mean():.1f}分です。",
         })
 
     return pd.DataFrame(rows) if rows else pd.DataFrame([{"分析": "蓄積中", "内容": "ショー前後の比較対象がまだ不足しています。"}])
@@ -1962,9 +2111,9 @@ def auto_collect_prediction_context(cursor, conn, park):
             saved_count,
             today
         )
-        results.append(f"?????{saved_count}???")
+        results.append(f"営業時間を{saved_count}件保存")
     else:
-        results.append("?????????")
+        results.append("営業時間は確認済み")
 
     if should_fetch_data_today(logs, park, "event_signals", today):
         event_df = build_event_signal_rows(park)
@@ -1975,13 +2124,13 @@ def auto_collect_prediction_context(cursor, conn, park):
             park,
             "event_signals",
             "success" if saved_count > 0 else "empty",
-            "??/?????????",
+            "イベント/休暇シグナル",
             saved_count,
             today
         )
-        results.append(f"?????????{saved_count}???")
+        results.append(f"イベント/休暇シグナルを{saved_count}件保存")
     else:
-        results.append("?????????????")
+        results.append("イベント/休暇シグナルは確認済み")
 
     existing_show_df = load_show_schedules(conn)
     has_today_shows = False
@@ -2008,9 +2157,9 @@ def auto_collect_prediction_context(cursor, conn, park):
             saved_count,
             today
         )
-        results.append(f"??????{saved_count}???")
+        results.append(f"ショー/パレード時刻を{saved_count}件保存")
     else:
-        results.append("??????????")
+        results.append("ショー/パレード時刻は確認済み")
 
     return results
 
@@ -2485,19 +2634,52 @@ def _weighted_average(values):
     return sum(v * w for v, w in clean_values) / total_weight
 
 
-def _prepare_model_history(history_df, rides):
+def build_time_slots(start_hour=9, end_hour=21, step_minutes=15):
+    rows = []
+    current = datetime.combine(date.today(), datetime.min.time()).replace(hour=start_hour)
+    end = datetime.combine(date.today(), datetime.min.time()).replace(hour=end_hour)
+    while current < end:
+        rows.append({
+            "Time": current.hour + current.minute / 60,
+            "TimeLabel": current.strftime("%H:%M"),
+            "Hour": current.hour,
+            "Minute": current.minute,
+        })
+        current += timedelta(minutes=step_minutes)
+    return rows
+
+
+def _prediction_attractions(history_df, settings, current_target_df=None):
+    names = []
+    if history_df is not None and len(history_df) > 0 and "attraction" in history_df.columns:
+        names.extend(history_df["attraction"].dropna().astype(str).unique().tolist())
+    if current_target_df is not None and len(current_target_df) > 0 and "Attraction" in current_target_df.columns:
+        names.extend(current_target_df["Attraction"].dropna().astype(str).unique().tolist())
+    names.extend(settings.get("rides", []))
+    unique_names = []
+    for name in names:
+        if name not in unique_names:
+            unique_names.append(name)
+    return unique_names
+
+
+def _prepare_model_history(history_df, rides=None):
     if len(history_df) == 0:
         return history_df
 
-    model_df = history_df[
-        history_df["attraction"].isin(rides)
-        & (history_df["wait_time"] > 0)
-    ].copy()
+    model_df = history_df[history_df["wait_time"] > 0].copy()
+    if "is_open" in model_df.columns:
+        model_df = model_df[pd.to_numeric(model_df["is_open"], errors="coerce").fillna(1).astype(int) == 1].copy()
+    if rides:
+        model_df = model_df[model_df["attraction"].isin(rides)].copy()
     model_df = filter_crowd_history(model_df)
 
     if len(model_df) > 0:
         model_df["weekday"] = model_df["datetime"].dt.weekday
         model_df["month"] = model_df["datetime"].dt.month
+        model_df["minute"] = model_df["datetime"].dt.minute
+        model_df["minute_slot"] = (model_df["minute"] // 15) * 15
+        model_df["time_slot"] = model_df["hour"] + model_df["minute_slot"] / 60
 
     return model_df
 
@@ -2511,113 +2693,132 @@ def predict_wait_times_for_date(
     prediction_history,
     ticket_price=None,
     current_target_df=None,
+    attraction_list=None,
 ):
     target_date = target_date.date() if isinstance(target_date, datetime) else target_date
-    model_df = _prepare_model_history(history_df, settings["rides"])
+    if attraction_list is None:
+        attractions = _prediction_attractions(history_df, settings, current_target_df)
+    else:
+        attractions = [str(a) for a in attraction_list if str(a).strip()]
+    model_df = _prepare_model_history(history_df, attractions)
     today = datetime.now(JST).date()
-    now_hour = datetime.now(JST).hour
-
+    now = datetime.now(JST)
     target_bonus, target_reasons = get_calendar_bonus(target_date, ticket_price)
     rows = []
 
     if len(model_df) > 0:
+        time_all = model_df.groupby("time_slot")["wait_time"].median()
         hour_all = model_df.groupby("hour")["wait_time"].median()
         attraction_all = model_df.groupby("attraction")["wait_time"].median()
+        attraction_time = model_df.groupby(["attraction", "time_slot"])["wait_time"].median()
         attraction_hour = model_df.groupby(["attraction", "hour"])["wait_time"].median()
         same_weekday = model_df[model_df["weekday"] == target_date.weekday()]
         same_month = model_df[model_df["month"] == target_date.month]
         overall = model_df["wait_time"].median()
     else:
+        time_all = pd.Series(dtype=float)
         hour_all = pd.Series(dtype=float)
         attraction_all = pd.Series(dtype=float)
+        attraction_time = pd.Series(dtype=float)
         attraction_hour = pd.Series(dtype=float)
         same_weekday = pd.DataFrame()
         same_month = pd.DataFrame()
-        overall = 75
+        overall = 45
 
     current_map = {}
     if current_target_df is not None and len(current_target_df) > 0:
         current_map = dict(zip(current_target_df["Attraction"], current_target_df["Wait"]))
 
-    for attraction in settings["rides"]:
+    slots = build_time_slots(OPEN_HOUR, CROWD_END_HOUR, 15)
+    for attraction in attractions:
         attraction_feedback = get_feedback_error(prediction_history, attraction)
+        ride_base = attraction_all.get(attraction, None) if len(attraction_all) > 0 else None
+        raw_predictions = []
 
-        for hour in range(OPEN_HOUR, CROWD_END_HOUR):
-            specific = attraction_hour.get((attraction, hour), None) if len(attraction_hour) > 0 else None
-            ride_base = attraction_all.get(attraction, None) if len(attraction_all) > 0 else None
+        for slot in slots:
+            hour = int(slot["Hour"])
+            minute = int(slot["Minute"])
+            time_value = float(slot["Time"])
+            specific = attraction_time.get((attraction, time_value), None) if len(attraction_time) > 0 else None
+            hour_specific = attraction_hour.get((attraction, hour), None) if len(attraction_hour) > 0 else None
             hour_base = hour_all.get(hour, None) if len(hour_all) > 0 else None
+            time_base = time_all.get(time_value, None) if len(time_all) > 0 else None
 
             weekday_value = None
             if len(same_weekday) > 0:
-                weekday_rows = same_weekday[
+                rows_weekday = same_weekday[
                     (same_weekday["attraction"] == attraction)
-                    & (same_weekday["hour"] == hour)
+                    & (same_weekday["time_slot"] == time_value)
                 ]
-                if len(weekday_rows) > 0:
-                    weekday_value = weekday_rows["wait_time"].median()
+                if len(rows_weekday) > 0:
+                    weekday_value = rows_weekday["wait_time"].median()
 
             month_value = None
             if len(same_month) > 0:
-                month_rows = same_month[
+                rows_month = same_month[
                     (same_month["attraction"] == attraction)
                     & (same_month["hour"] == hour)
                 ]
-                if len(month_rows) > 0:
-                    month_value = month_rows["wait_time"].median()
+                if len(rows_month) > 0:
+                    month_value = rows_month["wait_time"].median()
 
             profile_value = None
             if ride_base is not None and not pd.isna(ride_base):
                 profile_value = ride_base * HOUR_PROFILE.get(hour, 1.0)
 
             base_wait = _weighted_average([
-                (specific, 0.34),
-                (weekday_value, 0.20),
-                (month_value, 0.12),
-                (profile_value, 0.18),
-                (ride_base, 0.10),
-                (hour_base, 0.04),
+                (specific, 0.30),
+                (hour_specific, 0.20),
+                (weekday_value, 0.16),
+                (month_value, 0.10),
+                (profile_value, 0.12),
+                (ride_base, 0.07),
+                (time_base, 0.03),
+                (hour_base, 0.02),
                 (overall, 0.02),
             ])
 
             current_reason = ""
             if target_date == today and attraction in current_map:
-                distance = abs(hour - now_hour)
-                if now_hour < 11:
-                    current_weight = 0.08
-                elif now_hour < 13:
-                    current_weight = 0.16
-                else:
-                    current_weight = 0.26
-
-                current_weight = current_weight / (distance + 1)
-                if hour < now_hour:
+                slot_minutes = hour * 60 + minute
+                now_minutes = now.hour * 60 + (now.minute // 15) * 15
+                distance_slots = abs(slot_minutes - now_minutes) / 15
+                current_weight = (0.08 if now.hour < 11 else 0.16 if now.hour < 13 else 0.26) / (distance_slots + 1)
+                if slot_minutes < now_minutes:
                     current_weight *= 0.35
-
                 base_wait = _weighted_average([
                     (base_wait, 1 - current_weight),
                     (current_map[attraction], current_weight),
                 ])
-                current_reason = "現在値は朝の一時的な偏りを避けるため低めの重みで反映"
+                current_reason = "現在値は低めの重みで反映"
 
             adjustment = target_bonus * 2.5
-
             if rain_mm > 0:
                 adjustment -= min(8, rain_mm * 2)
-
             if temperature >= 30:
                 adjustment -= 4
             elif temperature <= 5:
                 adjustment -= 3
 
-            predicted = max(0, base_wait + adjustment + attraction_feedback)
+            raw_predictions.append(max(0, base_wait + adjustment + attraction_feedback))
 
+        if raw_predictions:
+            smooth = pd.Series(raw_predictions).rolling(window=3, center=True, min_periods=1).mean().tolist()
+        else:
+            smooth = []
+
+        for slot, predicted in zip(slots, smooth):
             rows.append({
-                "Hour": hour,
+                "Time": slot["Time"],
+                "TimeLabel": slot["TimeLabel"],
+                "Hour": int(slot["Hour"]),
+                "Minute": int(slot["Minute"]),
                 "Attraction": attraction,
-                "Predicted Wait": round(predicted, 1),
+                "Predicted Wait": round(float(predicted), 1),
                 "理由": " / ".join([
-                    "履歴中央値",
-                    "曜日・月・時間帯プロファイル",
+                    "15分枠履歴",
+                    "時間帯中央値",
+                    "曜日・月補正",
                     "予測誤差補正",
                     current_reason,
                 ] + target_reasons).strip(" / ")
@@ -2625,14 +2826,142 @@ def predict_wait_times_for_date(
 
     return pd.DataFrame(rows)
 
+def make_major_average_prediction(wait_prediction_df, major_rides=None):
+    columns = ["Time", "TimeLabel", "Hour", "Minute", "Predicted Wait"]
+    if wait_prediction_df is None or len(wait_prediction_df) == 0:
+        return pd.DataFrame(columns=columns)
 
-def make_major_average_prediction(wait_prediction_df):
-    if len(wait_prediction_df) == 0:
-        return pd.DataFrame(columns=["Hour", "Predicted Wait"])
+    df = wait_prediction_df.copy()
+    if major_rides is not None and "Attraction" in df.columns:
+        df = df[df["Attraction"].isin(major_rides)].copy()
+    if len(df) == 0:
+        return pd.DataFrame(columns=columns)
 
-    avg_df = wait_prediction_df.groupby("Hour")["Predicted Wait"].mean().reset_index()
-    return avg_df.rename(columns={"Predicted Wait": "Predicted Wait"})
+    group_cols = [col for col in ["Time", "TimeLabel", "Hour", "Minute"] if col in df.columns]
+    if not group_cols:
+        group_cols = ["Hour"]
+    avg_df = df.groupby(group_cols)["Predicted Wait"].mean().reset_index()
+    return avg_df.sort_values(group_cols).rename(columns={"Predicted Wait": "Predicted Wait"})
 
+
+def get_all_attraction_crowd_stats(valid_all_df=None, history_df=None, target_date=None):
+    if target_date is None:
+        target_date = datetime.now(JST).date()
+    target_date = target_date.date() if isinstance(target_date, datetime) else target_date
+
+    waits = pd.Series(dtype=float)
+    open_count = 0
+    closed_count = 0
+    source = "???????"
+    target_names = []
+
+    # ????????????????????? live ?????????
+    if valid_all_df is not None and len(valid_all_df) > 0:
+        df = valid_all_df.copy()
+        open_mask = df.get("Open", True) == True
+        open_df = df[open_mask & (pd.to_numeric(df["Wait"], errors="coerce") > 0)].copy()
+        waits = pd.to_numeric(open_df["Wait"], errors="coerce").dropna().astype(float)
+        target_names = open_df["Attraction"].dropna().astype(str).unique().tolist() if "Attraction" in open_df.columns else []
+        open_count = int(len(target_names)) if target_names else int(len(open_df))
+        closed_count = int(len(df) - len(open_df))
+        source = "?????????????????"
+
+    if len(waits) == 0 and history_df is not None and len(history_df) > 0:
+        hist = filter_crowd_history(history_df.copy())
+        if "date" not in hist.columns and "datetime" in hist.columns:
+            hist["date"] = pd.to_datetime(hist["datetime"]).dt.date
+        day_df = hist[(hist.get("date") == target_date) & (hist["wait_time"] > 0)].copy() if "date" in hist.columns else pd.DataFrame()
+        if len(day_df) > 0:
+            waits = pd.to_numeric(day_df["wait_time"], errors="coerce").dropna().astype(float)
+            target_names = day_df["attraction"].dropna().astype(str).unique().tolist() if "attraction" in day_df.columns else []
+            open_count = int(len(target_names)) if target_names else 0
+            source = "???9:00?20:59???????????"
+
+    if len(waits) == 0:
+        return {
+            "avg_wait": 0.0,
+            "max_wait": 0.0,
+            "top_quartile_wait": 0.0,
+            "std_wait": 0.0,
+            "open_count": open_count,
+            "closed_count": closed_count,
+            "sample_count": 0,
+            "attraction_count": len(target_names),
+            "attraction_names": target_names,
+            "source": source,
+        }
+
+    top_count = max(1, int(np.ceil(len(waits) * 0.25)))
+    top_quartile = waits.sort_values(ascending=False).head(top_count).mean()
+    std_wait = waits.std()
+    if pd.isna(std_wait):
+        std_wait = 0
+
+    return {
+        "avg_wait": float(waits.mean()),
+        "max_wait": float(waits.max()),
+        "top_quartile_wait": float(top_quartile),
+        "std_wait": float(std_wait),
+        "open_count": open_count,
+        "closed_count": closed_count,
+        "sample_count": int(len(waits)),
+        "attraction_count": len(target_names),
+        "attraction_names": target_names,
+        "source": source,
+    }
+
+def get_prediction_crowd_stats(wait_prediction_df):
+    if wait_prediction_df is None or len(wait_prediction_df) == 0 or "Predicted Wait" not in wait_prediction_df.columns:
+        return {
+            "avg_wait": 0.0,
+            "max_wait": 0.0,
+            "top_quartile_wait": 0.0,
+            "std_wait": 0.0,
+            "open_count": 0,
+            "closed_count": 0,
+            "sample_count": 0,
+            "attraction_count": 0,
+            "attraction_names": [],
+            "source": "予測データなし",
+        }
+    df = wait_prediction_df.copy()
+    waits = pd.to_numeric(df["Predicted Wait"], errors="coerce").dropna().astype(float)
+    if len(waits) == 0:
+        return {
+            "avg_wait": 0.0,
+            "max_wait": 0.0,
+            "top_quartile_wait": 0.0,
+            "std_wait": 0.0,
+            "open_count": 0,
+            "closed_count": 0,
+            "sample_count": 0,
+            "attraction_count": 0,
+            "attraction_names": [],
+            "source": "予測データなし",
+        }
+    if "Attraction" in df.columns:
+        by_attraction = df.assign(**{"Predicted Wait": pd.to_numeric(df["Predicted Wait"], errors="coerce")}).groupby("Attraction")["Predicted Wait"].mean().dropna()
+        attraction_names = by_attraction.index.astype(str).tolist()
+    else:
+        by_attraction = waits
+        attraction_names = []
+    top_count = max(1, int(np.ceil(len(by_attraction) * 0.25)))
+    top_quartile = by_attraction.sort_values(ascending=False).head(top_count).mean()
+    std_wait = waits.std()
+    if pd.isna(std_wait):
+        std_wait = 0
+    return {
+        "avg_wait": float(waits.mean()),
+        "max_wait": float(waits.max()),
+        "top_quartile_wait": float(top_quartile),
+        "std_wait": float(std_wait),
+        "open_count": int(len(attraction_names)),
+        "closed_count": 0,
+        "sample_count": int(len(waits)),
+        "attraction_count": int(len(attraction_names)),
+        "attraction_names": attraction_names,
+        "source": "全アトラクション予測",
+    }
 
 def predict_crowd_index_for_date(
     history_df,
@@ -2660,51 +2989,43 @@ def predict_crowd_index_for_date(
         current_target_df,
     )
 
-    if len(wait_df) == 0:
-        avg_wait = 0
-        max_wait = 0
-        var_wait = 0
-    else:
-        avg_wait = wait_df["Predicted Wait"].mean()
-        max_wait = wait_df["Predicted Wait"].max()
-        var_wait = wait_df["Predicted Wait"].var()
-
-    if pd.isna(var_wait):
-        var_wait = 0
-
+    stats = get_prediction_crowd_stats(wait_df)
+    major_df = wait_df[wait_df["Attraction"].isin(settings.get("rides", []))].copy() if len(wait_df) > 0 and "Attraction" in wait_df.columns else pd.DataFrame()
+    major_stats = get_prediction_crowd_stats(major_df)
     target_bonus, reasons = get_calendar_bonus(target_date, ticket_price)
     event_bonus, event_reasons = get_event_bonus(event_signals if event_signals is not None else pd.DataFrame(), target_date, park)
     hours_bonus, hours_reasons = get_park_hours_bonus(park_hours_df if park_hours_df is not None else pd.DataFrame(), target_date)
     target_bonus += event_bonus + hours_bonus
     reasons.extend(event_reasons)
     reasons.extend(hours_reasons)
-    weather_score = get_weather_score(
-        "雨" if rain_mm > 0 else "晴れ",
-        rain_mm,
-        temperature
-    )
+    weather_score = get_weather_score("?" if rain_mm > 0 else "??", rain_mm, temperature)
     feedback_error = get_feedback_error(prediction_history, GLOBAL_PREDICTION_NAME)
     daily_feedback = get_daily_crowd_feedback_error(daily_prediction_history)
 
-    crowd_index = get_crowd_index(
-        avg_wait,
-        max_wait,
-        var_wait,
-        get_dpa_score(avg_wait, max_wait),
+    crowd_index = get_crowd_index_for_park(
+        park or settings.get("park", "DisneySea"),
+        major_stats["avg_wait"],
+        major_stats["max_wait"],
+        major_stats["top_quartile_wait"],
+        major_stats["std_wait"],
+        major_stats["open_count"],
+        major_stats["closed_count"],
         weather_score,
-        feedback_error,
-        target_bonus
+        feedback_error + daily_feedback,
+        target_bonus,
     )
 
-    crowd_index = int(min(10, max(1, round(crowd_index + daily_feedback))))
+    major_avg = float(major_df["Predicted Wait"].mean()) if len(major_df) > 0 else 0
 
     reasons = reasons + [
-        f"5大予想平均 {avg_wait:.1f}分",
-        f"過去の混雑指数誤差補正 {daily_feedback:+.1f}",
+        f"全体予想平均 {stats['avg_wait']:.1f}分",
+        f"上位25%平均 {stats['top_quartile_wait']:.1f}分",
+        f"人気主要アトラクション予想平均 {major_avg:.1f}分",
+        "混雑指数は人気主要5施設ベース",
+        f"日別誤差補正 {daily_feedback:+.1f}",
     ]
 
     return crowd_index, wait_df, reasons
-
 
 def make_week_forecast(
     history_df,
@@ -2720,11 +3041,15 @@ def make_week_forecast(
     park_hours_df=None,
     park=None,
     daily_weather=None,
+    cursor=None,
+    conn=None,
+    use_live_current_data=False,
 ):
     rows = []
 
     for i in range(7):
         d = start_date + timedelta(days=i)
+        locked_value = get_locked_daily_prediction(conn, d) if conn is not None else None
         ticket_price, ticket_source = get_ticket_price_from_castel(d, ticket_price_map)
         forecast_temperature, forecast_rain, weather_source = get_forecast_weather_for_date(
             daily_weather,
@@ -2732,28 +3057,54 @@ def make_week_forecast(
             temperature,
             rain_mm
         )
-        crowd_index, wait_df, reasons = predict_crowd_index_for_date(
-            history_df,
-            settings,
-            d,
-            forecast_temperature,
-            forecast_rain,
-            prediction_history,
-            daily_prediction_history,
-            ticket_price,
-            current_target_df if d == datetime.now(JST).date() else None,
-            event_signals,
-            park_hours_df,
-            park,
-        )
+        live_df = current_target_df if use_live_current_data and d == datetime.now(JST).date() else None
+
+        # v30: 混雑指数を人気主要5施設ベースへ戻したため、旧基準で保存済みの
+        # 固定予測は使わず、同じ日付でも新基準で作り直す。
+        if False and locked_value is not None and locked_value < 9.95:
+            crowd_index = locked_value
+            wait_df = predict_wait_times_for_date(
+                history_df,
+                settings,
+                d,
+                forecast_temperature,
+                forecast_rain,
+                prediction_history,
+                ticket_price,
+                None,
+            )
+            reasons = ["保存済みの日別固定予測を使用"]
+            prediction_source = "保存済み"
+        else:
+            crowd_index, wait_df, reasons = predict_crowd_index_for_date(
+                history_df,
+                settings,
+                d,
+                forecast_temperature,
+                forecast_rain,
+                prediction_history,
+                daily_prediction_history,
+                ticket_price,
+                live_df,
+                event_signals,
+                park_hours_df,
+                park,
+            )
+            save_locked_daily_prediction(cursor, conn, d, crowd_index)
+            prediction_source = "新規固定保存" if conn is not None else "一時予測"
 
         rows.append({
             "Date": d.strftime("%m/%d"),
-            "Crowd Index": crowd_index,
+            "Crowd Index": round(float(crowd_index), 1),
+            "予測種別": prediction_source,
             "予報気温": round(forecast_temperature, 1),
             "予報降水量": round(forecast_rain, 1),
             "天気取得元": weather_source,
-            "5大平均待ち時間": round(wait_df["Predicted Wait"].mean(), 1) if len(wait_df) > 0 else 0,
+            "全体平均待ち時間": round(get_prediction_crowd_stats(wait_df)["avg_wait"], 1),
+            "上位25%平均待ち時間": round(get_prediction_crowd_stats(wait_df)["top_quartile_wait"], 1),
+            "人気主要アトラクション平均待ち時間": round(
+                wait_df[wait_df["Attraction"].isin(settings.get("rides", []))]["Predicted Wait"].mean(), 1
+            ) if len(wait_df) > 0 and "Attraction" in wait_df.columns else 0,
             "チケット価格": "未取得" if ticket_price is None else ticket_price,
             "主な理由": " / ".join(reasons[:4]),
             "価格取得元": ticket_source,
@@ -2761,6 +3112,204 @@ def make_week_forecast(
 
     return pd.DataFrame(rows)
 
+
+def make_locked_week_forecast(*args, **kwargs):
+    kwargs["use_live_current_data"] = False
+    return make_week_forecast(*args, **kwargs)
+
+
+
+def _time_to_minutes(value):
+    if isinstance(value, str):
+        h, m = value.split(":")[:2]
+        return int(h) * 60 + int(m)
+    if isinstance(value, (int, float)):
+        if float(value) > 24:
+            return int(float(value))
+        return int(float(value) * 60)
+    if isinstance(value, datetime):
+        return value.hour * 60 + value.minute
+    return OPEN_HOUR * 60
+
+
+def _minutes_to_label(minutes):
+    minutes = int(minutes)
+    return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
+def time_label_to_minutes(time_label):
+    return _time_to_minutes(time_label)
+
+
+def minutes_to_time_label(minutes):
+    return _minutes_to_label(minutes)
+
+
+def round_to_nearest_slot(minutes, step=15):
+    return int(round(int(minutes) / step) * step)
+
+
+def _prediction_minutes(df):
+    if "Time" in df.columns:
+        return (pd.to_numeric(df["Time"], errors="coerce") * 60).round().astype("Int64")
+    hour = pd.to_numeric(df.get("Hour", 0), errors="coerce").fillna(0).astype(int)
+    minute = pd.to_numeric(df.get("Minute", 0), errors="coerce").fillna(0).astype(int)
+    return hour * 60 + minute
+
+
+def get_predicted_wait_at_time(wait_pred_df, attraction, current_time):
+    if wait_pred_df is None or len(wait_pred_df) == 0:
+        return None
+    if "Predicted Wait" not in wait_pred_df.columns:
+        return None
+    target_minutes = round_to_nearest_slot(_time_to_minutes(current_time), 15)
+    df_all = wait_pred_df.copy()
+    df_all["_minutes"] = _prediction_minutes(df_all)
+    df_all["Predicted Wait"] = pd.to_numeric(df_all["Predicted Wait"], errors="coerce")
+    df_all = df_all.dropna(subset=["Predicted Wait", "_minutes"])
+    if len(df_all) == 0:
+        return None
+
+    if "Attraction" in df_all.columns:
+        df = df_all[df_all["Attraction"] == attraction].copy()
+    else:
+        df = pd.DataFrame()
+    if len(df) == 0:
+        near_all = df_all.assign(_distance=(df_all["_minutes"].astype(int) - target_minutes).abs()).sort_values("_distance")
+        if len(near_all) > 0:
+            return float(near_all.head(8)["Predicted Wait"].mean())
+        return float(df_all["Predicted Wait"].mean())
+
+    df["_distance"] = (df["_minutes"].astype(int) - target_minutes).abs()
+    row = df.sort_values("_distance").iloc[0]
+    return float(row["Predicted Wait"])
+
+
+def simulate_route_order(wait_pred_df, attraction_order, start_minutes, end_minutes):
+    rows = []
+    current = int(start_minutes)
+    total_wait = 0.0
+    warnings = []
+    skipped = []
+    filled = []
+    for idx, attraction in enumerate(attraction_order, start=1):
+        if current >= end_minutes:
+            skipped.append(attraction)
+            warnings.append(f"{attraction} は終了時刻内に入りませんでした")
+            break
+        has_exact_attraction = (
+            wait_pred_df is not None
+            and len(wait_pred_df) > 0
+            and "Attraction" in wait_pred_df.columns
+            and attraction in set(wait_pred_df["Attraction"].astype(str))
+        )
+        wait = get_predicted_wait_at_time(wait_pred_df, attraction, _minutes_to_label(current))
+        if wait is None:
+            warnings.append(f"{attraction} は予測データ不足です")
+            skipped.append(attraction)
+            continue
+        if not has_exact_attraction:
+            filled.append(attraction)
+            warnings.append(f"{attraction} は予測データ不足のため平均値で補完しました")
+        rows.append({
+            "順番": idx,
+            "開始時刻": _minutes_to_label(current),
+            "Attraction": attraction,
+            "予測待ち時間": round(wait, 1),
+            "移動・体験込み所要": round(wait + 20, 1),
+        })
+        total_wait += wait
+        current += int(round(wait + 20))
+    return rows, total_wait, current, warnings, skipped, filled
+
+
+def _simulate_route_order(wait_pred_df, order, start_minutes, end_minutes):
+    rows, total_wait, finish, warnings, _skipped, _filled = simulate_route_order(
+        wait_pred_df,
+        order,
+        start_minutes,
+        end_minutes,
+    )
+    return rows, total_wait, finish, warnings
+
+
+def build_optimal_route_plan(wait_pred_df, selected_attractions, start_time, end_time):
+    selected = [a for a in selected_attractions if a]
+    start_minutes = round_to_nearest_slot(_time_to_minutes(start_time), 15)
+    end_minutes = round_to_nearest_slot(_time_to_minutes(end_time), 15)
+    if not selected:
+        return pd.DataFrame(), {
+            "total_wait": 0,
+            "end_time": _minutes_to_label(start_minutes),
+            "message": "行きたいアトラクションを選択してください。",
+            "warnings": [],
+            "skipped": [],
+            "filled_attractions": [],
+        }
+    if end_minutes <= start_minutes:
+        return pd.DataFrame(), {
+            "total_wait": 0,
+            "end_time": _minutes_to_label(start_minutes),
+            "message": "終了時刻は開始時刻より後にしてください。",
+            "warnings": [],
+            "skipped": selected,
+            "filled_attractions": [],
+        }
+
+    if len(selected) <= 7:
+        from itertools import permutations
+        candidates = permutations(selected)
+    else:
+        remaining = selected[:]
+        order = []
+        current = start_minutes
+        while remaining:
+            waits = [(get_predicted_wait_at_time(wait_pred_df, a, _minutes_to_label(current)) or 999, a) for a in remaining]
+            _, chosen = sorted(waits)[0]
+            order.append(chosen)
+            wait = get_predicted_wait_at_time(wait_pred_df, chosen, _minutes_to_label(current)) or 0
+            current += int(round(wait + 20))
+            remaining.remove(chosen)
+        candidates = [order]
+
+    best = None
+    for order in candidates:
+        rows, total_wait, finish, warnings, skipped, filled = simulate_route_order(wait_pred_df, order, start_minutes, end_minutes)
+        score = total_wait + max(0, finish - end_minutes) * 3 + len(warnings) * 50
+        if best is None or score < best[0]:
+            best = (score, rows, total_wait, finish, warnings, list(order), skipped, filled)
+
+    _, rows, total_wait, finish, warnings, order, skipped, filled = best
+    route_df = pd.DataFrame(rows)
+    peak_avoided = "予測待ち時間が短い時間帯を優先した順番です。" if len(route_df) > 0 else "プランを作成できませんでした。"
+    meta = {
+        "total_wait": round(total_wait, 1),
+        "end_time": _minutes_to_label(finish),
+        "message": peak_avoided,
+        "warnings": warnings,
+        "order": order,
+        "completed_count": int(len(route_df)),
+        "selected_count": int(len(selected)),
+        "skipped": skipped,
+        "filled_attractions": sorted(set(filled)),
+    }
+    return route_df, meta
+
+
+def format_route_plan_cards(route_df):
+    if route_df is None or len(route_df) == 0:
+        return "<div class='ios-card'>プランを作成できませんでした。</div>"
+    html = ["<div class='ios-list-card'>"]
+    for _, row in route_df.iterrows():
+        html.append(
+            "<div class='ios-list-row'>"
+            f"<div><div class='ios-list-title'>{int(row['順番'])}. {row['開始時刻']} {row['Attraction']}</div>"
+            f"<div class='ios-list-detail'>移動・体験込み 約{row['移動・体験込み所要']:.0f}分</div></div>"
+            f"<div class='ios-list-value'>{row['予測待ち時間']:.0f}分</div>"
+            "</div>"
+        )
+    html.append("</div>")
+    return "".join(html)
 
 def predict_dpa_sellout_time(attraction, wait, crowd_10, ticket_price, bonus, dpa_sellout_history):
     historical_hour = None
@@ -2819,7 +3368,7 @@ def get_data_quality_report(history_df, prediction_history, dpa_sellout_history,
 
     if len(target_history) == 0:
         rows.append({
-            "項目": "5大アトラクション履歴",
+            "項目": "人気主要アトラクション履歴",
             "状態": "不足",
             "対応": "9:00〜20:59にアプリを起動し、待ち時間を蓄積してください。"
         })
@@ -2827,7 +3376,7 @@ def get_data_quality_report(history_df, prediction_history, dpa_sellout_history,
         days = target_history["date"].nunique()
         rides = target_history["attraction"].nunique()
         rows.append({
-            "項目": "5大アトラクション履歴",
+            "項目": "人気主要アトラクション履歴",
             "状態": f"{days}日 / {rides}施設",
             "対応": "曜日差を学習するには複数週の履歴があると安定します。"
         })
@@ -2918,9 +3467,9 @@ def get_prediction_confidence(
     notes = []
 
     if history_days < 7:
-        notes.append("5大アトラクションの履歴日数が少ない")
+        notes.append("人気主要アトラクションの履歴日数が少ない")
     if ride_coverage < len(settings["rides"]):
-        notes.append("5大アトラクションの一部で履歴が不足")
+        notes.append("人気主要アトラクションの一部で履歴が不足")
     if error_count < 20:
         notes.append("予測誤差の学習データが少ない")
     if dpa_count < 10:
@@ -3012,7 +3561,7 @@ def get_prediction_alerts(wait_prediction_df, confidence):
 
         if avg_wait >= 100:
             alerts.append({
-                "注意点": "5大平均が高め",
+                "注意点": "人気主要アトラクション平均が高め",
                 "内容": f"平均{avg_wait:.0f}分前後の予測です。午後に集中しすぎない計画がおすすめです。"
             })
 
@@ -3166,7 +3715,7 @@ def get_historical_crowd_rank(history_df, settings, lookback_days=30):
     target_df = filter_crowd_history(target_df)
 
     if len(target_df) == 0:
-        return {"message": "比較には9:00〜20:59の5大アトラクション履歴が不足しています。", "percentile": None, "today_avg": None, "days": 0, "level": "データ不足"}
+        return {"message": "比較には9:00〜20:59の人気主要アトラクション履歴が不足しています。", "percentile": None, "today_avg": None, "days": 0, "level": "データ不足"}
 
     today = datetime.now(JST).date()
     start_date = today - timedelta(days=lookback_days)
@@ -3222,16 +3771,16 @@ def get_prediction_risk_diagnosis(
         days = model_df["date"].nunique() if len(model_df) > 0 and "date" in model_df.columns else 0
         ride_count = model_df["attraction"].nunique() if len(model_df) > 0 and "attraction" in model_df.columns else 0
         if days < 7:
-            add("履歴データ", "少ない", f"5大アトラクションの有効履歴が{days}日分です。曜日傾向が弱くなります。", "高")
+            add("履歴データ", "少ない", f"人気主要アトラクションの有効履歴が{days}日分です。曜日傾向が弱くなります。", "高")
         elif days < 21:
             add("履歴データ", "やや少ない", f"有効履歴は{days}日分です。季節差やイベント差はまだ弱めです。", "中")
         else:
             add("履歴データ", "良好", f"有効履歴は{days}日分あります。", "低")
 
         if ride_count < len(settings["rides"]):
-            add("5大アトラクション網羅", "不足", f"{ride_count}/{len(settings['rides'])}施設分だけ履歴があります。", "中")
+            add("人気主要アトラクション網羅", "不足", f"{ride_count}/{len(settings['rides'])}施設分だけ履歴があります。", "中")
         else:
-            add("5大アトラクション網羅", "良好", "5大アトラクションの履歴がそろっています。", "低")
+            add("人気主要アトラクション網羅", "良好", "人気主要アトラクションの履歴がそろっています。", "低")
 
     if len(current_df) == 0:
         add("現在値", "未取得", "現在の待ち時間が取れていません。今日の補正が弱くなります。", "中")
@@ -3239,9 +3788,9 @@ def get_prediction_risk_diagnosis(
         current_major = current_df[current_df["Attraction"].isin(settings["rides"])] if "Attraction" in current_df.columns else pd.DataFrame()
         open_major = current_major[(current_major["Open"] == True) & (current_major["Wait"] > 0)] if len(current_major) > 0 else pd.DataFrame()
         if len(open_major) < max(3, len(settings["rides"]) - 1):
-            add("現在値", "一部不足", f"現在取得できている5大アトラクションは{len(open_major)}件です。", "中")
+            add("現在値", "一部不足", f"現在取得できている人気主要アトラクションは{len(open_major)}件です。", "中")
         else:
-            add("現在値", "良好", "現在の5大アトラクション待ち時間を補正に使えます。", "低")
+            add("現在値", "良好", "現在の人気主要アトラクション待ち時間を補正に使えます。", "低")
 
         if len(history_df) > 0 and "hour" in history_df.columns and len(open_major) > 0:
             hist = history_df[history_df["attraction"].isin(settings["rides"])].copy()
@@ -3314,7 +3863,7 @@ def get_guest_action_plan(wait_prediction_df, crowd_index=None, ticket_price=Non
         rows.append({
             "優先度": "高",
             "おすすめ": f"{best_hour}:00台を狙う",
-            "理由": f"5大アトラクション平均が約{best_wait:.0f}分で、予測上いちばん軽い時間帯です。",
+            "理由": f"人気主要アトラクション平均が約{best_wait:.0f}分で、予測上いちばん軽い時間帯です。",
         })
 
     if len(hourly) >= 3:
@@ -3374,8 +3923,7 @@ def get_today_stats(history_df, valid_open_df):
     if len(history_df) > 0 and "date" in history_df.columns:
         today_df = history_df[
             (history_df["date"] == today)
-            &
-            (history_df["wait_time"] > 0)
+            & (history_df["wait_time"] > 0)
         ].copy()
     else:
         today_df = pd.DataFrame()
@@ -3384,12 +3932,12 @@ def get_today_stats(history_df, valid_open_df):
         avg_wait = today_df["wait_time"].mean()
         max_wait = today_df["wait_time"].max()
         var_wait = today_df["wait_time"].var()
-        source = "今日9:00以降〜現在までの5大アトラクション平均"
+        source = "今日9:00〜20:59の対象アトラクション履歴"
     elif len(valid_open_df) > 0:
         avg_wait = valid_open_df["Wait"].mean()
         max_wait = valid_open_df["Wait"].max()
         var_wait = valid_open_df["Wait"].var()
-        source = "現在の営業中5大アトラクションデータ"
+        source = "現在の営業中対象アトラクションデータ"
     else:
         avg_wait = 0
         max_wait = 0
@@ -3400,7 +3948,6 @@ def get_today_stats(history_df, valid_open_df):
         var_wait = 0
 
     return avg_wait, max_wait, var_wait, source
-
 
 def get_prediction_gap_summary(prediction_history):
     if len(prediction_history) == 0:
@@ -3495,7 +4042,8 @@ def format_crowd_index(value):
 
 
 
-def _low_wait_slots(wait_prediction_df, limit=3):
+
+def _attraction_prediction_profiles(wait_prediction_df, limit=5):
     if wait_prediction_df is None or len(wait_prediction_df) == 0:
         return []
     required = {"Attraction", "Hour", "Predicted Wait"}
@@ -3509,37 +4057,72 @@ def _low_wait_slots(wait_prediction_df, limit=3):
 
     rows = []
     for attraction, group in df.groupby("Attraction"):
+        group = group.sort_values("Hour").copy()
         best = group.sort_values("Predicted Wait").head(1)
         worst = group.sort_values("Predicted Wait", ascending=False).head(1)
-        if len(best) == 0:
+        if len(best) == 0 or len(worst) == 0:
             continue
+
+        group["diff"] = group["Predicted Wait"].diff()
+        surge = group.sort_values("diff", ascending=False).head(1)
+        surge_hour = None
+        surge_delta = 0
+        if len(surge) > 0 and not pd.isna(surge.iloc[0].get("diff")):
+            surge_hour = int(surge.iloc[0]["Hour"])
+            surge_delta = float(surge.iloc[0]["diff"])
+
         best_row = best.iloc[0]
         worst_row = worst.iloc[0]
         rows.append({
             "attraction": str(attraction),
             "hour": int(best_row["Hour"]),
+            "minute": int(best_row.get("Minute", 0)),
+            "time_label": str(best_row.get("TimeLabel", f"{int(best_row['Hour']):02d}:00")),
             "wait": float(best_row["Predicted Wait"]),
             "peak_hour": int(worst_row["Hour"]),
+            "peak_minute": int(worst_row.get("Minute", 0)),
+            "peak_time_label": str(worst_row.get("TimeLabel", f"{int(worst_row['Hour']):02d}:00")),
             "peak_wait": float(worst_row["Predicted Wait"]),
+            "surge_hour": surge_hour,
+            "surge_delta": surge_delta,
+            "range": float(worst_row["Predicted Wait"] - best_row["Predicted Wait"]),
         })
 
-    return sorted(rows, key=lambda x: x["wait"])[:limit]
+    return sorted(rows, key=lambda x: (x["wait"], -x["range"]))[:limit]
+
+
+def _low_wait_slots(wait_prediction_df, limit=3):
+    return _attraction_prediction_profiles(wait_prediction_df, limit=limit)
 
 
 def _short_attraction_name(name):
     replacements = {
-        "Soaring: Fantastic Flight": "Soaring",
-        "Tower of Terror": "Tower of Terror",
-        "Toy Story Mania!": "Toy Story",
-        "Journey to the Center of the Earth": "Journey",
-        "Anna and Elsa's Frozen Journey": "Frozen Journey",
-        "Enchanted Tale of Beauty and the Beast": "Beauty and Beast",
-        "The Happy Ride with Baymax": "Baymax",
-        "Monsters, Inc. Ride & Go Seek!": "Monsters Inc.",
-        "Pooh's Hunny Hunt": "Pooh",
-        "Splash Mountain": "Splash",
+        "Soaring: Fantastic Flight": "ソアリン",
+        "Tower of Terror": "タワテラ",
+        "Toy Story Mania!": "トイマニ",
+        "Journey to the Center of the Earth": "センター",
+        "Anna and Elsa's Frozen Journey": "アナ雪",
+        "Enchanted Tale of Beauty and the Beast": "美女と野獣",
+        "The Happy Ride with Baymax": "ベイマックス",
+        "Monsters, Inc. Ride & Go Seek!": "モンスターズインク",
+        "Pooh's Hunny Hunt": "プーさん",
+        "Splash Mountain": "スプラッシュ",
     }
-    return replacements.get(str(name), str(name).replace("TM", "").replace("?", ""))
+    value = replacements.get(str(name), str(name).replace("TM", "").replace("?", ""))
+    return "" if _is_broken_show_text(value) else value
+
+
+def _x_level_text(crowd_index):
+    value = float(crowd_index)
+    if value >= 8.5:
+        return "🔥 超混雑"
+    if value >= 6.5:
+        return "🔴 混雑"
+    if value >= 5:
+        return "🟠 やや混雑"
+    if value >= 3:
+        return "🟡 普通"
+    return "🟢 空いている"
 
 
 def _truncate_text(text, limit):
@@ -3548,8 +4131,65 @@ def _truncate_text(text, limit):
     return text[: max(0, limit - 1)] + "..."
 
 
-def _u(text):
-    return text.encode("ascii").decode("unicode_escape")
+def _major_attraction_names(wait_prediction_df):
+    if wait_prediction_df is None or len(wait_prediction_df) == 0 or "Attraction" not in wait_prediction_df.columns:
+        return ""
+    names = []
+    for name in wait_prediction_df["Attraction"].dropna().tolist():
+        short = _short_attraction_name(name)
+        if short not in names:
+            names.append(short)
+        if len(names) >= 5:
+            break
+    return "、".join(names)
+
+
+def _x_pick_text(profile, include_particle=False):
+    name = _short_attraction_name(profile.get("attraction", ""))
+    time_label = profile.get("time_label") or f"{int(profile.get('hour', 0)):02d}:{int(profile.get('minute', 0)):02d}"
+    time_text = _format_time_jp(time_label)
+    wait = float(profile.get("wait", 0))
+    if include_particle:
+        return f"{name}は{time_text}に{wait:.0f}分予測"
+    return f"{name}{time_text} {wait:.0f}分"
+
+
+def _format_time_jp(time_label):
+    text = str(time_label)
+    if ":" not in text:
+        return text
+    hour, minute = text.split(":", 1)
+    try:
+        return f"{int(hour)}時{int(minute):02d}分"
+    except Exception:
+        return text
+
+
+def _fit_x_post_text(line1, main_text, other_text):
+    ending = "おすすめは午前に人気施設を1つ押さえ、夕方以降に下がる候補を拾う動き。"
+    line2 = main_text
+    if other_text:
+        line2 += f"ほかの狙い目は{other_text}。"
+    line2 += ending
+    text = f"{line1}\n{line2}"
+
+    if len(text) <= 280:
+        return text
+
+    if other_text and "、" in other_text:
+        first_other = other_text.split("、")[0]
+        line2 = f"{main_text}ほかの狙い目は{first_other}。{ending}"
+        text = f"{line1}\n{line2}"
+        if len(text) <= 280:
+            return text
+
+    line2 = f"{main_text}{ending}"
+    text = f"{line1}\n{line2}"
+    if len(text) <= 280:
+        return text
+
+    keep = max(0, 280 - len(line2) - 2)
+    return f"{line1[:keep]}…\n{line2}"
 
 
 def make_x_post_summary(
@@ -3566,78 +4206,185 @@ def make_x_post_summary(
     if len(df) > 0 and "Predicted Wait" in df.columns:
         df = df[df["Predicted Wait"].notna()].copy()
 
-    avg_wait = float(df["Predicted Wait"].mean()) if len(df) > 0 and "Predicted Wait" in df.columns else 0
-    quiet_hour = None
-    quiet_wait = None
-    peak_hour = None
-    peak_wait = None
+    level_text = _x_level_text(crowd_index)
+    title = f"【{park} {date_text}の混雑予測】"
+    required_columns = {"Attraction", "Hour", "Predicted Wait"}
+    if len(df) == 0 or not required_columns.issubset(df.columns):
+        return (
+            f"{title}\n"
+            f"混雑指数{format_crowd_index(crowd_index)}/10（{level_text}）。\n"
+            "全体平均と人気主要アトラクション平均は計算中です。履歴が増えると、狙い目の時間帯も表示できます。"
+        )[:280]
 
-    if len(df) > 0 and {"Hour", "Predicted Wait"}.issubset(df.columns):
-        hourly = df.groupby("Hour")["Predicted Wait"].mean()
-        if len(hourly) > 0:
-            quiet_hour = int(hourly.idxmin())
-            quiet_wait = float(hourly.min())
-            peak_hour = int(hourly.idxmax())
-            peak_wait = float(hourly.max())
+    stats = get_prediction_crowd_stats(df)
+    major_rides = PARK_SETTINGS.get(park, {}).get("rides", [])
+    major_df = df[df["Attraction"].isin(major_rides)].copy() if "Attraction" in df.columns else pd.DataFrame()
+    if len(major_df) == 0:
+        major_df = df.copy()
+    major_avg = float(major_df["Predicted Wait"].mean()) if len(major_df) > 0 else 0
 
-    if quiet_hour is not None and peak_hour is not None:
-        overview = (
-            f"{_u('\\u3010')}{park} {_u('\\u660e\\u65e5')}{date_text}{_u('\\u4e88\\u60f3\\u3011')}"
-            f"{_u('\\u6df7\\u96d1\\u6307\\u6570')}{format_crowd_index(crowd_index)}/10{_u('\\u3002')}"
-            f"{_u('\\u4e3b\\u89815\\u65bd\\u8a2d\\u306f\\u5e73\\u5747')}{avg_wait:.0f}{_u('\\u5206\\u524d\\u5f8c\\u3002')}"
-            f"{_u('\\u7a7a\\u304d\\u3084\\u3059\\u3044\\u306e\\u306f')}{quiet_hour}{_u('\\u6642\\u53f0')}({quiet_wait:.0f}{_u('\\u5206')}){_u('\\u3001')}"
-            f"{_u('\\u4f38\\u3073\\u3084\\u3059\\u3044\\u306e\\u306f')}{peak_hour}{_u('\\u6642\\u53f0')}({peak_wait:.0f}{_u('\\u5206')}){_u('\\u3002')}"
-        )
+    hourly = df.groupby("Hour")["Predicted Wait"].mean()
+    peak_hour = int(hourly.idxmax()) if len(hourly) > 0 else 0
+    if crowd_index >= 8.5:
+        mood = "かなり混雑する予想です"
+    elif crowd_index >= 6.5:
+        mood = "混雑しやすい予想です"
+    elif crowd_index >= 5.0:
+        mood = "普通〜やや混雑寄りの予想です"
+    elif crowd_index >= 3.0:
+        mood = "全体的には普通の予想です"
     else:
-        overview = (
-            f"{_u('\\u3010')}{park} {_u('\\u660e\\u65e5')}{date_text}{_u('\\u4e88\\u60f3\\u3011')}"
-            f"{_u('\\u6df7\\u96d1\\u6307\\u6570')}{format_crowd_index(crowd_index)}/10{_u('\\u3002')}"
-            + _u("\\u6642\\u9593\\u5e2f\\u5225\\u306e\\u7d30\\u304b\\u3044\\u50be\\u5411\\u306f\\u30c7\\u30fc\\u30bf\\u84c4\\u7a4d\\u4e2d\\u3067\\u3059\\u3002")
-        )
+        mood = "かなり落ち着いた予想です"
 
-    slots = _low_wait_slots(df, limit=3)
-    if slots:
-        details = []
-        for slot in slots[:3]:
-            name = _short_attraction_name(slot["attraction"])
-            details.append(f"{name}:{slot['hour']}{_u('\\u6642\\u53f0')}{slot['wait']:.0f}{_u('\\u5206')}")
-        detail_text = _u("\\u72d9\\u3044\\u76ee\\u2192") + _u("\\u3001").join(details) + _u("\\u3002")
-        if slots[0].get("peak_hour") is not None:
-            first = slots[0]
-            detail_text += (
-                f"{_short_attraction_name(first['attraction'])}"
-                f"{_u('\\u306f\\u30d4\\u30fc\\u30af')}{first['peak_hour']}{_u('\\u6642\\u53f0')}"
-                f"{first['peak_wait']:.0f}{_u('\\u5206\\u4e88\\u60f3\\u3002')}"
-            )
+    profile_source_df = major_df if len(major_df) > 0 else df
+    profiles = _attraction_prediction_profiles(profile_source_df, limit=3)
+    if profiles:
+        parts = []
+        for profile in profiles[:3]:
+            name = _short_attraction_name(profile.get("attraction", ""))
+            if not name:
+                continue
+            time_label = profile.get("time_label") or f"{int(profile.get('hour', 0)):02d}:{int(profile.get('minute', 0)):02d}"
+            hour_text = _format_time_jp(time_label).split("時")[0]
+            if hour_text.isdigit():
+                parts.append(f"{name}{int(hour_text)}時台")
+            else:
+                parts.append(f"{name}{_format_time_jp(time_label)}")
+        aim_text = "狙い目は" + "、".join(parts) + "。" if parts else "狙い目はデータ蓄積後に表示します。"
     else:
-        detail_text = _u("\\u30a2\\u30c8\\u30e9\\u30af\\u30b7\\u30e7\\u30f3\\u5225\\u306e\\u72d9\\u3044\\u76ee\\u306f\\u30c7\\u30fc\\u30bf\\u84c4\\u7a4d\\u4e2d\\u3002\\u4eba\\u6c17\\u65bd\\u8a2d\\u306f\\u5348\\u524d\\u306b1\\u3064\\u62bc\\u3055\\u3048\\u308b\\u52d5\\u304d\\u304c\\u304a\\u3059\\u3059\\u3081\\u3002")
+        aim_text = "狙い目はデータ蓄積後に表示します。"
 
-    return _truncate_text(overview, 140) + "\n" + _truncate_text(detail_text, 140)
+    text = (
+        f"{title}\n"
+        f"混雑指数{format_crowd_index(crowd_index)}/10（{level_text}）。\n"
+        f"全体平均は約{stats['avg_wait']:.0f}分、人気主要アトラクション平均は約{major_avg:.0f}分。ピークは{peak_hour}時台で、{mood}。\n"
+        f"{aim_text}人気施設は午前〜昼過ぎに伸びやすいので、夜の下がる時間も活用がおすすめです。"
+    )
+    if _is_broken_show_text(text):
+        return f"{title}\n混雑指数{format_crowd_index(crowd_index)}/10（{level_text}）。\n予測文を安全に表示できませんでした。"
+    if len(text) <= 280:
+        return text
+    for cut in ["。 ", "。", "\n"]:
+        idx = text.rfind(cut, 0, 280)
+        if idx > 120:
+            end = idx + (1 if cut.strip() == "。" else 0)
+            return text[:end].rstrip()
+    return text[:277].rstrip() + "..."
+
+def get_crowd_index_for_park(
+    park,
+    avg_wait,
+    max_wait,
+    top_quartile_wait,
+    std_wait,
+    open_count,
+    closed_count,
+    weather_score,
+    feedback_error,
+    demand_bonus,
+    return_debug=False,
+):
+    baseline = PARK_CROWD_BASELINES.get(park, PARK_CROWD_BASELINES["DisneySea"])
+    avg_ratio = avg_wait / baseline["avg_wait_normal"] if baseline["avg_wait_normal"] else 0
+    top_ratio = top_quartile_wait / baseline["top_quartile_wait_normal"] if baseline["top_quartile_wait_normal"] else 0
+    max_ratio = max_wait / baseline["max_wait_normal"] if baseline["max_wait_normal"] else 0
+    std_ratio = std_wait / baseline["std_wait_normal"] if baseline["std_wait_normal"] else 0
+    avg_ratio_clipped = float(np.clip(avg_ratio, 0, 2.5))
+    top_ratio_clipped = float(np.clip(top_ratio, 0, 2.5))
+    max_ratio_clipped = float(np.clip(max_ratio, 0, 2.0))
+    std_ratio_clipped = float(np.clip(std_ratio, 0, 2.5))
+
+    base_score = (
+        avg_ratio_clipped * 1.8
+        + top_ratio_clipped * 2.3
+        + max_ratio_clipped * 0.9
+        + std_ratio_clipped * 0.5
+    )
+    closed_adjustment = min(0.4, max(0, closed_count) * 0.025)
+    open_adjustment = -0.2 if open_count >= 25 else 0.15 if 0 < open_count < 12 else 0
+    demand_adjustment = float(np.clip(demand_bonus * baseline.get("demand_scale", 0.12), -0.6, 1.0))
+    weather_adjustment = float(np.clip(weather_score * 0.15, -0.3, 0.3))
+    feedback_adjustment = float(np.clip(feedback_error * 0.03, -0.7, 0.7))
+    corrected_score = (
+        base_score
+        + baseline.get("score_offset", 0.0)
+        + baseline.get("park_bias", 0.0)
+        + demand_adjustment
+        + weather_adjustment
+        + feedback_adjustment
+        + closed_adjustment
+        + open_adjustment
+    )
+    final_score = round(min(10, max(1, corrected_score)), 1)
+    warnings = []
+    if open_count and open_count <= 5:
+        warnings.append("全体平均の対象が5件以下です。人気主要5施設だけで計算されている可能性があります。")
+    if base_score >= 8:
+        warnings.append("補正前スコアが高めです。全体平均の対象数と上位25%平均を確認してください。")
+    if corrected_score >= 10:
+        warnings.append("補正後スコアが10以上です。需要補正や対象データを確認してください。")
+    debug = {
+        "park": park,
+        "avg_wait": round(float(avg_wait), 2),
+        "top_quartile_wait": round(float(top_quartile_wait), 2),
+        "max_wait": round(float(max_wait), 2),
+        "std_wait": round(float(std_wait), 2),
+        "open_count": int(open_count or 0),
+        "closed_count": int(closed_count or 0),
+        "avg_ratio": round(float(avg_ratio), 3),
+        "top_ratio": round(float(top_ratio), 3),
+        "max_ratio": round(float(max_ratio), 3),
+        "std_ratio": round(float(std_ratio), 3),
+        "avg_ratio_clipped": round(float(avg_ratio_clipped), 3),
+        "top_ratio_clipped": round(float(top_ratio_clipped), 3),
+        "max_ratio_clipped": round(float(max_ratio_clipped), 3),
+        "std_ratio_clipped": round(float(std_ratio_clipped), 3),
+        "score_offset": baseline.get("score_offset", 0.0),
+        "park_bias": baseline.get("park_bias", 0.0),
+        "demand_bonus": round(float(demand_bonus), 2),
+        "demand_adjustment": round(float(demand_adjustment), 3),
+        "weather_score": round(float(weather_score), 2),
+        "weather_adjustment": round(float(weather_adjustment), 3),
+        "feedback_error": round(float(feedback_error), 2),
+        "feedback_adjustment": round(float(feedback_adjustment), 3),
+        "closed_adjustment": round(float(closed_adjustment), 3),
+        "open_adjustment": round(float(open_adjustment), 3),
+        "base_score": round(float(base_score), 3),
+        "corrected_score": round(float(corrected_score), 3),
+        "final_crowd_index": final_score,
+        "baseline": park,
+        "warnings": warnings,
+    }
+    return (final_score, debug) if return_debug else final_score
+
 
 def get_crowd_index(avg_wait, max_wait, var_wait, dpa, weather_score, feedback_error, today_bonus):
-    crowd_score = (
-        avg_wait * 0.45
-        + max_wait * 0.35
-        + np.sqrt(var_wait) * 0.1
-        + dpa * 20
-        + weather_score * 5
-        + feedback_error
-        + today_bonus * 8
+    std_wait = np.sqrt(var_wait) if var_wait is not None and not pd.isna(var_wait) else 0
+    top_quartile_wait = max(avg_wait, max_wait * 0.55)
+    return get_crowd_index_for_park(
+        "DisneySea",
+        avg_wait,
+        max_wait,
+        top_quartile_wait,
+        std_wait,
+        20,
+        0,
+        weather_score,
+        feedback_error,
+        today_bonus,
     )
-
-    return round(min(10, max(1, crowd_score / 25)), 1)
 
 
 def get_level(crowd_10):
-    if crowd_10 >= 9:
-        return "🔴 超混雑", "red"
-    elif crowd_10 >= 6:
-        return "🟠 混雑", "orange"
-    elif crowd_10 >= 3:
-        return "🟡 普通", "gold"
-    else:
-        return "🟢 空いている", "#4ade80"
-
+    if crowd_10 >= 8.5:
+        return "🔥 超混雑", "#ff3b30"
+    if crowd_10 >= 6.5:
+        return "🔴 混雑", "#ff453a"
+    if crowd_10 >= 5.0:
+        return "🟠 やや混雑", "#ff9500"
+    if crowd_10 >= 3.0:
+        return "🟡 普通", "#ffcc00"
+    return "🟢 空いている", "#34c759"
 
 def make_action_advice(
     crowd_10,
@@ -3683,7 +4430,7 @@ def make_action_advice(
         target_sorted = valid_target_df.sort_values("Wait")
         target_best = target_sorted.iloc[0]
         advice.append(
-            f"5大アトラクション内なら **{target_best['Attraction']}** が今の候補です。現在{target_best['Wait']}分です。"
+            f"人気主要アトラクション内なら **{target_best['Attraction']}** が今の候補です。現在{target_best['Wait']}分です。"
         )
 
     return advice
