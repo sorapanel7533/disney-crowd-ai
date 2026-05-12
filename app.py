@@ -457,8 +457,8 @@ def render_crowd_hero(crowd_index, level_text, avg_wait, top_wait, confidence_sc
               <div class="hero-crowd-label">{escape(str(level_text))}</div>
             </div>
             <div class="ios-card-grid" style="margin:0;">
-              <div class="compact-metric"><div class="compact-label">全体平均</div><div class="compact-value">{avg_wait:.1f}分</div></div>
-              <div class="compact-metric"><div class="compact-label">上位25%平均</div><div class="compact-value">{top_wait:.1f}分</div></div>
+              <div class="compact-metric"><div class="compact-label">人気主要アトラクション平均</div><div class="compact-value">{avg_wait:.1f}分</div></div>
+              <div class="compact-metric"><div class="compact-label">人気主要上位25%平均</div><div class="compact-value">{top_wait:.1f}分</div></div>
               <div class="compact-metric"><div class="compact-label">予測信頼度</div><div class="compact-value">{confidence_score}%</div></div>
             </div>
           </div>
@@ -642,6 +642,11 @@ all_crowd_stats = get_all_attraction_crowd_stats(
     history_df,
     datetime.now(JST).date()
 )
+major_crowd_stats = get_all_attraction_crowd_stats(
+    valid_target_df,
+    target_history_df,
+    datetime.now(JST).date()
+)
 
 if len(valid_all_df) == 0:
     st.warning("現在は営業中の有効な待ち時間データがありません。")
@@ -714,12 +719,12 @@ park_open_now, today_open_hour, today_close_hour, park_hours_source = is_park_op
 
 crowd_10, crowd_debug = get_crowd_index_for_park(
     park,
-    all_crowd_stats["avg_wait"],
-    all_crowd_stats["max_wait"],
-    all_crowd_stats["top_quartile_wait"],
-    all_crowd_stats["std_wait"],
-    all_crowd_stats["open_count"],
-    all_crowd_stats["closed_count"],
+    major_crowd_stats["avg_wait"],
+    major_crowd_stats["max_wait"],
+    major_crowd_stats["top_quartile_wait"],
+    major_crowd_stats["std_wait"],
+    major_crowd_stats["open_count"],
+    major_crowd_stats["closed_count"],
     weather_score,
     global_feedback_error,
     today_bonus,
@@ -767,9 +772,10 @@ if len(valid_all_df) > 0 and len(history_df) > 20:
 save_wait_times(
     cursor,
     conn,
-    valid_all_df,
+    all_df,
     temperature,
-    rain_mm
+    rain_mm,
+    park
 )
 
 history_df = load_history(conn)
@@ -875,8 +881,8 @@ if display_mode == "ダッシュボード":
         render_crowd_hero(
             crowd_10,
             crowd_level_label(crowd_10),
-            all_crowd_stats["avg_wait"],
-            all_crowd_stats["top_quartile_wait"],
+            major_crowd_stats["avg_wait"],
+            major_crowd_stats["top_quartile_wait"],
             today_confidence["score"]
         )
     else:
@@ -903,7 +909,7 @@ if display_mode == "ダッシュボード":
     ])
 
     st.caption(
-        f"混雑指数は全アトラクションの9:00〜20:59データを基準に、上位25%平均も加味して算出しています。営業時間判定: {park_hours_source}"
+        f"混雑指数は、履歴が安定している人気主要5施設の9:00〜20:59データを基準に算出しています。営業時間判定: {park_hours_source}"
     )
     with st.expander("信頼度・補正理由を見る", expanded=False):
         st.write("信頼度:", f"{today_confidence['score']}% / {today_confidence['label']}")
@@ -1954,17 +1960,44 @@ elif display_mode == "データ管理":
     ])
 
     st.caption("表形式の詳細データは、必要な時だけ開けるように折りたたみにまとめています。")
-    st.caption("日別混雑指数の誤差は、1日終了後の9:00〜20:59の全アトラクション実測混雑指数と比較します。")
+    st.caption("日別混雑指数の誤差は、1日終了後の9:00〜20:59の人気主要5施設実測混雑指数と比較します。")
+
+    today_date = datetime.now(JST).date()
+    today_history_df = history_df[history_df["date"] == today_date].copy() if len(history_df) > 0 and "date" in history_df.columns else pd.DataFrame()
+    live_total_count = int(len(all_df)) if len(all_df) > 0 else 0
+    live_valid_count = int(len(valid_all_df)) if len(valid_all_df) > 0 else 0
+    history_total_attractions = int(today_history_df["attraction"].nunique()) if len(today_history_df) > 0 and "attraction" in today_history_df.columns else 0
+    history_open_attractions = int(today_history_df[today_history_df.get("is_open", 1) == 1]["attraction"].nunique()) if len(today_history_df) > 0 and "is_open" in today_history_df.columns else history_total_attractions
+    history_positive_attractions = int(today_history_df[today_history_df["wait_time"] > 0]["attraction"].nunique()) if len(today_history_df) > 0 and "wait_time" in today_history_df.columns else 0
+    compact_card_grid([
+        ("現在取得できた全施設", live_total_count),
+        ("現在の有効待ち時間施設", live_valid_count),
+        ("今日保存済み全施設", history_total_attractions),
+        ("今日保存済み営業中施設", history_open_attractions),
+        ("今日保存済み待ち時間あり施設", history_positive_attractions),
+    ])
+    with st.expander("全施設履歴の保存状況", expanded=False):
+        st.caption("v31以降は、待ち時間0分や休止中も含めてAPIから取得できた全施設を wait_times に保存します。学習や混雑指数では、営業時間内かつ有効な待ち時間だけを使います。")
+        if len(today_history_df) > 0:
+            history_check_df = today_history_df.groupby("attraction").agg(
+                保存件数=("wait_time", "count"),
+                最大待ち時間=("wait_time", "max"),
+                営業中記録=("is_open", "sum") if "is_open" in today_history_df.columns else ("wait_time", "count"),
+            ).reset_index().sort_values("保存件数", ascending=False)
+            st.dataframe(history_check_df, use_container_width=True)
+        else:
+            st.info("今日の履歴はまだ保存されていません。アプリ起動後の取得タイミングから保存されます。")
 
     with st.expander("混雑指数デバッグ", expanded=False):
         debug_df = pd.DataFrame([{
             "パーク": crowd_debug.get("park"),
-            "全アトラクション平均": crowd_debug.get("avg_wait"),
-            "上位25%平均": crowd_debug.get("top_quartile_wait"),
-            "最大待ち時間": crowd_debug.get("max_wait"),
-            "標準偏差": crowd_debug.get("std_wait"),
-            "営業中数": crowd_debug.get("open_count"),
-            "休止数": crowd_debug.get("closed_count"),
+            "混雑指数の計算対象": "人気主要5施設",
+            "人気主要アトラクション平均": crowd_debug.get("avg_wait"),
+            "人気主要上位25%平均": crowd_debug.get("top_quartile_wait"),
+            "人気主要最大待ち時間": crowd_debug.get("max_wait"),
+            "人気主要標準偏差": crowd_debug.get("std_wait"),
+            "人気主要営業中数": crowd_debug.get("open_count"),
+            "人気主要休止数": crowd_debug.get("closed_count"),
             "avg_ratio": crowd_debug.get("avg_ratio"),
             "top_ratio": crowd_debug.get("top_ratio"),
             "max_ratio": crowd_debug.get("max_ratio"),
@@ -1991,10 +2024,7 @@ elif display_mode == "データ管理":
         st.dataframe(debug_df, use_container_width=True)
         for warn in crowd_debug.get("warnings", []):
             st.warning(warn)
-        if all_crowd_stats.get("attraction_count", 0) <= 5:
-            st.warning("全体平均の対象が5件以下です。人気主要5施設だけで計算されている可能性があります。")
-        if park_open_now and avg_wait > 0 and abs(all_crowd_stats.get("avg_wait", 0) - avg_wait) <= 3:
-            st.warning("全アトラクション平均と人気主要アトラクション平均が近すぎます。全体平均の対象を確認してください。")
+        st.info("現在は、全アトラクション履歴が不足しているため、混雑指数だけ人気主要5施設ベースに戻しています。全体平均は参考値として残しています。")
 
     with st.expander("ダッシュボードから移動した詳細表", expanded=False):
         st.markdown("#### 人気主要アトラクションの予想平均待ち時間")
