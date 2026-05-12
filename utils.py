@@ -309,6 +309,18 @@ def connect_db(db_name):
 
     conn.commit()
 
+    cursor.execute("PRAGMA table_info(wait_times)")
+    wait_columns = [row[1] for row in cursor.fetchall()]
+    if "is_open" not in wait_columns:
+        cursor.execute("ALTER TABLE wait_times ADD COLUMN is_open INTEGER DEFAULT 1")
+        conn.commit()
+    if "park" not in wait_columns:
+        cursor.execute("ALTER TABLE wait_times ADD COLUMN park TEXT")
+        conn.commit()
+    if "source" not in wait_columns:
+        cursor.execute("ALTER TABLE wait_times ADD COLUMN source TEXT DEFAULT 'queue-times'")
+        conn.commit()
+
     cursor.execute("PRAGMA table_info(predictions)")
     columns = [row[1] for row in cursor.fetchall()]
 
@@ -742,6 +754,9 @@ def load_history(conn):
         history_df["datetime"] = pd.to_datetime(history_df["datetime"])
         history_df["hour"] = history_df["datetime"].dt.hour
         history_df["date"] = history_df["datetime"].dt.date
+        if "is_open" not in history_df.columns:
+            history_df["is_open"] = 1
+        history_df["is_open"] = pd.to_numeric(history_df["is_open"], errors="coerce").fillna(1).astype(int)
 
     return history_df
 
@@ -765,20 +780,28 @@ def load_prediction_history(conn):
     return prediction_df
 
 
-def save_wait_times(cursor, conn, valid_open_df, temperature, rain_mm):
+def save_wait_times(cursor, conn, wait_df, temperature, rain_mm, park=None):
     now = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
 
-    if len(valid_open_df) > 0:
-        for _, row in valid_open_df.iterrows():
+    if len(wait_df) > 0:
+        for _, row in wait_df.iterrows():
+            wait_value = pd.to_numeric(row.get("Wait", 0), errors="coerce")
+            if pd.isna(wait_value):
+                wait_value = 0
+            is_open = 1 if bool(row.get("Open", False)) else 0
             cursor.execute("""
             INSERT INTO wait_times
-            VALUES (?, ?, ?, ?, ?)
+            (datetime, attraction, wait_time, temperature, rain, is_open, park, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 now,
-                row["Attraction"],
-                row["Wait"],
+                str(row.get("Attraction", "")),
+                int(wait_value),
                 temperature,
-                rain_mm
+                rain_mm,
+                is_open,
+                park,
+                "queue-times",
             ))
 
         conn.commit()
@@ -1041,6 +1064,8 @@ def update_daily_crowd_feedback(cursor, conn, history_df, settings, park=None):
             (target_history["date"] == target_day)
             & (target_history["wait_time"] > 0)
         ].copy()
+        if "attraction" in day_df.columns:
+            day_df = day_df[day_df["attraction"].isin(settings.get("rides", []))].copy()
         if len(day_df) < 24:
             continue
         if "attraction" in day_df.columns and day_df["attraction"].nunique() < 3:
@@ -2643,6 +2668,8 @@ def _prepare_model_history(history_df, rides=None):
         return history_df
 
     model_df = history_df[history_df["wait_time"] > 0].copy()
+    if "is_open" in model_df.columns:
+        model_df = model_df[pd.to_numeric(model_df["is_open"], errors="coerce").fillna(1).astype(int) == 1].copy()
     if rides:
         model_df = model_df[model_df["attraction"].isin(rides)].copy()
     model_df = filter_crowd_history(model_df)
@@ -2963,6 +2990,8 @@ def predict_crowd_index_for_date(
     )
 
     stats = get_prediction_crowd_stats(wait_df)
+    major_df = wait_df[wait_df["Attraction"].isin(settings.get("rides", []))].copy() if len(wait_df) > 0 and "Attraction" in wait_df.columns else pd.DataFrame()
+    major_stats = get_prediction_crowd_stats(major_df)
     target_bonus, reasons = get_calendar_bonus(target_date, ticket_price)
     event_bonus, event_reasons = get_event_bonus(event_signals if event_signals is not None else pd.DataFrame(), target_date, park)
     hours_bonus, hours_reasons = get_park_hours_bonus(park_hours_df if park_hours_df is not None else pd.DataFrame(), target_date)
@@ -2975,24 +3004,24 @@ def predict_crowd_index_for_date(
 
     crowd_index = get_crowd_index_for_park(
         park or settings.get("park", "DisneySea"),
-        stats["avg_wait"],
-        stats["max_wait"],
-        stats["top_quartile_wait"],
-        stats["std_wait"],
-        stats["open_count"],
-        stats["closed_count"],
+        major_stats["avg_wait"],
+        major_stats["max_wait"],
+        major_stats["top_quartile_wait"],
+        major_stats["std_wait"],
+        major_stats["open_count"],
+        major_stats["closed_count"],
         weather_score,
         feedback_error + daily_feedback,
         target_bonus,
     )
 
-    major_df = wait_df[wait_df["Attraction"].isin(settings.get("rides", []))].copy() if len(wait_df) > 0 else pd.DataFrame()
     major_avg = float(major_df["Predicted Wait"].mean()) if len(major_df) > 0 else 0
 
     reasons = reasons + [
         f"全体予想平均 {stats['avg_wait']:.1f}分",
         f"上位25%平均 {stats['top_quartile_wait']:.1f}分",
         f"人気主要アトラクション予想平均 {major_avg:.1f}分",
+        "混雑指数は人気主要5施設ベース",
         f"日別誤差補正 {daily_feedback:+.1f}",
     ]
 
@@ -3030,7 +3059,9 @@ def make_week_forecast(
         )
         live_df = current_target_df if use_live_current_data and d == datetime.now(JST).date() else None
 
-        if locked_value is not None and locked_value < 9.95:
+        # v30: 混雑指数を人気主要5施設ベースへ戻したため、旧基準で保存済みの
+        # 固定予測は使わず、同じ日付でも新基準で作り直す。
+        if False and locked_value is not None and locked_value < 9.95:
             crowd_index = locked_value
             wait_df = predict_wait_times_for_date(
                 history_df,
