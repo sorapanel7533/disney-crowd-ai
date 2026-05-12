@@ -815,7 +815,7 @@ if display_mode == "ダッシュボード":
             unsafe_allow_html=True
         )
 
-    st.subheader("🎢 5大アトラクション")
+    st.subheader("🎢 人気主要アトラクション")
 
     display_df = target_df.copy()
 
@@ -833,11 +833,16 @@ if display_mode == "ダッシュボード":
         )
         attraction_rows.append({
             "title": row.get("Attraction", ""),
-            "detail": "5大アトラクション",
+            "detail": "人気主要アトラクション",
             "value": f'<span class="ios-wait-badge">{row.get("Wait", 0)}分</span> {status_html}',
             "unsafe_value": True,
         })
     ios_list_card(attraction_rows)
+    st.caption(
+        "人気主要5施設とは、各パークで待ち時間が伸びやすい代表的なアトラクションです。"
+        "DisneySea: センター / タワテラ / アナ雪 / ソアリン / トイマニ。"
+        "Disneyland: 美女と野獣 / ベイマックス / モンスターズインク / プーさん / スプラッシュ。"
+    )
 
     st.subheader("🟢 相対的に空いている")
 
@@ -890,8 +895,8 @@ if display_mode == "ダッシュボード":
         )
 
     compact_card_grid([
-        ("5大平均待ち時間", "閉園中" if not park_open_now else f"{avg_wait:.1f}分"),
-        ("5大最大待ち時間", "閉園中" if not park_open_now else f"{max_wait:.1f}分"),
+        ("人気主要アトラクション平均", "閉園中" if not park_open_now else f"{avg_wait:.1f}分"),
+        ("人気主要アトラクション最大待ち時間", "閉園中" if not park_open_now else f"{max_wait:.1f}分"),
         ("全体最大待ち時間", "閉園中" if not park_open_now else f"{all_crowd_stats['max_wait']:.1f}分"),
         ("営業中アトラクション数", all_crowd_stats["open_count"]),
         ("営業時間", f"{today_open_hour:.0f}:00〜{today_close_hour:.0f}:00"),
@@ -923,7 +928,7 @@ if display_mode == "ダッシュボード":
         get_show_wait_insights(show_wait_context),
         use_container_width=True
     )
-    st.subheader("🤖 5大アトラクションの予想平均待ち時間")
+    st.subheader("🤖 人気主要アトラクションの予想平均待ち時間")
 
     st.subheader("今後空き始めそうな候補")
     st.dataframe(
@@ -979,12 +984,12 @@ if display_mode == "ダッシュボード":
         rain_mm,
         prediction_history,
         ticket_price,
-        valid_target_df
+        valid_all_df
     )
 
     major_pred_df = make_major_average_prediction(wait_pred_df, settings["rides"])
     major_display_df = major_pred_df.rename(
-        columns={"Predicted Wait": "5大予想平均待ち時間"}
+        columns={"Predicted Wait": "人気主要アトラクション予想平均待ち時間"}
     )
 
     if len(major_pred_df) > 0:
@@ -1034,7 +1039,7 @@ if display_mode == "ダッシュボード":
             prediction_history,
             daily_prediction_history,
             x_ticket_price,
-            valid_target_df if x_target_date == x_base_now.date() else None,
+            valid_all_df if x_target_date == x_base_now.date() else None,
             event_signals,
             park_hours_df,
             park
@@ -1054,7 +1059,7 @@ if display_mode == "ダッシュボード":
             "投稿文コピー用",
             value=x_post_text,
             height=150,
-            key=f"x_post_text_v22_{park}_{x_target_date}_{format_crowd_index(x_crowd)}"
+            key=f"x_post_text_v29_{park}_{x_target_date}_{format_crowd_index(x_crowd)}_{sum(ord(ch) for ch in x_post_text)}"
         )
         st.caption("上に最新の生成文を固定表示しています。本文に天気・価格・営業時間は入れません。")
         st.subheader("予測の注意点")
@@ -1074,7 +1079,7 @@ if display_mode == "ダッシュボード":
 
         ax.plot(
             major_display_df["TimeLabel"] if "TimeLabel" in major_display_df.columns else major_display_df["Hour"],
-            major_display_df["5大予想平均待ち時間"],
+            major_display_df["人気主要アトラクション予想平均待ち時間"],
             linewidth=2.4
         )
         if "TimeLabel" in major_display_df.columns:
@@ -1084,22 +1089,22 @@ if display_mode == "ダッシュボード":
 
         ax.set_ylim(
             0,
-            graph_ylim(major_display_df["5大予想平均待ち時間"].tolist())
+            graph_ylim(major_display_df["人気主要アトラクション予想平均待ち時間"].tolist())
         )
 
         ax.set_ylabel("Predicted Wait")
         ax.set_title(f"{park} Major Attractions Average Prediction")
 
         st.pyplot(fig)
-        best_row = major_display_df.sort_values("5大予想平均待ち時間").iloc[0]
-        peak_row = major_display_df.sort_values("5大予想平均待ち時間", ascending=False).iloc[0]
+        best_row = major_display_df.sort_values("人気主要アトラクション予想平均待ち時間").iloc[0]
+        peak_row = major_display_df.sort_values("人気主要アトラクション予想平均待ち時間", ascending=False).iloc[0]
         compact_card_grid([
-            ("5大の狙い目", f"{best_row.get('TimeLabel', best_row.get('Hour'))} 約{best_row['5大予想平均待ち時間']:.0f}分"),
-            ("5大のピーク", f"{peak_row.get('TimeLabel', peak_row.get('Hour'))} 約{peak_row['5大予想平均待ち時間']:.0f}分"),
+            ("人気主要施設の狙い目", f"{best_row.get('TimeLabel', best_row.get('Hour'))} 約{best_row['人気主要アトラクション予想平均待ち時間']:.0f}分"),
+            ("人気主要施設のピーク", f"{peak_row.get('TimeLabel', peak_row.get('Hour'))} 約{peak_row['人気主要アトラクション予想平均待ち時間']:.0f}分"),
         ])
 
     else:
-        st.info("5大アトラクション平均予測には、9:00〜20:59の履歴データがもう少し必要です。")
+        st.info("人気主要アトラクション平均予測には、9:00〜20:59の履歴データがもう少し必要です。")
 
 
     st.subheader("🧭 今日のおすすめ行動プラン")
@@ -1134,12 +1139,12 @@ if display_mode == "ダッシュボード":
         temperature,
         rain_mm,
         prediction_history,
-        daily_prediction_history,
-        ticket_price_map,
-        valid_target_df,
-        event_signals,
-        park_hours_df,
-        park,
+            daily_prediction_history,
+            ticket_price_map,
+            valid_all_df,
+            event_signals,
+            park_hours_df,
+            park,
         daily_weather,
         cursor=cursor,
         conn=conn,
@@ -1151,7 +1156,7 @@ if display_mode == "ダッシュボード":
         for _, row in week_df.iterrows():
             week_rows.append({
                 "title": row.get("Date", ""),
-                "detail": f"全体平均 {row.get('全体平均待ち時間', 0)}分 / 上位25% {row.get('上位25%平均待ち時間', 0)}分 / 5大 {row.get('5大平均待ち時間', 0)}分",
+                "detail": f"全体平均 {row.get('全体平均待ち時間', 0)}分 / 上位25% {row.get('上位25%平均待ち時間', 0)}分 / 人気主要アトラクション平均 {row.get('人気主要アトラクション平均待ち時間', 0)}分",
                 "value": f"{format_crowd_index(row.get('Crowd Index', 0))}/10",
             })
         ios_list_card(week_rows)
@@ -1443,7 +1448,7 @@ elif display_mode == "アトラクション別予測":
             attraction_rain,
             prediction_history,
             ticket_price,
-            valid_target_df if attraction_target_date == datetime.now(JST).date() else None
+            valid_all_df if attraction_target_date == datetime.now(JST).date() else None
         )
 
         pred_df = pred_all_df[
@@ -1574,10 +1579,9 @@ elif display_mode == "回り方プランナー":
     end_options = [label for label in time_labels if label > start_label] + ["21:00"]
     end_label = st.selectbox("終了時刻", end_options, index=min(len(end_options) - 1, 8), key="route_end")
 
-    attraction_choices = sorted(
-        set(all_df["Attraction"].dropna().tolist())
-        | set(history_df["attraction"].dropna().tolist() if len(history_df) > 0 else [])
-    )
+    live_choices = set(all_df["Attraction"].dropna().astype(str).tolist()) if "Attraction" in all_df.columns else set()
+    history_choices = set(history_df["attraction"].dropna().astype(str).tolist()) if len(history_df) > 0 and "attraction" in history_df.columns else set()
+    attraction_choices = sorted(live_choices | history_choices | set(settings.get("rides", [])))
     selected_route_attractions = st.multiselect(
         "行きたいアトラクション",
         attraction_choices,
@@ -1611,9 +1615,14 @@ elif display_mode == "回り方プランナー":
         compact_card_grid([
             ("合計予測待ち時間", f"{route_meta['total_wait']:.0f}分"),
             ("予想終了時刻", route_meta["end_time"]),
+            ("回れた数", f"{route_meta.get('completed_count', len(route_df))}/{route_meta.get('selected_count', len(selected_route_attractions))}"),
             ("判断理由", route_meta["message"]),
         ])
         st.markdown(format_route_plan_cards(route_df), unsafe_allow_html=True)
+        if route_meta.get("skipped"):
+            st.warning("時間内に回れない候補: " + " / ".join(route_meta["skipped"]))
+        if route_meta.get("filled_attractions"):
+            st.info("予測データ不足のため平均値で補完: " + " / ".join(route_meta["filled_attractions"]))
         if route_meta.get("warnings"):
             with st.expander("注意点", expanded=False):
                 for warning in route_meta["warnings"]:
@@ -1813,7 +1822,7 @@ elif display_mode == "日付指定予測":
         prediction_history,
         daily_prediction_history,
         target_ticket_price,
-        valid_target_df if target_date == datetime.now(JST).date() else None,
+        valid_all_df if target_date == datetime.now(JST).date() else None,
         event_signals,
         park_hours_df,
         park
@@ -1836,7 +1845,7 @@ elif display_mode == "日付指定予測":
         ("予測混雑指数", f"{format_crowd_index(target_crowd)}/10"),
         ("全体平均予測", f"{target_stats['avg_wait']:.1f}分"),
         ("上位25%平均", f"{target_stats['top_quartile_wait']:.1f}分"),
-        ("5大平均予測", f"{target_major_avg:.1f}分"),
+        ("人気主要アトラクション平均予測", f"{target_major_avg:.1f}分"),
         ("チケット価格", "未取得" if target_ticket_price is None else f"{target_ticket_price}円"),
     ])
 
@@ -1960,17 +1969,35 @@ elif display_mode == "データ管理":
             "top_ratio": crowd_debug.get("top_ratio"),
             "max_ratio": crowd_debug.get("max_ratio"),
             "std_ratio": crowd_debug.get("std_ratio"),
+            "avg_ratio_clip後": crowd_debug.get("avg_ratio_clipped"),
+            "top_ratio_clip後": crowd_debug.get("top_ratio_clipped"),
+            "max_ratio_clip後": crowd_debug.get("max_ratio_clipped"),
+            "std_ratio_clip後": crowd_debug.get("std_ratio_clipped"),
+            "score_offset": crowd_debug.get("score_offset"),
             "park_bias": crowd_debug.get("park_bias"),
             "demand_bonus": crowd_debug.get("demand_bonus"),
+            "需要補正値": crowd_debug.get("demand_adjustment"),
+            "天気補正値": crowd_debug.get("weather_adjustment"),
+            "誤差補正値": crowd_debug.get("feedback_adjustment"),
             "補正前スコア": crowd_debug.get("base_score"),
             "補正後スコア": crowd_debug.get("corrected_score"),
             "最終混雑指数": crowd_debug.get("final_crowd_index"),
             "使用基準": crowd_debug.get("baseline"),
+            "全体平均対象数": all_crowd_stats.get("attraction_count"),
+            "全体平均対象リスト": " / ".join(all_crowd_stats.get("attraction_names", [])[:80]),
+            "人気主要平均対象数": int(len(valid_target_df)) if len(valid_target_df) > 0 else 0,
+            "人気主要平均対象リスト": " / ".join(settings.get("rides", [])),
         }])
         st.dataframe(debug_df, use_container_width=True)
+        for warn in crowd_debug.get("warnings", []):
+            st.warning(warn)
+        if all_crowd_stats.get("attraction_count", 0) <= 5:
+            st.warning("全体平均の対象が5件以下です。人気主要5施設だけで計算されている可能性があります。")
+        if park_open_now and avg_wait > 0 and abs(all_crowd_stats.get("avg_wait", 0) - avg_wait) <= 3:
+            st.warning("全アトラクション平均と人気主要アトラクション平均が近すぎます。全体平均の対象を確認してください。")
 
     with st.expander("ダッシュボードから移動した詳細表", expanded=False):
-        st.markdown("#### 5大アトラクションの予想平均待ち時間")
+        st.markdown("#### 人気主要アトラクションの予想平均待ち時間")
         try:
             management_wait_pred_df = predict_wait_times_for_date(
                 history_df,
@@ -1980,7 +2007,7 @@ elif display_mode == "データ管理":
                 rain_mm,
                 prediction_history,
                 ticket_price,
-                valid_target_df
+                valid_all_df
             )
             management_major_df = make_major_average_prediction(
                 management_wait_pred_df,
@@ -1990,15 +2017,15 @@ elif display_mode == "データ管理":
                 st.dataframe(
                     management_major_df.rename(
                         columns={
-                            "Predicted Wait": "5大アトラクション平均待ち時間"
+                            "Predicted Wait": "人気主要アトラクション平均待ち時間"
                         }
                     ),
                     use_container_width=True
                 )
             else:
-                st.info("表示できる5大アトラクション予測データがまだありません。")
+                st.info("表示できる人気主要アトラクション予測データがまだありません。")
         except Exception as exc:
-            st.warning(f"5大アトラクション予測表を作成できませんでした: {exc}")
+            st.warning(f"人気主要アトラクション予測表を作成できませんでした: {exc}")
 
         st.markdown("#### 1週間混雑指数予測")
         try:
