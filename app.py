@@ -1,6 +1,7 @@
 import os
 import time
 from datetime import datetime, timedelta
+from html import escape
 from zoneinfo import ZoneInfo
 
 import matplotlib.pyplot as plt
@@ -33,10 +34,13 @@ from utils import (
     get_attraction_status_summary,
     get_event_bonus,
     get_park_hours_bonus,
+    get_today_park_hours,
+    is_park_open_now,
     get_prediction_accuracy_report,
     get_prediction_alerts,
     get_prediction_confidence,
     get_area_crowd_map,
+    get_all_attraction_crowd_stats,
     get_emptying_candidates,
     get_guest_action_plan,
     get_prediction_risk_diagnosis,
@@ -52,6 +56,11 @@ from utils import (
     get_valid_open_df,
     get_weather,
     get_weather_score,
+    get_crowd_index_for_park,
+    get_prediction_crowd_stats,
+    build_time_slots,
+    build_optimal_route_plan,
+    format_route_plan_cards,
     load_daily_crowd_predictions,
     load_data_fetch_logs,
     load_dpa_fetch_logs,
@@ -65,7 +74,7 @@ from utils import (
     load_history,
     load_prediction_history,
     make_major_average_prediction,
-    make_week_forecast as build_week_forecast,
+    make_locked_week_forecast as build_week_forecast,
     make_action_advice,
     predict_crowd_index_for_date,
     predict_dpa_sellout_time,
@@ -102,218 +111,288 @@ def cached_fetch_ticket_prices():
 def cached_fetch_urtrip_dpa_sellouts(park_name):
     return fetch_urtrip_dpa_sellouts(PARK_SETTINGS[park_name])
 
-CUSTOM_CSS = (
-    "<style>\n"
-    "html, body, [class*=\"css\"] {\n"
-    "    font-family: -apple-system, BlinkMacSystemFont, \"SF Pro Display\", \"SF Pro Text\",\n"
-    "        \"Hiragino Sans\", \"Yu Gothic\", \"Meiryo\", sans-serif !important;\n"
-    "}\n"
-    ".stApp {\n"
-    "    background: #f5f5f7;\n"
-    "    color: #1d1d1f;\n"
-    "}\n"
-    ".block-container {\n"
-    "    max-width: 980px;\n"
-    "    padding-top: 1.1rem;\n"
-    "    padding-left: 1rem;\n"
-    "    padding-right: 1rem;\n"
-    "    padding-bottom: 5rem;\n"
-    "}\n"
-    "h1, h2, h3, h4, h5, h6, p, label, span, div {\n"
-    "    color: #1d1d1f !important;\n"
-    "    letter-spacing: 0 !important;\n"
-    "}\n"
-    "h1 {\n"
-    "    font-size: 30px !important;\n"
-    "    font-weight: 800 !important;\n"
-    "}\n"
-    "h2, h3 {\n"
-    "    font-weight: 750 !important;\n"
-    "    margin-top: 1.1rem !important;\n"
-    "}\n"
-    ".stMarkdown, .stDataFrame, .stPlotlyChart, .stPyplot, .stAlert, .stForm {\n"
-    "    max-width: 100%;\n"
-    "}\n"
-    "[data-testid=\"stMetric\"] {\n"
-    "    background: rgba(255, 255, 255, 0.92);\n"
-    "    border: 1px solid rgba(60, 60, 67, 0.12);\n"
-    "    padding: 16px 15px;\n"
-    "    border-radius: 22px;\n"
-    "    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);\n"
-    "    min-height: 104px;\n"
-    "}\n"
-    "[data-testid=\"stMetricLabel\"] {\n"
-    "    color: #6e6e73 !important;\n"
-    "    font-size: 13px !important;\n"
-    "    font-weight: 650 !important;\n"
-    "}\n"
-    "[data-testid=\"stMetricValue\"] {\n"
-    "    color: #111111 !important;\n"
-    "    font-size: 27px !important;\n"
-    "    font-weight: 800 !important;\n"
-    "}\n"
-    ".title-card {\n"
-    "    background: rgba(255, 255, 255, 0.94);\n"
-    "    padding: 22px;\n"
-    "    border-radius: 28px;\n"
-    "    margin-bottom: 16px;\n"
-    "    border: 1px solid rgba(60, 60, 67, 0.12);\n"
-    "    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.10);\n"
-    "}\n"
-    ".title-card h1 {\n"
-    "    color: #111111 !important;\n"
-    "    font-size: 34px;\n"
-    "    line-height: 1.12;\n"
-    "    margin-bottom: 8px;\n"
-    "    text-shadow: none;\n"
-    "}\n"
-    ".title-card p {\n"
-    "    color: #6e6e73 !important;\n"
-    "    font-size: 15px;\n"
-    "    margin: 0;\n"
-    "}\n"
-    ".card {\n"
-    "    background: rgba(255, 255, 255, 0.92);\n"
-    "    padding: 18px;\n"
-    "    border-radius: 22px;\n"
-    "    margin-bottom: 16px;\n"
-    "    border: 1px solid rgba(60, 60, 67, 0.12);\n"
-    "    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);\n"
-    "}\n"
-    ".rank-card {\n"
-    "    background: rgba(255, 255, 255, 0.94);\n"
-    "    padding: 15px;\n"
-    "    border-radius: 20px;\n"
-    "    margin-bottom: 10px;\n"
-    "    border: 1px solid rgba(60, 60, 67, 0.12);\n"
-    "    border-left: 5px solid #34c759;\n"
-    "    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.07);\n"
-    "    color: #1d1d1f;\n"
-    "}\n"
-    ".advice-card {\n"
-    "    background: rgba(255, 255, 255, 0.94);\n"
-    "    padding: 16px;\n"
-    "    border-radius: 20px;\n"
-    "    margin-bottom: 10px;\n"
-    "    border: 1px solid rgba(60, 60, 67, 0.12);\n"
-    "    border-left: 5px solid #007aff;\n"
-    "    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.07);\n"
-    "    color: #1d1d1f;\n"
-    "}\n"
-    "div[data-baseweb=\"select\"] {\n"
-    "    background: rgba(255, 255, 255, 0.96) !important;\n"
-    "    border-radius: 18px !important;\n"
-    "    border: 1px solid rgba(60, 60, 67, 0.18) !important;\n"
-    "    box-shadow: 0 5px 18px rgba(0, 0, 0, 0.07);\n"
-    "    min-height: 46px;\n"
-    "}\n"
-    "div[data-baseweb=\"select\"] span {\n"
-    "    color: #1d1d1f !important;\n"
-    "    font-weight: 600 !important;\n"
-    "}\n"
-    "div[data-baseweb=\"select\"] svg {\n"
-    "    color: #007aff !important;\n"
-    "}\n"
-    "div[data-baseweb=\"popover\"] {\n"
-    "    background-color: #ffffff !important;\n"
-    "    border-radius: 18px !important;\n"
-    "    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.16) !important;\n"
-    "}\n"
-    "div[role=\"option\"] {\n"
-    "    color: #1d1d1f !important;\n"
-    "    background-color: #ffffff !important;\n"
-    "}\n"
-    "div[role=\"option\"]:hover {\n"
-    "    background-color: #f2f2f7 !important;\n"
-    "}\n"
-    "thead tr th {\n"
-    "    color: #1d1d1f !important;\n"
-    "}\n"
-    "tbody tr td {\n"
-    "    color: #1d1d1f !important;\n"
-    "}\n"
-    "[data-testid=\"stDataFrame\"],\n"
-    "[data-testid=\"stTable\"],\n"
-    "[data-testid=\"stAlert\"],\n"
-    "[data-testid=\"stExpander\"],\n"
-    "[data-testid=\"stForm\"] {\n"
-    "    border-radius: 22px !important;\n"
-    "    overflow: hidden;\n"
-    "}\n"
-    "button[kind=\"primary\"], button[kind=\"secondary\"], .stButton > button {\n"
-    "    width: 100%;\n"
-    "    min-height: 44px;\n"
-    "    border-radius: 999px !important;\n"
-    "    background: #007aff !important;\n"
-    "    color: white !important;\n"
-    "    border: none !important;\n"
-    "    box-shadow: 0 6px 16px rgba(0, 122, 255, 0.24);\n"
-    "    font-weight: 700 !important;\n"
-    "}\n"
-    ".stButton > button p,\n"
-    ".stButton > button span {\n"
-    "    color: white !important;\n"
-    "}\n"
-    "input, textarea {\n"
-    "    border-radius: 16px !important;\n"
-    "}\n"
-    "[data-testid=\"stImage\"],\n"
-    "[data-testid=\"stPyplot\"] {\n"
-    "    background: #ffffff;\n"
-    "    border-radius: 22px;\n"
-    "    padding: 10px;\n"
-    "    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);\n"
-    "    border: 1px solid rgba(60, 60, 67, 0.12);\n"
-    "}\n"
-    "[data-testid=\"stPyplot\"] img,\n"
-    "[data-testid=\"stImage\"] img {\n"
-    "    width: 100% !important;\n"
-    "    height: auto !important;\n"
-    "}\n"
-    ".stCaptionContainer, .stCaptionContainer p {\n"
-    "    color: #6e6e73 !important;\n"
-    "}\n"
-    "@media (max-width: 760px) {\n"
-    "    .block-container {\n"
-    "        padding-left: 0.75rem;\n"
-    "        padding-right: 0.75rem;\n"
-    "        padding-top: 0.75rem;\n"
-    "    }\n"
-    "    [data-testid=\"stHorizontalBlock\"] {\n"
-    "        flex-direction: column !important;\n"
-    "        gap: 0.75rem !important;\n"
-    "    }\n"
-    "    [data-testid=\"column\"] {\n"
-    "        width: 100% !important;\n"
-    "        flex: 1 1 100% !important;\n"
-    "        min-width: 100% !important;\n"
-    "    }\n"
-    "    .title-card {\n"
-    "        padding: 18px;\n"
-    "        border-radius: 24px;\n"
-    "    }\n"
-    "    .title-card h1 {\n"
-    "        font-size: 28px;\n"
-    "    }\n"
-    "    [data-testid=\"stMetric\"] {\n"
-    "        min-height: 92px;\n"
-    "        padding: 14px;\n"
-    "    }\n"
-    "    [data-testid=\"stMetricValue\"] {\n"
-    "        font-size: 24px !important;\n"
-    "    }\n"
-    "    h1 {\n"
-    "        font-size: 27px !important;\n"
-    "    }\n"
-    "    h2, h3 {\n"
-    "        font-size: 21px !important;\n"
-    "    }\n"
-    "    [data-testid=\"stDataFrame\"] {\n"
-    "        font-size: 13px;\n"
-    "    }\n"
-    "}\n"
-    "</style>\n"
-)
+CUSTOM_CSS = """
+<style>
+:root {
+    --ios-bg: #f2f2f7;
+    --ios-card: rgba(255, 255, 255, 0.96);
+    --ios-card-solid: #ffffff;
+    --ios-text: #1d1d1f;
+    --ios-subtext: #6e6e73;
+    --ios-blue: #007aff;
+    --ios-green: #34c759;
+    --ios-yellow: #ffcc00;
+    --ios-orange: #ff9500;
+    --ios-red: #ff3b30;
+    --ios-border: rgba(60, 60, 67, 0.13);
+    --ios-shadow: 0 8px 26px rgba(0, 0, 0, 0.065);
+}
+html, body, [class*="css"] {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif !important;
+}
+.stApp {
+    background: var(--ios-bg);
+    color: var(--ios-text);
+}
+.block-container {
+    max-width: 880px;
+    padding: 18px 14px 80px;
+}
+h1, h2, h3, h4, h5, h6, p, label, span, div {
+    letter-spacing: 0 !important;
+}
+h1, h2, h3, h4, h5, h6 {
+    color: var(--ios-text) !important;
+    font-weight: 800 !important;
+}
+h2, h3 {
+    font-size: 22px !important;
+    margin: 22px 0 10px !important;
+}
+p, label, span, div {
+    color: var(--ios-text);
+}
+[data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p, .caption, .ios-subtitle, .ios-meta, .ios-label {
+    color: var(--ios-subtext) !important;
+}
+.ios-title-card {
+    background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,255,255,0.92));
+    border: 1px solid var(--ios-border);
+    border-radius: 28px;
+    box-shadow: var(--ios-shadow);
+    padding: 22px 20px;
+    margin: 4px 0 12px;
+}
+.ios-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.ios-title-card h1 {
+    margin: 0;
+    font-size: 31px !important;
+    line-height: 1.08;
+}
+.ios-subtitle {
+    margin-top: 7px;
+    font-size: 14px;
+    line-height: 1.45;
+}
+.ios-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    background: rgba(0, 122, 255, 0.10);
+    color: var(--ios-blue) !important;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 750;
+    white-space: nowrap;
+}
+.ios-section, .ios-card, .card, .advice-card, .rank-card {
+    background: var(--ios-card);
+    border: 1px solid var(--ios-border);
+    border-radius: 24px;
+    box-shadow: var(--ios-shadow);
+    padding: 16px;
+    margin: 10px 0 14px;
+}
+.ios-list-card {
+    background: var(--ios-card-solid);
+    border: 1px solid var(--ios-border);
+    border-radius: 22px;
+    overflow: hidden;
+    box-shadow: 0 5px 18px rgba(0, 0, 0, 0.045);
+    margin: 10px 0 14px;
+}
+.ios-list-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 54px;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(60, 60, 67, 0.10);
+}
+.ios-list-row:last-child { border-bottom: none; }
+.ios-list-title { font-size: 14px; font-weight: 750; color: var(--ios-text) !important; }
+.ios-list-detail { font-size: 13px; color: var(--ios-subtext) !important; margin-top: 2px; }
+.ios-list-value { font-size: 15px; font-weight: 800; white-space: nowrap; color: var(--ios-text) !important; }
+.ios-card-grid, .compact-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin: 8px 0 14px;
+}
+.compact-card, .compact-metric {
+    background: var(--ios-card-solid);
+    border: 1px solid var(--ios-border);
+    border-radius: 18px;
+    box-shadow: 0 5px 16px rgba(0, 0, 0, 0.045);
+    padding: 11px 12px;
+    min-height: 64px;
+}
+.compact-label, .ios-label {
+    color: var(--ios-subtext) !important;
+    font-size: 12px;
+    font-weight: 750;
+    line-height: 1.2;
+}
+.compact-value, .ios-value {
+    color: var(--ios-text) !important;
+    font-size: 16px;
+    font-weight: 850;
+    line-height: 1.24;
+    margin-top: 4px;
+    word-break: break-word;
+}
+.hero-crowd-card {
+    background: radial-gradient(circle at top right, rgba(0,122,255,0.16), transparent 34%), var(--ios-card-solid);
+    border: 1px solid var(--ios-border);
+    border-radius: 28px;
+    box-shadow: var(--ios-shadow);
+    padding: 18px;
+    margin: 12px 0 16px;
+}
+.hero-crowd-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 14px;
+    align-items: center;
+}
+.hero-crowd-index {
+    font-size: 46px;
+    font-weight: 900;
+    line-height: 1;
+    color: var(--ios-text) !important;
+}
+.hero-crowd-label {
+    display: inline-flex;
+    margin-top: 8px;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 13px;
+    font-weight: 800;
+    background: rgba(0,122,255,0.10);
+    color: var(--ios-blue) !important;
+}
+.ios-status-open, .ios-status-closed {
+    border-radius: 999px;
+    padding: 5px 9px;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+.ios-status-open { background: rgba(52,199,89,0.14); color: #168a38 !important; }
+.ios-status-closed { background: rgba(142,142,147,0.15); color: #636366 !important; }
+.ios-wait-badge {
+    border-radius: 999px;
+    padding: 6px 10px;
+    background: rgba(0,122,255,0.10);
+    color: var(--ios-blue) !important;
+    font-weight: 850;
+    white-space: nowrap;
+}
+.ios-segment-shell {
+    background: rgba(118, 118, 128, 0.13);
+    border: 1px solid rgba(60,60,67,0.08);
+    border-radius: 999px;
+    padding: 4px;
+    margin: 8px 0 14px;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);
+}
+.ios-segment-status {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+.ios-segment-item {
+    border-radius: 999px;
+    text-align: center;
+    padding: 9px 10px;
+    font-size: 14px;
+    font-weight: 850;
+    background: #fff;
+    color: var(--ios-text) !important;
+    border: 1px solid rgba(60,60,67,0.08);
+}
+.ios-segment-item.active {
+    background: var(--ios-blue);
+    color: #fff !important;
+    border-color: var(--ios-blue);
+    box-shadow: 0 5px 14px rgba(0,122,255,0.24);
+}
+div[data-testid="stButton"] > button, .stButton > button {
+    width: 100%;
+    min-height: 44px;
+    border-radius: 999px !important;
+    font-weight: 800 !important;
+    border: 1px solid rgba(60,60,67,0.12) !important;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.06) !important;
+}
+button[kind="primary"] {
+    background: var(--ios-blue) !important;
+    color: #fff !important;
+}
+button[kind="secondary"] {
+    background: #fff !important;
+    color: var(--ios-text) !important;
+}
+button[kind="primary"] p, button[kind="primary"] span { color: #fff !important; }
+button[kind="secondary"] p, button[kind="secondary"] span { color: var(--ios-text) !important; }
+div[data-baseweb="select"], input, textarea, [data-baseweb="input"] {
+    border-radius: 18px !important;
+}
+div[data-baseweb="select"] {
+    background: #fff !important;
+    border: 1px solid var(--ios-border) !important;
+    box-shadow: 0 5px 16px rgba(0,0,0,0.045);
+    min-height: 46px;
+}
+[data-testid="stMetric"] {
+    background: var(--ios-card-solid);
+    border: 1px solid var(--ios-border);
+    border-radius: 22px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.05);
+    padding: 14px 13px;
+    min-height: 92px;
+}
+[data-testid="stMetricLabel"] { color: var(--ios-subtext) !important; font-size: 12px !important; font-weight: 750 !important; }
+[data-testid="stMetricValue"] { color: var(--ios-text) !important; font-size: 26px !important; font-weight: 900 !important; }
+[data-testid="stDataFrame"], [data-testid="stTable"], [data-testid="stAlert"], [data-testid="stExpander"], [data-testid="stForm"], [data-testid="stPyplot"] {
+    border-radius: 22px !important;
+    overflow: hidden;
+}
+[data-testid="stDataFrame"], [data-testid="stTable"], [data-testid="stPyplot"] {
+    background: #fff;
+    border: 1px solid var(--ios-border);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.05);
+    padding: 8px;
+}
+thead tr th, tbody tr td { color: var(--ios-text) !important; }
+hr { border-color: rgba(60,60,67,0.12) !important; }
+@media (max-width: 760px) {
+    .block-container { padding: 12px 10px 74px; }
+    [data-testid="stHorizontalBlock"] { gap: 0.55rem !important; }
+    [data-testid="column"] { min-width: 0 !important; }
+    .ios-title-card { border-radius: 24px; padding: 18px; }
+    .ios-title-card h1 { font-size: 27px !important; }
+    .hero-crowd-grid { grid-template-columns: 1fr; }
+    .hero-crowd-index { font-size: 42px; }
+    .ios-list-row { padding: 11px 12px; }
+    .ios-card-grid, .compact-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .compact-card, .compact-metric { min-height: 58px; padding: 9px 10px; }
+    .compact-value, .ios-value { font-size: 14px; }
+    h2, h3 { font-size: 20px !important; margin-top: 18px !important; }
+}
+@media (max-width: 420px) {
+    .ios-card-grid, .compact-grid { grid-template-columns: 1fr; }
+    .ios-segment-item { font-size: 13px; padding: 8px; }
+}
+</style>
+"""
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
@@ -331,6 +410,75 @@ def graph_ylim(values):
 
     return 200
 
+
+
+def compact_card_grid(items):
+    html = ['<div class="compact-grid">']
+    for label, value in items:
+        html.append(
+            '<div class="compact-card">'
+            f'<div class="compact-label">{escape(str(label))}</div>'
+            f'<div class="compact-value">{escape(str(value))}</div>'
+            '</div>'
+        )
+    html.append("</div>")
+    st.markdown("".join(html), unsafe_allow_html=True)
+
+
+def ios_list_card(rows):
+    html = ['<div class="ios-list-card">']
+    for row in rows:
+        title = escape(str(row.get("title", "")))
+        detail = escape(str(row.get("detail", "")))
+        value = row.get("value", "")
+        value_html = str(value) if row.get("unsafe_value") else escape(str(value))
+        html.append(
+            '<div class="ios-list-row">'
+            '<div>'
+            f'<div class="ios-list-title">{title}</div>'
+            f'<div class="ios-list-detail">{detail}</div>'
+            '</div>'
+            f'<div class="ios-list-value">{value_html}</div>'
+            '</div>'
+        )
+    html.append("</div>")
+    st.markdown("".join(html), unsafe_allow_html=True)
+
+
+def render_crowd_hero(crowd_index, level_text, avg_wait, top_wait, confidence_score):
+    value = format_crowd_index(crowd_index)
+    st.markdown(
+        f"""
+        <div class="hero-crowd-card">
+          <div class="hero-crowd-grid">
+            <div>
+              <div class="ios-label">現在の混雑指数</div>
+              <div class="hero-crowd-index">{escape(value)}<span style="font-size:18px;font-weight:800;color:#6e6e73;"> / 10</span></div>
+              <div class="hero-crowd-label">{escape(str(level_text))}</div>
+            </div>
+            <div class="ios-card-grid" style="margin:0;">
+              <div class="compact-metric"><div class="compact-label">人気主要アトラクション平均</div><div class="compact-value">{avg_wait:.1f}分</div></div>
+              <div class="compact-metric"><div class="compact-label">人気主要上位25%平均</div><div class="compact-value">{top_wait:.1f}分</div></div>
+              <div class="compact-metric"><div class="compact-label">予測信頼度</div><div class="compact-value">{confidence_score}%</div></div>
+            </div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+def crowd_level_label(crowd_index):
+    value = float(crowd_index)
+    if value >= 8.5:
+        return "🔥 超混雑"
+    if value >= 6.5:
+        return "🔴 混雑"
+    if value >= 5.0:
+        return "🟠 やや混雑"
+    if value >= 3.0:
+        return "🟡 普通"
+    return "🟢 空いている"
 
 
 def safe_sort_head(df, sort_column, n=100, ascending=False):
@@ -355,19 +503,41 @@ def filter_crowd_hours(df):
 
 now_display = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
 
+if "park" not in st.session_state:
+    st.session_state["park"] = "DisneySea"
+
 st.markdown(f"""
-<div class="title-card">
-<h1>🏰 ディズニー混雑AI</h1>
-<p>東京ディズニーリゾート混雑分析システム</p>
-<p>最終更新: {now_display}（日本時間）</p>
+<div class="ios-title-card">
+  <div class="ios-title-row">
+    <div>
+      <h1>ディズニー混雑AI</h1>
+      <div class="ios-subtitle">東京ディズニーリゾート混雑分析システム</div>
+    </div>
+    <div class="ios-pill">JST</div>
+  </div>
+  <div class="ios-subtitle">最終更新: {now_display}</div>
 </div>
 """, unsafe_allow_html=True)
 
-park = st.selectbox(
-    "🏰 パークを選択",
-    ["DisneySea", "Disneyland"],
-    key="park"
-)
+park_options = ["DisneySea", "Disneyland"]
+if hasattr(st, "segmented_control"):
+    park = st.segmented_control(
+        "パーク",
+        park_options,
+        default=st.session_state["park"],
+        key="park_segmented"
+    )
+else:
+    park = st.radio(
+        "パーク",
+        park_options,
+        index=park_options.index(st.session_state["park"]),
+        horizontal=True,
+        key="park_radio"
+    )
+if park != st.session_state["park"]:
+    st.session_state["park"] = park
+    st.rerun()
 
 settings = PARK_SETTINGS[park]
 
@@ -377,6 +547,7 @@ display_mode = st.selectbox(
         "ダッシュボード",
         "全アトラクション",
         "アトラクション別予測",
+        "回り方プランナー",
         "DPA売切れ予測",
         "日付指定予測",
         "データ管理"
@@ -466,6 +637,16 @@ avg_wait, max_wait, var_wait, crowd_source = get_today_stats(
     target_history_df,
     valid_target_df
 )
+all_crowd_stats = get_all_attraction_crowd_stats(
+    valid_all_df,
+    history_df,
+    datetime.now(JST).date()
+)
+major_crowd_stats = get_all_attraction_crowd_stats(
+    valid_target_df,
+    target_history_df,
+    datetime.now(JST).date()
+)
 
 if len(valid_all_df) == 0:
     st.warning("現在は営業中の有効な待ち時間データがありません。")
@@ -500,7 +681,8 @@ update_daily_crowd_feedback(
     cursor,
     conn,
     history_df,
-    settings
+    settings,
+    park
 )
 
 daily_prediction_history = load_daily_crowd_predictions(conn)
@@ -523,22 +705,30 @@ today_bonus += event_bonus + hours_bonus
 today_reasons.extend(event_reasons)
 today_reasons.extend(hours_reasons)
 
-dpa = get_dpa_score(avg_wait, max_wait)
-
 weather_score = get_weather_score(
     weather_text,
     rain_mm,
     temperature
 )
 
-crowd_10 = get_crowd_index(
-    avg_wait,
-    max_wait,
-    var_wait,
-    dpa,
+park_open_now, today_open_hour, today_close_hour, park_hours_source = is_park_open_now(
+    park_hours_df,
+    park,
+    datetime.now(JST)
+)
+
+crowd_10, crowd_debug = get_crowd_index_for_park(
+    park,
+    major_crowd_stats["avg_wait"],
+    major_crowd_stats["max_wait"],
+    major_crowd_stats["top_quartile_wait"],
+    major_crowd_stats["std_wait"],
+    major_crowd_stats["open_count"],
+    major_crowd_stats["closed_count"],
     weather_score,
     global_feedback_error,
-    today_bonus
+    today_bonus,
+    return_debug=True
 )
 
 relative_rows = []
@@ -582,9 +772,10 @@ if len(valid_all_df) > 0 and len(history_df) > 20:
 save_wait_times(
     cursor,
     conn,
-    valid_all_df,
+    all_df,
     temperature,
-    rain_mm
+    rain_mm,
+    park
 )
 
 history_df = load_history(conn)
@@ -593,35 +784,19 @@ if display_mode == "ダッシュボード":
 
     st.subheader("🌤 現在の天気")
 
-    w1, w2, w3 = st.columns(3)
-
-    with w1:
-        st.metric("天気", weather_text)
-
-    with w2:
-        st.metric("気温", f"{temperature}℃")
-
-    with w3:
-        st.metric("降水量", f"{rain_mm}mm")
+    compact_card_grid([
+        ("天気", weather_text),
+        ("気温", f"{temperature}℃"),
+        ("降水量", f"{rain_mm}mm"),
+    ])
 
     st.subheader("📅 需要補正")
 
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-        st.metric(
-            "チケット価格",
-            "取得不可" if ticket_price is None else f"{ticket_price}円"
-        )
-
-    with c2:
-        st.metric("取得元", ticket_map_source if ticket_price is not None else ticket_source)
-
-    with c3:
-        st.metric("補正値", today_bonus)
-
-    if len(today_reasons) > 0:
-        st.write("補正理由:", " / ".join(today_reasons))
+    compact_card_grid([
+        ("チケット価格", "取得不可" if ticket_price is None else f"{ticket_price}円"),
+        ("取得元", ticket_map_source if ticket_price is not None else ticket_source),
+        ("補正値", today_bonus),
+    ])
 
     st.subheader("🧭 今日のおすすめ行動")
 
@@ -635,7 +810,7 @@ if display_mode == "ダッシュボード":
         rain_mm
     )
 
-    for advice in advice_list:
+    for advice in advice_list[:3]:
 
         st.markdown(
             f"""
@@ -646,7 +821,7 @@ if display_mode == "ダッシュボード":
             unsafe_allow_html=True
         )
 
-    st.subheader("🎢 5大アトラクション")
+    st.subheader("🎢 人気主要アトラクション")
 
     display_df = target_df.copy()
 
@@ -654,11 +829,25 @@ if display_mode == "ダッシュボード":
         lambda x: "🟢 OPEN" if x else "⚫ CLOSED"
     )
 
-    st.dataframe(
-        display_df[
-            ["Attraction", "Wait", "Status"]
-        ],
-        use_container_width=True
+    attraction_rows = []
+    for _, row in display_df.iterrows():
+        is_open = bool(row.get("Open", False))
+        status_html = (
+            '<span class="ios-status-open">OPEN</span>'
+            if is_open
+            else '<span class="ios-status-closed">CLOSED</span>'
+        )
+        attraction_rows.append({
+            "title": row.get("Attraction", ""),
+            "detail": "人気主要アトラクション",
+            "value": f'<span class="ios-wait-badge">{row.get("Wait", 0)}分</span> {status_html}',
+            "unsafe_value": True,
+        })
+    ios_list_card(attraction_rows)
+    st.caption(
+        "人気主要5施設とは、各パークで待ち時間が伸びやすい代表的なアトラクションです。"
+        "DisneySea: センター / タワテラ / アナ雪 / ソアリン / トイマニ。"
+        "Disneyland: 美女と野獣 / ベイマックス / モンスターズインク / プーさん / スプラッシュ。"
     )
 
     st.subheader("🟢 相対的に空いている")
@@ -679,24 +868,6 @@ if display_mode == "ダッシュボード":
                 unsafe_allow_html=True
             )
 
-    m1, m2, m3, m4 = st.columns(4)
-
-    with m1:
-        st.metric("5大平均待ち時間", round(avg_wait, 1))
-
-    with m2:
-        st.metric("5大最大待ち時間", round(max_wait, 1))
-
-    with m3:
-        st.metric("混雑指数", format_crowd_index(crowd_10))
-
-    with m4:
-        st.metric("5大予測補正", round(global_feedback_error, 1))
-
-    st.caption(
-        f"混雑指数は5大アトラクションのみを対象に、9:00〜20:59までのデータだけで算出しています。現在の参照元: {crowd_source}"
-    )
-
     today_confidence = get_prediction_confidence(
         history_df,
         prediction_history,
@@ -706,25 +877,45 @@ if display_mode == "ダッシュボード":
         "現在天気"
     )
 
-    c_conf1, c_conf2 = st.columns(2)
-    with c_conf1:
-        st.metric("予測信頼度", f"{today_confidence['score']}%")
-    with c_conf2:
-        st.metric("信頼度レベル", today_confidence["label"])
-    st.caption("信頼度の理由: " + " / ".join(today_confidence["notes"]))
+    if park_open_now:
+        render_crowd_hero(
+            crowd_10,
+            crowd_level_label(crowd_10),
+            major_crowd_stats["avg_wait"],
+            major_crowd_stats["top_quartile_wait"],
+            today_confidence["score"]
+        )
+    else:
+        st.markdown(
+            f"""
+            <div class="hero-crowd-card">
+              <div class="ios-label">現在の混雑指数</div>
+              <div class="hero-crowd-index" style="font-size:38px;">閉園中</div>
+              <div class="hero-crowd-label">本日の営業は終了しました</div>
+              <div class="ios-subtitle" style="margin-top:10px;">
+                次に表示できるのは営業時間中です。予測・1週間予測・回り方プランナーは利用できます。
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-    level, color = get_level(crowd_10)
+    compact_card_grid([
+        ("人気主要アトラクション平均", "閉園中" if not park_open_now else f"{avg_wait:.1f}分"),
+        ("人気主要アトラクション最大待ち時間", "閉園中" if not park_open_now else f"{max_wait:.1f}分"),
+        ("全体最大待ち時間", "閉園中" if not park_open_now else f"{all_crowd_stats['max_wait']:.1f}分"),
+        ("営業中アトラクション数", all_crowd_stats["open_count"]),
+        ("営業時間", f"{today_open_hour:.0f}:00〜{today_close_hour:.0f}:00"),
+    ])
 
-    st.markdown(
-        f"""
-        <div class="card">
-        <h1 style='color:{color};'>
-        {level}
-        </h1>
-        </div>
-        """,
-        unsafe_allow_html=True
+    st.caption(
+        f"混雑指数は、履歴が安定している人気主要5施設の9:00〜20:59データを基準に算出しています。営業時間判定: {park_hours_source}"
     )
+    with st.expander("信頼度・補正理由を見る", expanded=False):
+        st.write("信頼度:", f"{today_confidence['score']}% / {today_confidence['label']}")
+        st.write("信頼度の理由:", " / ".join(today_confidence["notes"]))
+        if len(today_reasons) > 0:
+            st.write("需要補正理由:", " / ".join(today_reasons))
 
 
     st.subheader("🎭 今日のショー/パレード")
@@ -736,14 +927,14 @@ if display_mode == "ダッシュボード":
             use_container_width=True
         )
     else:
-        st.info("今日のショー/パレード時刻はまだ取得できていません。公式ページ取得に失敗した場合も、アプリはそのまま動きます。")
+        st.info("公式ショー時刻を取得できませんでした。推定時刻や仮のショー名は表示しません。")
 
     st.subheader("🎯 ショー前後の待ち時間メモ")
     st.dataframe(
         get_show_wait_insights(show_wait_context),
         use_container_width=True
     )
-    st.subheader("🤖 5大アトラクションの予想平均待ち時間")
+    st.subheader("🤖 人気主要アトラクションの予想平均待ち時間")
 
     st.subheader("今後空き始めそうな候補")
     st.dataframe(
@@ -799,12 +990,12 @@ if display_mode == "ダッシュボード":
         rain_mm,
         prediction_history,
         ticket_price,
-        valid_target_df
+        valid_all_df
     )
 
-    major_pred_df = make_major_average_prediction(wait_pred_df)
+    major_pred_df = make_major_average_prediction(wait_pred_df, settings["rides"])
     major_display_df = major_pred_df.rename(
-        columns={"Predicted Wait": "5大予想平均待ち時間"}
+        columns={"Predicted Wait": "人気主要アトラクション予想平均待ち時間"}
     )
 
     if len(major_pred_df) > 0:
@@ -818,7 +1009,7 @@ if display_mode == "ダッシュボード":
         for attraction in settings["rides"]:
             one_pred_df = wait_pred_df[
                 wait_pred_df["Attraction"] == attraction
-            ][["Hour", "Predicted Wait"]]
+            ][["Time", "TimeLabel", "Hour", "Minute", "Predicted Wait"]]
 
             if len(one_pred_df) > 0:
                 save_prediction_rows(
@@ -829,47 +1020,54 @@ if display_mode == "ダッシュボード":
                 )
 
 
-        tomorrow_date = datetime.now(JST).date() + timedelta(days=1)
-        tomorrow_ticket_price, _ = get_ticket_price_from_castel(
-            tomorrow_date,
+        x_base_now = datetime.now(JST)
+        x_target_date = (
+            x_base_now.date() + timedelta(days=1)
+            if x_base_now.hour >= 21
+            else x_base_now.date()
+        )
+        x_ticket_price, _ = get_ticket_price_from_castel(
+            x_target_date,
             ticket_price_map
         )
-        tomorrow_temperature, tomorrow_rain, tomorrow_weather_source = get_forecast_weather_for_date(
+        x_temperature, x_rain, x_weather_source = get_forecast_weather_for_date(
             daily_weather,
-            tomorrow_date,
+            x_target_date,
             temperature,
             rain_mm
         )
-        tomorrow_crowd, tomorrow_wait_df, tomorrow_reasons = predict_crowd_index_for_date(
+        x_crowd, x_wait_df, x_reasons = predict_crowd_index_for_date(
             history_df,
             settings,
-            tomorrow_date,
-            tomorrow_temperature,
-            tomorrow_rain,
+            x_target_date,
+            x_temperature,
+            x_rain,
             prediction_history,
             daily_prediction_history,
-            tomorrow_ticket_price,
-            None,
+            x_ticket_price,
+            valid_all_df if x_target_date == x_base_now.date() else None,
             event_signals,
             park_hours_df,
             park
         )
         x_post_text = make_x_post_summary(
             park,
-            tomorrow_date,
-            tomorrow_crowd,
-            tomorrow_wait_df,
-            tomorrow_weather_source,
-            tomorrow_ticket_price,
-            tomorrow_reasons
+            x_target_date,
+            x_crowd,
+            x_wait_df,
+            x_weather_source,
+            x_ticket_price,
+            x_reasons
         )
         st.subheader("📝 21時投稿用 X文面")
+        st.code(x_post_text, language="text")
         st.text_area(
-            "\u660e\u65e5\u306e\u6295\u7a3f\u6587\uff08\u524d\u534a140\u5b57:\u6982\u8981 / \u5f8c\u534a140\u5b57:\u30a2\u30c8\u30e9\u30af\u30b7\u30e7\u30f3\u8a73\u7d30\uff09",
-            x_post_text,
-            height=130
+            "投稿文コピー用",
+            value=x_post_text,
+            height=150,
+            key=f"x_post_text_v29_{park}_{x_target_date}_{format_crowd_index(x_crowd)}_{sum(ord(ch) for ch in x_post_text)}"
         )
-        st.caption("\u524d\u534a\u306f\u660e\u65e5\u306e\u5168\u4f53\u6982\u8981\u3001\u5f8c\u534a\u306f\u4f55\u6642\u3054\u308d\u306b\u4f55\u304c\u7a7a\u304d\u305d\u3046\u304b\u3092\u5177\u4f53\u7684\u306a\u5206\u6570\u3064\u304d\u3067\u4f5c\u6210\u3057\u307e\u3059\u3002")
+        st.caption("上に最新の生成文を固定表示しています。本文に天気・価格・営業時間は入れません。")
         st.subheader("予測の注意点")
         st.dataframe(
             get_prediction_alerts(
@@ -886,23 +1084,33 @@ if display_mode == "ダッシュボード":
         fig, ax = plt.subplots(figsize=(10, 5))
 
         ax.plot(
-            major_display_df["Hour"],
-            major_display_df["5大予想平均待ち時間"],
-            marker="o"
+            major_display_df["TimeLabel"] if "TimeLabel" in major_display_df.columns else major_display_df["Hour"],
+            major_display_df["人気主要アトラクション予想平均待ち時間"],
+            linewidth=2.4
         )
+        if "TimeLabel" in major_display_df.columns:
+            tick_df = major_display_df[major_display_df["Minute"].fillna(0).astype(int) == 0]
+            ax.set_xticks(tick_df["TimeLabel"].tolist())
+            ax.tick_params(axis="x", rotation=45)
 
         ax.set_ylim(
             0,
-            graph_ylim(major_display_df["5大予想平均待ち時間"].tolist())
+            graph_ylim(major_display_df["人気主要アトラクション予想平均待ち時間"].tolist())
         )
 
         ax.set_ylabel("Predicted Wait")
         ax.set_title(f"{park} Major Attractions Average Prediction")
 
         st.pyplot(fig)
+        best_row = major_display_df.sort_values("人気主要アトラクション予想平均待ち時間").iloc[0]
+        peak_row = major_display_df.sort_values("人気主要アトラクション予想平均待ち時間", ascending=False).iloc[0]
+        compact_card_grid([
+            ("人気主要施設の狙い目", f"{best_row.get('TimeLabel', best_row.get('Hour'))} 約{best_row['人気主要アトラクション予想平均待ち時間']:.0f}分"),
+            ("人気主要施設のピーク", f"{peak_row.get('TimeLabel', peak_row.get('Hour'))} 約{peak_row['人気主要アトラクション予想平均待ち時間']:.0f}分"),
+        ])
 
     else:
-        st.info("5大アトラクション平均予測には、9:00〜20:59の履歴データがもう少し必要です。")
+        st.info("人気主要アトラクション平均予測には、9:00〜20:59の履歴データがもう少し必要です。")
 
 
     st.subheader("🧭 今日のおすすめ行動プラン")
@@ -937,26 +1145,27 @@ if display_mode == "ダッシュボード":
         temperature,
         rain_mm,
         prediction_history,
-        daily_prediction_history,
-        ticket_price_map,
-        valid_target_df,
-        event_signals,
-        park_hours_df,
-        park,
-        daily_weather
+            daily_prediction_history,
+            ticket_price_map,
+            valid_all_df,
+            event_signals,
+            park_hours_df,
+            park,
+        daily_weather,
+        cursor=cursor,
+        conn=conn,
+        use_live_current_data=False
     )
 
-    for _, row in week_df.iterrows():
-        target_date = datetime.strptime(
-            f"{datetime.now(JST).year}/{row['Date']}",
-            "%Y/%m/%d"
-        ).date()
-        save_daily_crowd_prediction(
-            cursor,
-            conn,
-            target_date,
-            row["Crowd Index"]
-        )
+    if len(week_df) > 0:
+        week_rows = []
+        for _, row in week_df.iterrows():
+            week_rows.append({
+                "title": row.get("Date", ""),
+                "detail": f"全体平均 {row.get('全体平均待ち時間', 0)}分 / 上位25% {row.get('上位25%平均待ち時間', 0)}分 / 人気主要アトラクション平均 {row.get('人気主要アトラクション平均待ち時間', 0)}分",
+                "value": f"{format_crowd_index(row.get('Crowd Index', 0))}/10",
+            })
+        ios_list_card(week_rows)
 
     fig_week, ax_week = plt.subplots(figsize=(10, 4))
 
@@ -1245,7 +1454,7 @@ elif display_mode == "アトラクション別予測":
             attraction_rain,
             prediction_history,
             ticket_price,
-            valid_target_df if attraction_target_date == datetime.now(JST).date() else None
+            valid_all_df if attraction_target_date == datetime.now(JST).date() else None
         )
 
         pred_df = pred_all_df[
@@ -1272,7 +1481,7 @@ elif display_mode == "アトラクション別予測":
             save_prediction_rows(
                 cursor,
                 conn,
-                pred_df[["Hour", "Predicted Wait"]],
+                pred_df[["Time", "TimeLabel", "Hour", "Minute", "Predicted Wait"]],
                 selected_attraction
             )
 
@@ -1308,10 +1517,14 @@ elif display_mode == "アトラクション別予測":
             )
 
             ax.plot(
-                pred_df["Hour"],
+                pred_df["TimeLabel"] if "TimeLabel" in pred_df.columns else pred_df["Hour"],
                 pred_df["Predicted Wait"],
-                marker="o"
+                linewidth=2.4
             )
+            if "TimeLabel" in pred_df.columns:
+                tick_df = pred_df[pred_df["Minute"].fillna(0).astype(int) == 0]
+                ax.set_xticks(tick_df["TimeLabel"].tolist())
+                ax.tick_params(axis="x", rotation=45)
 
             ax.set_ylim(
                 0,
@@ -1325,6 +1538,12 @@ elif display_mode == "アトラクション別予測":
             )
 
             st.pyplot(fig)
+            best_row = pred_df.sort_values("Predicted Wait").iloc[0]
+            peak_row = pred_df.sort_values("Predicted Wait", ascending=False).iloc[0]
+            compact_card_grid([
+                ("最短予測", f"{best_row.get('TimeLabel', best_row.get('Hour'))} 約{best_row['Predicted Wait']:.0f}分"),
+                ("ピーク予測", f"{peak_row.get('TimeLabel', peak_row.get('Hour'))} 約{peak_row['Predicted Wait']:.0f}分"),
+            ])
 
             if len(prediction_history) > 0:
                 st.subheader("🧠 このアトラクションの予測誤差履歴")
@@ -1348,6 +1567,72 @@ elif display_mode == "アトラクション別予測":
 
     else:
         st.info("履歴データがまだありません。")
+
+elif display_mode == "回り方プランナー":
+
+    st.subheader("🗺 回り方プランナー")
+    st.caption("予測待ち時間を使って、選んだアトラクションの回る順番を提案します。")
+
+    planner_date = st.date_input(
+        "対象日",
+        value=datetime.now(JST).date(),
+        min_value=datetime.now(JST).date(),
+        max_value=datetime.now(JST).date() + timedelta(days=7),
+        key="route_planner_date"
+    )
+    time_labels = [slot["TimeLabel"] for slot in build_time_slots(9, 21, 15)]
+    start_label = st.selectbox("開始時刻", time_labels[:-4], index=0, key="route_start")
+    end_options = [label for label in time_labels if label > start_label] + ["21:00"]
+    end_label = st.selectbox("終了時刻", end_options, index=min(len(end_options) - 1, 8), key="route_end")
+
+    live_choices = set(all_df["Attraction"].dropna().astype(str).tolist()) if "Attraction" in all_df.columns else set()
+    history_choices = set(history_df["attraction"].dropna().astype(str).tolist()) if len(history_df) > 0 and "attraction" in history_df.columns else set()
+    attraction_choices = sorted(live_choices | history_choices | set(settings.get("rides", [])))
+    selected_route_attractions = st.multiselect(
+        "行きたいアトラクション",
+        attraction_choices,
+        default=attraction_choices[:3] if len(attraction_choices) >= 3 else attraction_choices,
+        key="route_attractions"
+    )
+
+    if st.button("プランを作成", type="primary", use_container_width=True):
+        planner_temperature, planner_rain, _ = get_forecast_weather_for_date(
+            daily_weather,
+            planner_date,
+            temperature,
+            rain_mm
+        )
+        planner_pred_df = predict_wait_times_for_date(
+            history_df,
+            settings,
+            planner_date,
+            planner_temperature,
+            planner_rain,
+            prediction_history,
+            ticket_price,
+            valid_all_df if planner_date == datetime.now(JST).date() else None
+        )
+        route_df, route_meta = build_optimal_route_plan(
+            planner_pred_df,
+            selected_route_attractions,
+            start_label,
+            end_label
+        )
+        compact_card_grid([
+            ("合計予測待ち時間", f"{route_meta['total_wait']:.0f}分"),
+            ("予想終了時刻", route_meta["end_time"]),
+            ("回れた数", f"{route_meta.get('completed_count', len(route_df))}/{route_meta.get('selected_count', len(selected_route_attractions))}"),
+            ("判断理由", route_meta["message"]),
+        ])
+        st.markdown(format_route_plan_cards(route_df), unsafe_allow_html=True)
+        if route_meta.get("skipped"):
+            st.warning("時間内に回れない候補: " + " / ".join(route_meta["skipped"]))
+        if route_meta.get("filled_attractions"):
+            st.info("予測データ不足のため平均値で補完: " + " / ".join(route_meta["filled_attractions"]))
+        if route_meta.get("warnings"):
+            with st.expander("注意点", expanded=False):
+                for warning in route_meta["warnings"]:
+                    st.write(warning)
 
 elif display_mode == "DPA売切れ予測":
 
@@ -1543,7 +1828,7 @@ elif display_mode == "日付指定予測":
         prediction_history,
         daily_prediction_history,
         target_ticket_price,
-        valid_target_df if target_date == datetime.now(JST).date() else None,
+        valid_all_df if target_date == datetime.now(JST).date() else None,
         event_signals,
         park_hours_df,
         park
@@ -1559,22 +1844,16 @@ elif display_mode == "日付指定予測":
         "手入力/日付指定"
     )
 
-    m1, m2, m3 = st.columns(3)
-
-    with m1:
-        st.metric("予測混雑指数", format_crowd_index(target_crowd))
-
-    with m2:
-        st.metric(
-            "5大予想平均待ち時間",
-            round(target_wait_df["Predicted Wait"].mean(), 1) if len(target_wait_df) > 0 else 0
-        )
-
-    with m3:
-        st.metric(
-            "チケット価格",
-            "未取得" if target_ticket_price is None else f"{target_ticket_price}円"
-        )
+    target_stats = get_prediction_crowd_stats(target_wait_df)
+    target_major_df = target_wait_df[target_wait_df["Attraction"].isin(settings["rides"])] if len(target_wait_df) > 0 else pd.DataFrame()
+    target_major_avg = target_major_df["Predicted Wait"].mean() if len(target_major_df) > 0 else 0
+    compact_card_grid([
+        ("予測混雑指数", f"{format_crowd_index(target_crowd)}/10"),
+        ("全体平均予測", f"{target_stats['avg_wait']:.1f}分"),
+        ("上位25%平均", f"{target_stats['top_quartile_wait']:.1f}分"),
+        ("人気主要アトラクション平均予測", f"{target_major_avg:.1f}分"),
+        ("チケット価格", "未取得" if target_ticket_price is None else f"{target_ticket_price}円"),
+    ])
 
     st.metric("予測信頼度", f"{target_confidence['score']}%")
     st.caption("信頼度の理由: " + " / ".join(target_confidence["notes"]))
@@ -1671,43 +1950,84 @@ elif display_mode == "データ管理":
         prediction_history["error"].notna()
     ].copy() if len(prediction_history) > 0 else pd.DataFrame()
 
-    m1, m2, m3 = st.columns(3)
-
-    with m1:
-        st.metric("保存データ数", total_count)
-
-    with m2:
-        st.metric(
-            "予測データ数",
-            len(prediction_history)
-        )
-
-    with m3:
-        st.metric(
-            "予測誤差データ",
-            len(error_only_df)
-        )
-
-    m4, m5 = st.columns(2)
-
-    with m4:
-        st.metric(
-            "日別混雑指数予測",
-            len(daily_prediction_history)
-        )
-
-    with m5:
-        st.metric(
-            "DPA売切れ履歴",
-            len(dpa_sellout_history)
-        )
-
-    st.metric("DPA取得ログ", len(dpa_fetch_logs))
+    compact_card_grid([
+        ("保存データ数", total_count),
+        ("予測データ数", len(prediction_history)),
+        ("予測誤差データ", len(error_only_df)),
+        ("日別混雑指数予測", len(daily_prediction_history)),
+        ("DPA売切れ履歴", len(dpa_sellout_history)),
+        ("DPA取得ログ", len(dpa_fetch_logs)),
+    ])
 
     st.caption("表形式の詳細データは、必要な時だけ開けるように折りたたみにまとめています。")
+    st.caption("日別混雑指数の誤差は、1日終了後の9:00〜20:59の人気主要5施設実測混雑指数と比較します。")
+
+    today_date = datetime.now(JST).date()
+    today_history_df = history_df[history_df["date"] == today_date].copy() if len(history_df) > 0 and "date" in history_df.columns else pd.DataFrame()
+    live_total_count = int(len(all_df)) if len(all_df) > 0 else 0
+    live_valid_count = int(len(valid_all_df)) if len(valid_all_df) > 0 else 0
+    history_total_attractions = int(today_history_df["attraction"].nunique()) if len(today_history_df) > 0 and "attraction" in today_history_df.columns else 0
+    history_open_attractions = int(today_history_df[today_history_df.get("is_open", 1) == 1]["attraction"].nunique()) if len(today_history_df) > 0 and "is_open" in today_history_df.columns else history_total_attractions
+    history_positive_attractions = int(today_history_df[today_history_df["wait_time"] > 0]["attraction"].nunique()) if len(today_history_df) > 0 and "wait_time" in today_history_df.columns else 0
+    compact_card_grid([
+        ("現在取得できた全施設", live_total_count),
+        ("現在の有効待ち時間施設", live_valid_count),
+        ("今日保存済み全施設", history_total_attractions),
+        ("今日保存済み営業中施設", history_open_attractions),
+        ("今日保存済み待ち時間あり施設", history_positive_attractions),
+    ])
+    with st.expander("全施設履歴の保存状況", expanded=False):
+        st.caption("v31以降は、待ち時間0分や休止中も含めてAPIから取得できた全施設を wait_times に保存します。学習や混雑指数では、営業時間内かつ有効な待ち時間だけを使います。")
+        if len(today_history_df) > 0:
+            history_check_df = today_history_df.groupby("attraction").agg(
+                保存件数=("wait_time", "count"),
+                最大待ち時間=("wait_time", "max"),
+                営業中記録=("is_open", "sum") if "is_open" in today_history_df.columns else ("wait_time", "count"),
+            ).reset_index().sort_values("保存件数", ascending=False)
+            st.dataframe(history_check_df, use_container_width=True)
+        else:
+            st.info("今日の履歴はまだ保存されていません。アプリ起動後の取得タイミングから保存されます。")
+
+    with st.expander("混雑指数デバッグ", expanded=False):
+        debug_df = pd.DataFrame([{
+            "パーク": crowd_debug.get("park"),
+            "混雑指数の計算対象": "人気主要5施設",
+            "人気主要アトラクション平均": crowd_debug.get("avg_wait"),
+            "人気主要上位25%平均": crowd_debug.get("top_quartile_wait"),
+            "人気主要最大待ち時間": crowd_debug.get("max_wait"),
+            "人気主要標準偏差": crowd_debug.get("std_wait"),
+            "人気主要営業中数": crowd_debug.get("open_count"),
+            "人気主要休止数": crowd_debug.get("closed_count"),
+            "avg_ratio": crowd_debug.get("avg_ratio"),
+            "top_ratio": crowd_debug.get("top_ratio"),
+            "max_ratio": crowd_debug.get("max_ratio"),
+            "std_ratio": crowd_debug.get("std_ratio"),
+            "avg_ratio_clip後": crowd_debug.get("avg_ratio_clipped"),
+            "top_ratio_clip後": crowd_debug.get("top_ratio_clipped"),
+            "max_ratio_clip後": crowd_debug.get("max_ratio_clipped"),
+            "std_ratio_clip後": crowd_debug.get("std_ratio_clipped"),
+            "score_offset": crowd_debug.get("score_offset"),
+            "park_bias": crowd_debug.get("park_bias"),
+            "demand_bonus": crowd_debug.get("demand_bonus"),
+            "需要補正値": crowd_debug.get("demand_adjustment"),
+            "天気補正値": crowd_debug.get("weather_adjustment"),
+            "誤差補正値": crowd_debug.get("feedback_adjustment"),
+            "補正前スコア": crowd_debug.get("base_score"),
+            "補正後スコア": crowd_debug.get("corrected_score"),
+            "最終混雑指数": crowd_debug.get("final_crowd_index"),
+            "使用基準": crowd_debug.get("baseline"),
+            "全体平均対象数": all_crowd_stats.get("attraction_count"),
+            "全体平均対象リスト": " / ".join(all_crowd_stats.get("attraction_names", [])[:80]),
+            "人気主要平均対象数": int(len(valid_target_df)) if len(valid_target_df) > 0 else 0,
+            "人気主要平均対象リスト": " / ".join(settings.get("rides", [])),
+        }])
+        st.dataframe(debug_df, use_container_width=True)
+        for warn in crowd_debug.get("warnings", []):
+            st.warning(warn)
+        st.info("現在は、全アトラクション履歴が不足しているため、混雑指数だけ人気主要5施設ベースに戻しています。全体平均は参考値として残しています。")
 
     with st.expander("ダッシュボードから移動した詳細表", expanded=False):
-        st.markdown("#### 5大アトラクションの予想平均待ち時間")
+        st.markdown("#### 人気主要アトラクションの予想平均待ち時間")
         try:
             management_wait_pred_df = predict_wait_times_for_date(
                 history_df,
@@ -1717,24 +2037,25 @@ elif display_mode == "データ管理":
                 rain_mm,
                 prediction_history,
                 ticket_price,
-                valid_target_df
+                valid_all_df
             )
             management_major_df = make_major_average_prediction(
-                management_wait_pred_df
+                management_wait_pred_df,
+                settings["rides"]
             )
             if len(management_major_df) > 0:
                 st.dataframe(
                     management_major_df.rename(
                         columns={
-                            "Predicted Wait": "5大アトラクション平均待ち時間"
+                            "Predicted Wait": "人気主要アトラクション平均待ち時間"
                         }
                     ),
                     use_container_width=True
                 )
             else:
-                st.info("表示できる5大アトラクション予測データがまだありません。")
+                st.info("表示できる人気主要アトラクション予測データがまだありません。")
         except Exception as exc:
-            st.warning(f"5大アトラクション予測表を作成できませんでした: {exc}")
+            st.warning(f"人気主要アトラクション予測表を作成できませんでした: {exc}")
 
         st.markdown("#### 1週間混雑指数予測")
         try:
@@ -1751,7 +2072,10 @@ elif display_mode == "データ管理":
                 event_signals,
                 park_hours_df,
                 park,
-                daily_weather
+                daily_weather,
+                cursor=cursor,
+                conn=conn,
+                use_live_current_data=False
             )
             if len(management_week_df) > 0:
                 st.dataframe(management_week_df, use_container_width=True)
@@ -1938,22 +2262,17 @@ elif display_mode == "データ管理":
             use_container_width=True
         )
 
-st.subheader("⚙ システム")
-
-st.write("選択中:", park)
-
-st.write("表示モード:", display_mode)
-
-st.write("保存データ:", len(history_df))
-
-st.write("予測データ:", len(prediction_history))
-
-st.write("5大予測補正:", round(global_feedback_error, 1))
-
-st.write(
-    "最終更新:",
-    datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S") + "（日本時間）"
-)
+if display_mode == "データ管理":
+    with st.expander("システム情報", expanded=False):
+        st.write("選択中:", park)
+        st.write("表示モード:", display_mode)
+        st.write("保存データ:", len(history_df))
+        st.write("予測データ:", len(prediction_history))
+        st.write("予測補正:", round(global_feedback_error, 1))
+        st.write(
+            "最終更新:",
+            datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S") + "（日本時間）"
+        )
 
 refresh_seconds = 900
 
