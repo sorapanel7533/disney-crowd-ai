@@ -34,6 +34,8 @@ from utils import (
     get_attraction_status_summary,
     get_event_bonus,
     get_park_hours_bonus,
+    get_today_park_hours,
+    is_park_open_now,
     get_prediction_accuracy_report,
     get_prediction_alerts,
     get_prediction_confidence,
@@ -704,7 +706,13 @@ weather_score = get_weather_score(
     temperature
 )
 
-crowd_10 = get_crowd_index_for_park(
+park_open_now, today_open_hour, today_close_hour, park_hours_source = is_park_open_now(
+    park_hours_df,
+    park,
+    datetime.now(JST)
+)
+
+crowd_10, crowd_debug = get_crowd_index_for_park(
     park,
     all_crowd_stats["avg_wait"],
     all_crowd_stats["max_wait"],
@@ -714,7 +722,8 @@ crowd_10 = get_crowd_index_for_park(
     all_crowd_stats["closed_count"],
     weather_score,
     global_feedback_error,
-    today_bonus
+    today_bonus,
+    return_debug=True
 )
 
 relative_rows = []
@@ -857,23 +866,39 @@ if display_mode == "ダッシュボード":
         "現在天気"
     )
 
-    render_crowd_hero(
-        crowd_10,
-        crowd_level_label(crowd_10),
-        all_crowd_stats["avg_wait"],
-        all_crowd_stats["top_quartile_wait"],
-        today_confidence["score"]
-    )
+    if park_open_now:
+        render_crowd_hero(
+            crowd_10,
+            crowd_level_label(crowd_10),
+            all_crowd_stats["avg_wait"],
+            all_crowd_stats["top_quartile_wait"],
+            today_confidence["score"]
+        )
+    else:
+        st.markdown(
+            f"""
+            <div class="hero-crowd-card">
+              <div class="ios-label">現在の混雑指数</div>
+              <div class="hero-crowd-index" style="font-size:38px;">閉園中</div>
+              <div class="hero-crowd-label">本日の営業は終了しました</div>
+              <div class="ios-subtitle" style="margin-top:10px;">
+                次に表示できるのは営業時間中です。予測・1週間予測・回り方プランナーは利用できます。
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
     compact_card_grid([
-        ("5大平均待ち時間", f"{avg_wait:.1f}分"),
-        ("5大最大待ち時間", f"{max_wait:.1f}分"),
-        ("全体最大待ち時間", f"{all_crowd_stats['max_wait']:.1f}分"),
+        ("5大平均待ち時間", "閉園中" if not park_open_now else f"{avg_wait:.1f}分"),
+        ("5大最大待ち時間", "閉園中" if not park_open_now else f"{max_wait:.1f}分"),
+        ("全体最大待ち時間", "閉園中" if not park_open_now else f"{all_crowd_stats['max_wait']:.1f}分"),
         ("営業中アトラクション数", all_crowd_stats["open_count"]),
+        ("営業時間", f"{today_open_hour:.0f}:00〜{today_close_hour:.0f}:00"),
     ])
 
     st.caption(
-        f"混雑指数は全アトラクションの9:00〜20:59データを基準に、上位25%平均も加味して算出しています。現在の参照元: {all_crowd_stats['source']}"
+        f"混雑指数は全アトラクションの9:00〜20:59データを基準に、上位25%平均も加味して算出しています。営業時間判定: {park_hours_source}"
     )
     with st.expander("信頼度・補正理由を見る", expanded=False):
         st.write("信頼度:", f"{today_confidence['score']}% / {today_confidence['label']}")
@@ -1023,15 +1048,15 @@ if display_mode == "ダッシュボード":
             x_ticket_price,
             x_reasons
         )
-        st.subheader("\U0001f4dd 21\u6642\u6295\u7a3f\u7528 X\u6587\u9762 v22")
+        st.subheader("📝 21時投稿用 X文面")
         st.code(x_post_text, language="text")
         st.text_area(
-            "\u6295\u7a3f\u6587\u30b3\u30d4\u30fc\u7528\uff08v22\u30fb\u81ea\u52d5\u66f4\u65b0\uff09",
+            "投稿文コピー用",
             value=x_post_text,
             height=150,
             key=f"x_post_text_v22_{park}_{x_target_date}_{format_crowd_index(x_crowd)}"
         )
-        st.caption("v22: Streamlit\u306e\u53e4\u3044\u5165\u529b\u72b6\u614b\u3092\u907f\u3051\u308b\u305f\u3081\u3001\u4e0a\u306b\u6700\u65b0\u751f\u6210\u6587\u3092\u56fa\u5b9a\u8868\u793a\u3057\u3066\u3044\u307e\u3059\u3002\u5929\u6c17\u30fb\u4fa1\u683c\u30fb\u55b6\u696d\u6642\u9593\u306f\u5165\u308c\u307e\u305b\u3093\u3002")
+        st.caption("上に最新の生成文を固定表示しています。本文に天気・価格・営業時間は入れません。")
         st.subheader("予測の注意点")
         st.dataframe(
             get_prediction_alerts(
@@ -1804,22 +1829,16 @@ elif display_mode == "日付指定予測":
         "手入力/日付指定"
     )
 
-    m1, m2, m3 = st.columns(3)
-
-    with m1:
-        st.metric("予測混雑指数", format_crowd_index(target_crowd))
-
-    with m2:
-        st.metric(
-            "5大予想平均待ち時間",
-            round(target_wait_df["Predicted Wait"].mean(), 1) if len(target_wait_df) > 0 else 0
-        )
-
-    with m3:
-        st.metric(
-            "チケット価格",
-            "未取得" if target_ticket_price is None else f"{target_ticket_price}円"
-        )
+    target_stats = get_prediction_crowd_stats(target_wait_df)
+    target_major_df = target_wait_df[target_wait_df["Attraction"].isin(settings["rides"])] if len(target_wait_df) > 0 else pd.DataFrame()
+    target_major_avg = target_major_df["Predicted Wait"].mean() if len(target_major_df) > 0 else 0
+    compact_card_grid([
+        ("予測混雑指数", f"{format_crowd_index(target_crowd)}/10"),
+        ("全体平均予測", f"{target_stats['avg_wait']:.1f}分"),
+        ("上位25%平均", f"{target_stats['top_quartile_wait']:.1f}分"),
+        ("5大平均予測", f"{target_major_avg:.1f}分"),
+        ("チケット価格", "未取得" if target_ticket_price is None else f"{target_ticket_price}円"),
+    ])
 
     st.metric("予測信頼度", f"{target_confidence['score']}%")
     st.caption("信頼度の理由: " + " / ".join(target_confidence["notes"]))
@@ -1926,6 +1945,29 @@ elif display_mode == "データ管理":
     ])
 
     st.caption("表形式の詳細データは、必要な時だけ開けるように折りたたみにまとめています。")
+    st.caption("日別混雑指数の誤差は、1日終了後の9:00〜20:59の全アトラクション実測混雑指数と比較します。")
+
+    with st.expander("混雑指数デバッグ", expanded=False):
+        debug_df = pd.DataFrame([{
+            "パーク": crowd_debug.get("park"),
+            "全アトラクション平均": crowd_debug.get("avg_wait"),
+            "上位25%平均": crowd_debug.get("top_quartile_wait"),
+            "最大待ち時間": crowd_debug.get("max_wait"),
+            "標準偏差": crowd_debug.get("std_wait"),
+            "営業中数": crowd_debug.get("open_count"),
+            "休止数": crowd_debug.get("closed_count"),
+            "avg_ratio": crowd_debug.get("avg_ratio"),
+            "top_ratio": crowd_debug.get("top_ratio"),
+            "max_ratio": crowd_debug.get("max_ratio"),
+            "std_ratio": crowd_debug.get("std_ratio"),
+            "park_bias": crowd_debug.get("park_bias"),
+            "demand_bonus": crowd_debug.get("demand_bonus"),
+            "補正前スコア": crowd_debug.get("base_score"),
+            "補正後スコア": crowd_debug.get("corrected_score"),
+            "最終混雑指数": crowd_debug.get("final_crowd_index"),
+            "使用基準": crowd_debug.get("baseline"),
+        }])
+        st.dataframe(debug_df, use_container_width=True)
 
     with st.expander("ダッシュボードから移動した詳細表", expanded=False):
         st.markdown("#### 5大アトラクションの予想平均待ち時間")
