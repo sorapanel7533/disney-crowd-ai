@@ -38,6 +38,7 @@ from utils import (
     get_prediction_alerts,
     get_prediction_confidence,
     get_area_crowd_map,
+    get_all_attraction_crowd_stats,
     get_emptying_candidates,
     get_guest_action_plan,
     get_prediction_risk_diagnosis,
@@ -53,6 +54,11 @@ from utils import (
     get_valid_open_df,
     get_weather,
     get_weather_score,
+    get_crowd_index_for_park,
+    get_prediction_crowd_stats,
+    build_time_slots,
+    build_optimal_route_plan,
+    format_route_plan_cards,
     load_daily_crowd_predictions,
     load_data_fetch_logs,
     load_dpa_fetch_logs,
@@ -437,7 +443,7 @@ def ios_list_card(rows):
     st.markdown("".join(html), unsafe_allow_html=True)
 
 
-def render_crowd_hero(crowd_index, level_text, avg_wait, max_wait, feedback_error):
+def render_crowd_hero(crowd_index, level_text, avg_wait, top_wait, confidence_score):
     value = format_crowd_index(crowd_index)
     st.markdown(
         f"""
@@ -449,9 +455,9 @@ def render_crowd_hero(crowd_index, level_text, avg_wait, max_wait, feedback_erro
               <div class="hero-crowd-label">{escape(str(level_text))}</div>
             </div>
             <div class="ios-card-grid" style="margin:0;">
-              <div class="compact-metric"><div class="compact-label">5大平均</div><div class="compact-value">{avg_wait:.1f}分</div></div>
-              <div class="compact-metric"><div class="compact-label">5大最大</div><div class="compact-value">{max_wait:.1f}分</div></div>
-              <div class="compact-metric"><div class="compact-label">予測補正</div><div class="compact-value">{feedback_error:.1f}</div></div>
+              <div class="compact-metric"><div class="compact-label">全体平均</div><div class="compact-value">{avg_wait:.1f}分</div></div>
+              <div class="compact-metric"><div class="compact-label">上位25%平均</div><div class="compact-value">{top_wait:.1f}分</div></div>
+              <div class="compact-metric"><div class="compact-label">予測信頼度</div><div class="compact-value">{confidence_score}%</div></div>
             </div>
           </div>
         </div>
@@ -462,11 +468,13 @@ def render_crowd_hero(crowd_index, level_text, avg_wait, max_wait, feedback_erro
 
 def crowd_level_label(crowd_index):
     value = float(crowd_index)
-    if value >= 9:
-        return "🔴 非常に混雑"
-    if value >= 6:
-        return "🟠 混雑"
-    if value >= 3:
+    if value >= 8.5:
+        return "🔥 超混雑"
+    if value >= 6.5:
+        return "🔴 混雑"
+    if value >= 5.0:
+        return "🟠 やや混雑"
+    if value >= 3.0:
         return "🟡 普通"
     return "🟢 空いている"
 
@@ -509,39 +517,25 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-current_park = st.session_state.get("park", "DisneySea")
-st.markdown(
-    f"""
-    <div class="ios-segment-shell">
-      <div class="ios-segment-status">
-        <div class="ios-segment-item {'active' if current_park == 'DisneySea' else ''}">DisneySea</div>
-        <div class="ios-segment-item {'active' if current_park == 'Disneyland' else ''}">Disneyland</div>
-      </div>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-seg_left, seg_right = st.columns(2)
-with seg_left:
-    if st.button(
-        "DisneySea",
-        key="park_button_sea",
-        type="primary" if current_park == "DisneySea" else "secondary",
-        use_container_width=True
-    ):
-        st.session_state["park"] = "DisneySea"
-        st.rerun()
-with seg_right:
-    if st.button(
-        "Disneyland",
-        key="park_button_land",
-        type="primary" if current_park == "Disneyland" else "secondary",
-        use_container_width=True
-    ):
-        st.session_state["park"] = "Disneyland"
-        st.rerun()
-
-park = st.session_state["park"]
+park_options = ["DisneySea", "Disneyland"]
+if hasattr(st, "segmented_control"):
+    park = st.segmented_control(
+        "パーク",
+        park_options,
+        default=st.session_state["park"],
+        key="park_segmented"
+    )
+else:
+    park = st.radio(
+        "パーク",
+        park_options,
+        index=park_options.index(st.session_state["park"]),
+        horizontal=True,
+        key="park_radio"
+    )
+if park != st.session_state["park"]:
+    st.session_state["park"] = park
+    st.rerun()
 
 settings = PARK_SETTINGS[park]
 
@@ -551,6 +545,7 @@ display_mode = st.selectbox(
         "ダッシュボード",
         "全アトラクション",
         "アトラクション別予測",
+        "回り方プランナー",
         "DPA売切れ予測",
         "日付指定予測",
         "データ管理"
@@ -640,6 +635,11 @@ avg_wait, max_wait, var_wait, crowd_source = get_today_stats(
     target_history_df,
     valid_target_df
 )
+all_crowd_stats = get_all_attraction_crowd_stats(
+    valid_all_df,
+    history_df,
+    datetime.now(JST).date()
+)
 
 if len(valid_all_df) == 0:
     st.warning("現在は営業中の有効な待ち時間データがありません。")
@@ -674,7 +674,8 @@ update_daily_crowd_feedback(
     cursor,
     conn,
     history_df,
-    settings
+    settings,
+    park
 )
 
 daily_prediction_history = load_daily_crowd_predictions(conn)
@@ -697,19 +698,20 @@ today_bonus += event_bonus + hours_bonus
 today_reasons.extend(event_reasons)
 today_reasons.extend(hours_reasons)
 
-dpa = get_dpa_score(avg_wait, max_wait)
-
 weather_score = get_weather_score(
     weather_text,
     rain_mm,
     temperature
 )
 
-crowd_10 = get_crowd_index(
-    avg_wait,
-    max_wait,
-    var_wait,
-    dpa,
+crowd_10 = get_crowd_index_for_park(
+    park,
+    all_crowd_stats["avg_wait"],
+    all_crowd_stats["max_wait"],
+    all_crowd_stats["top_quartile_wait"],
+    all_crowd_stats["std_wait"],
+    all_crowd_stats["open_count"],
+    all_crowd_stats["closed_count"],
     weather_score,
     global_feedback_error,
     today_bonus
@@ -781,9 +783,6 @@ if display_mode == "ダッシュボード":
         ("補正値", today_bonus),
     ])
 
-    if len(today_reasons) > 0:
-        st.write("補正理由:", " / ".join(today_reasons))
-
     st.subheader("🧭 今日のおすすめ行動")
 
     advice_list = make_action_advice(
@@ -796,7 +795,7 @@ if display_mode == "ダッシュボード":
         rain_mm
     )
 
-    for advice in advice_list:
+    for advice in advice_list[:3]:
 
         st.markdown(
             f"""
@@ -849,18 +848,6 @@ if display_mode == "ダッシュボード":
                 unsafe_allow_html=True
             )
 
-    render_crowd_hero(
-        crowd_10,
-        crowd_level_label(crowd_10),
-        avg_wait,
-        max_wait,
-        global_feedback_error
-    )
-
-    st.caption(
-        f"混雑指数は5大アトラクションのみを対象に、9:00〜20:59までのデータだけで算出しています。現在の参照元: {crowd_source}"
-    )
-
     today_confidence = get_prediction_confidence(
         history_df,
         prediction_history,
@@ -870,25 +857,29 @@ if display_mode == "ダッシュボード":
         "現在天気"
     )
 
-    c_conf1, c_conf2 = st.columns(2)
-    with c_conf1:
-        st.metric("予測信頼度", f"{today_confidence['score']}%")
-    with c_conf2:
-        st.metric("信頼度レベル", today_confidence["label"])
-    st.caption("信頼度の理由: " + " / ".join(today_confidence["notes"]))
-
-    level, color = get_level(crowd_10)
-
-    st.markdown(
-        f"""
-        <div class="card">
-        <h1 style='color:{color};'>
-        {level}
-        </h1>
-        </div>
-        """,
-        unsafe_allow_html=True
+    render_crowd_hero(
+        crowd_10,
+        crowd_level_label(crowd_10),
+        all_crowd_stats["avg_wait"],
+        all_crowd_stats["top_quartile_wait"],
+        today_confidence["score"]
     )
+
+    compact_card_grid([
+        ("5大平均待ち時間", f"{avg_wait:.1f}分"),
+        ("5大最大待ち時間", f"{max_wait:.1f}分"),
+        ("全体最大待ち時間", f"{all_crowd_stats['max_wait']:.1f}分"),
+        ("営業中アトラクション数", all_crowd_stats["open_count"]),
+    ])
+
+    st.caption(
+        f"混雑指数は全アトラクションの9:00〜20:59データを基準に、上位25%平均も加味して算出しています。現在の参照元: {all_crowd_stats['source']}"
+    )
+    with st.expander("信頼度・補正理由を見る", expanded=False):
+        st.write("信頼度:", f"{today_confidence['score']}% / {today_confidence['label']}")
+        st.write("信頼度の理由:", " / ".join(today_confidence["notes"]))
+        if len(today_reasons) > 0:
+            st.write("需要補正理由:", " / ".join(today_reasons))
 
 
     st.subheader("🎭 今日のショー/パレード")
@@ -900,7 +891,7 @@ if display_mode == "ダッシュボード":
             use_container_width=True
         )
     else:
-        st.info("今日のショー/パレード時刻はまだ取得できていません。公式ページ取得に失敗した場合も、アプリはそのまま動きます。")
+        st.info("公式ショー時刻を取得できませんでした。推定時刻や仮のショー名は表示しません。")
 
     st.subheader("🎯 ショー前後の待ち時間メモ")
     st.dataframe(
@@ -966,7 +957,7 @@ if display_mode == "ダッシュボード":
         valid_target_df
     )
 
-    major_pred_df = make_major_average_prediction(wait_pred_df)
+    major_pred_df = make_major_average_prediction(wait_pred_df, settings["rides"])
     major_display_df = major_pred_df.rename(
         columns={"Predicted Wait": "5大予想平均待ち時間"}
     )
@@ -982,7 +973,7 @@ if display_mode == "ダッシュボード":
         for attraction in settings["rides"]:
             one_pred_df = wait_pred_df[
                 wait_pred_df["Attraction"] == attraction
-            ][["Hour", "Predicted Wait"]]
+            ][["Time", "TimeLabel", "Hour", "Minute", "Predicted Wait"]]
 
             if len(one_pred_df) > 0:
                 save_prediction_rows(
@@ -1057,10 +1048,14 @@ if display_mode == "ダッシュボード":
         fig, ax = plt.subplots(figsize=(10, 5))
 
         ax.plot(
-            major_display_df["Hour"],
+            major_display_df["TimeLabel"] if "TimeLabel" in major_display_df.columns else major_display_df["Hour"],
             major_display_df["5大予想平均待ち時間"],
-            marker="o"
+            linewidth=2.4
         )
+        if "TimeLabel" in major_display_df.columns:
+            tick_df = major_display_df[major_display_df["Minute"].fillna(0).astype(int) == 0]
+            ax.set_xticks(tick_df["TimeLabel"].tolist())
+            ax.tick_params(axis="x", rotation=45)
 
         ax.set_ylim(
             0,
@@ -1071,6 +1066,12 @@ if display_mode == "ダッシュボード":
         ax.set_title(f"{park} Major Attractions Average Prediction")
 
         st.pyplot(fig)
+        best_row = major_display_df.sort_values("5大予想平均待ち時間").iloc[0]
+        peak_row = major_display_df.sort_values("5大予想平均待ち時間", ascending=False).iloc[0]
+        compact_card_grid([
+            ("5大の狙い目", f"{best_row.get('TimeLabel', best_row.get('Hour'))} 約{best_row['5大予想平均待ち時間']:.0f}分"),
+            ("5大のピーク", f"{peak_row.get('TimeLabel', peak_row.get('Hour'))} 約{peak_row['5大予想平均待ち時間']:.0f}分"),
+        ])
 
     else:
         st.info("5大アトラクション平均予測には、9:00〜20:59の履歴データがもう少し必要です。")
@@ -1125,7 +1126,7 @@ if display_mode == "ダッシュボード":
         for _, row in week_df.iterrows():
             week_rows.append({
                 "title": row.get("Date", ""),
-                "detail": f"5大平均 {row.get('5大平均待ち時間', 0)}分 / {row.get('予測種別', '固定予測')}",
+                "detail": f"全体平均 {row.get('全体平均待ち時間', 0)}分 / 上位25% {row.get('上位25%平均待ち時間', 0)}分 / 5大 {row.get('5大平均待ち時間', 0)}分",
                 "value": f"{format_crowd_index(row.get('Crowd Index', 0))}/10",
             })
         ios_list_card(week_rows)
@@ -1444,7 +1445,7 @@ elif display_mode == "アトラクション別予測":
             save_prediction_rows(
                 cursor,
                 conn,
-                pred_df[["Hour", "Predicted Wait"]],
+                pred_df[["Time", "TimeLabel", "Hour", "Minute", "Predicted Wait"]],
                 selected_attraction
             )
 
@@ -1480,10 +1481,14 @@ elif display_mode == "アトラクション別予測":
             )
 
             ax.plot(
-                pred_df["Hour"],
+                pred_df["TimeLabel"] if "TimeLabel" in pred_df.columns else pred_df["Hour"],
                 pred_df["Predicted Wait"],
-                marker="o"
+                linewidth=2.4
             )
+            if "TimeLabel" in pred_df.columns:
+                tick_df = pred_df[pred_df["Minute"].fillna(0).astype(int) == 0]
+                ax.set_xticks(tick_df["TimeLabel"].tolist())
+                ax.tick_params(axis="x", rotation=45)
 
             ax.set_ylim(
                 0,
@@ -1497,6 +1502,12 @@ elif display_mode == "アトラクション別予測":
             )
 
             st.pyplot(fig)
+            best_row = pred_df.sort_values("Predicted Wait").iloc[0]
+            peak_row = pred_df.sort_values("Predicted Wait", ascending=False).iloc[0]
+            compact_card_grid([
+                ("最短予測", f"{best_row.get('TimeLabel', best_row.get('Hour'))} 約{best_row['Predicted Wait']:.0f}分"),
+                ("ピーク予測", f"{peak_row.get('TimeLabel', peak_row.get('Hour'))} 約{peak_row['Predicted Wait']:.0f}分"),
+            ])
 
             if len(prediction_history) > 0:
                 st.subheader("🧠 このアトラクションの予測誤差履歴")
@@ -1520,6 +1531,68 @@ elif display_mode == "アトラクション別予測":
 
     else:
         st.info("履歴データがまだありません。")
+
+elif display_mode == "回り方プランナー":
+
+    st.subheader("🗺 回り方プランナー")
+    st.caption("予測待ち時間を使って、選んだアトラクションの回る順番を提案します。")
+
+    planner_date = st.date_input(
+        "対象日",
+        value=datetime.now(JST).date(),
+        min_value=datetime.now(JST).date(),
+        max_value=datetime.now(JST).date() + timedelta(days=7),
+        key="route_planner_date"
+    )
+    time_labels = [slot["TimeLabel"] for slot in build_time_slots(9, 21, 15)]
+    start_label = st.selectbox("開始時刻", time_labels[:-4], index=0, key="route_start")
+    end_options = [label for label in time_labels if label > start_label] + ["21:00"]
+    end_label = st.selectbox("終了時刻", end_options, index=min(len(end_options) - 1, 8), key="route_end")
+
+    attraction_choices = sorted(
+        set(all_df["Attraction"].dropna().tolist())
+        | set(history_df["attraction"].dropna().tolist() if len(history_df) > 0 else [])
+    )
+    selected_route_attractions = st.multiselect(
+        "行きたいアトラクション",
+        attraction_choices,
+        default=attraction_choices[:3] if len(attraction_choices) >= 3 else attraction_choices,
+        key="route_attractions"
+    )
+
+    if st.button("プランを作成", type="primary", use_container_width=True):
+        planner_temperature, planner_rain, _ = get_forecast_weather_for_date(
+            daily_weather,
+            planner_date,
+            temperature,
+            rain_mm
+        )
+        planner_pred_df = predict_wait_times_for_date(
+            history_df,
+            settings,
+            planner_date,
+            planner_temperature,
+            planner_rain,
+            prediction_history,
+            ticket_price,
+            valid_all_df if planner_date == datetime.now(JST).date() else None
+        )
+        route_df, route_meta = build_optimal_route_plan(
+            planner_pred_df,
+            selected_route_attractions,
+            start_label,
+            end_label
+        )
+        compact_card_grid([
+            ("合計予測待ち時間", f"{route_meta['total_wait']:.0f}分"),
+            ("予想終了時刻", route_meta["end_time"]),
+            ("判断理由", route_meta["message"]),
+        ])
+        st.markdown(format_route_plan_cards(route_df), unsafe_allow_html=True)
+        if route_meta.get("warnings"):
+            with st.expander("注意点", expanded=False):
+                for warning in route_meta["warnings"]:
+                    st.write(warning)
 
 elif display_mode == "DPA売切れ予測":
 
@@ -1868,7 +1941,8 @@ elif display_mode == "データ管理":
                 valid_target_df
             )
             management_major_df = make_major_average_prediction(
-                management_wait_pred_df
+                management_wait_pred_df,
+                settings["rides"]
             )
             if len(management_major_df) > 0:
                 st.dataframe(
@@ -2089,22 +2163,17 @@ elif display_mode == "データ管理":
             use_container_width=True
         )
 
-st.subheader("⚙ システム")
-
-st.write("選択中:", park)
-
-st.write("表示モード:", display_mode)
-
-st.write("保存データ:", len(history_df))
-
-st.write("予測データ:", len(prediction_history))
-
-st.write("5大予測補正:", round(global_feedback_error, 1))
-
-st.write(
-    "最終更新:",
-    datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S") + "（日本時間）"
-)
+if display_mode == "データ管理":
+    with st.expander("システム情報", expanded=False):
+        st.write("選択中:", park)
+        st.write("表示モード:", display_mode)
+        st.write("保存データ:", len(history_df))
+        st.write("予測データ:", len(prediction_history))
+        st.write("予測補正:", round(global_feedback_error, 1))
+        st.write(
+            "最終更新:",
+            datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S") + "（日本時間）"
+        )
 
 refresh_seconds = 900
 
