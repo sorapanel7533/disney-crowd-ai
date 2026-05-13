@@ -41,6 +41,8 @@ from utils import (
     get_prediction_confidence,
     get_area_crowd_map,
     get_all_attraction_crowd_stats,
+    get_major_attraction_crowd_stats,
+    get_crowd_index_from_major_attractions,
     get_emptying_candidates,
     get_guest_action_plan,
     get_prediction_risk_diagnosis,
@@ -86,6 +88,8 @@ from utils import (
     predict_dpa_risk,
     save_prediction_rows,
     save_wait_times,
+    import_disneyreal_history,
+    load_historical_import_logs,
     update_daily_crowd_feedback,
     update_prediction_feedback,
 )
@@ -445,7 +449,7 @@ def ios_list_card(rows):
     st.markdown("".join(html), unsafe_allow_html=True)
 
 
-def render_crowd_hero(crowd_index, level_text, avg_wait, top_wait, confidence_score):
+def render_crowd_hero(crowd_index, level_text, avg_wait, max_wait_value, confidence_score):
     value = format_crowd_index(crowd_index)
     st.markdown(
         f"""
@@ -458,7 +462,7 @@ def render_crowd_hero(crowd_index, level_text, avg_wait, top_wait, confidence_sc
             </div>
             <div class="ios-card-grid" style="margin:0;">
               <div class="compact-metric"><div class="compact-label">人気主要アトラクション平均</div><div class="compact-value">{avg_wait:.1f}分</div></div>
-              <div class="compact-metric"><div class="compact-label">人気主要上位25%平均</div><div class="compact-value">{top_wait:.1f}分</div></div>
+              <div class="compact-metric"><div class="compact-label">人気主要アトラクション最大</div><div class="compact-value">{max_wait_value:.1f}分</div></div>
               <div class="compact-metric"><div class="compact-label">予測信頼度</div><div class="compact-value">{confidence_score}%</div></div>
             </div>
           </div>
@@ -541,19 +545,38 @@ if park != st.session_state["park"]:
 
 settings = PARK_SETTINGS[park]
 
-display_mode = st.selectbox(
-    "🧭 表示モードを選択",
-    [
-        "ダッシュボード",
-        "全アトラクション",
-        "アトラクション別予測",
-        "回り方プランナー",
-        "DPA売切れ予測",
-        "日付指定予測",
-        "データ管理"
-    ],
-    key="display_mode"
-)
+display_mode_options = [
+    "ダッシュボード",
+    "全アトラクション",
+    "アトラクション別予測",
+    "DPA/PP予測",
+    "日付指定予測",
+    "回り方プランナー",
+    "データ管理",
+]
+if "display_mode_value" not in st.session_state:
+    st.session_state["display_mode_value"] = "ダッシュボード"
+if st.session_state["display_mode_value"] not in display_mode_options:
+    st.session_state["display_mode_value"] = "ダッシュボード"
+
+if hasattr(st, "segmented_control"):
+    display_mode = st.segmented_control(
+        "🧭 表示モード",
+        display_mode_options,
+        default=st.session_state["display_mode_value"],
+        key="display_mode_segmented",
+    )
+else:
+    display_mode = st.radio(
+        "🧭 表示モード",
+        display_mode_options,
+        index=display_mode_options.index(st.session_state["display_mode_value"]),
+        horizontal=True,
+        key="display_mode_radio",
+    )
+if display_mode != st.session_state["display_mode_value"]:
+    st.session_state["display_mode_value"] = display_mode
+    st.rerun()
 
 ticket_price_map, ticket_map_source = cached_fetch_ticket_prices()
 
@@ -593,6 +616,7 @@ park_hours_df = load_park_hours(conn)
 event_signals = load_event_signals(conn)
 show_schedules = load_show_schedules(conn)
 show_wait_context = load_show_wait_context(conn)
+historical_import_logs = load_historical_import_logs(conn)
 
 try:
     all_df, target_df = fetch_wait_times(settings)
@@ -642,7 +666,7 @@ all_crowd_stats = get_all_attraction_crowd_stats(
     history_df,
     datetime.now(JST).date()
 )
-major_crowd_stats = get_all_attraction_crowd_stats(
+major_crowd_stats = get_major_attraction_crowd_stats(
     valid_target_df,
     target_history_df,
     datetime.now(JST).date()
@@ -717,17 +741,20 @@ park_open_now, today_open_hour, today_close_hour, park_hours_source = is_park_op
     datetime.now(JST)
 )
 
-crowd_10, crowd_debug = get_crowd_index_for_park(
+dpa_score_today = get_dpa_score(
+    major_crowd_stats["major_avg_wait"],
+    major_crowd_stats["major_max_wait"]
+)
+crowd_10, crowd_debug = get_crowd_index_from_major_attractions(
     park,
-    major_crowd_stats["avg_wait"],
-    major_crowd_stats["max_wait"],
-    major_crowd_stats["top_quartile_wait"],
-    major_crowd_stats["std_wait"],
-    major_crowd_stats["open_count"],
-    major_crowd_stats["closed_count"],
+    major_crowd_stats["major_avg_wait"],
+    major_crowd_stats["major_max_wait"],
+    major_crowd_stats["major_std_wait"],
+    major_crowd_stats["major_count"],
+    dpa_score_today,
+    today_bonus,
     weather_score,
     global_feedback_error,
-    today_bonus,
     return_debug=True
 )
 
@@ -881,8 +908,8 @@ if display_mode == "ダッシュボード":
         render_crowd_hero(
             crowd_10,
             crowd_level_label(crowd_10),
-            major_crowd_stats["avg_wait"],
-            major_crowd_stats["top_quartile_wait"],
+            major_crowd_stats["major_avg_wait"],
+            major_crowd_stats["major_max_wait"],
             today_confidence["score"]
         )
     else:
@@ -1634,7 +1661,7 @@ elif display_mode == "回り方プランナー":
                 for warning in route_meta["warnings"]:
                     st.write(warning)
 
-elif display_mode == "DPA売切れ予測":
+elif display_mode == "DPA/PP予測":
 
     st.subheader("🎫 DPA売切れ予測")
 
@@ -1987,6 +2014,59 @@ elif display_mode == "データ管理":
             st.dataframe(history_check_df, use_container_width=True)
         else:
             st.info("今日の履歴はまだ保存されていません。アプリ起動後の取得タイミングから保存されます。")
+
+
+    st.subheader("過去待ち時間データ取り込み")
+    st.caption("ディズニーリアルの過去ページから、取得できる範囲の待ち時間履歴を取り込みます。画像表だけの日は数値を保存せず、ログに理由を残します。")
+    import_range = st.selectbox(
+        "取り込み期間",
+        ["過去30日", "過去90日", "過去180日", "過去1年"],
+        index=0,
+        key="historical_import_range"
+    )
+    range_days_map = {"過去30日": 30, "過去90日": 90, "過去180日": 180, "過去1年": 365}
+    import_days = range_days_map.get(import_range, 30)
+    max_days = st.number_input(
+        "今回処理する最大日数",
+        min_value=1,
+        max_value=365,
+        value=min(30, import_days),
+        step=1,
+        key="historical_import_max_days"
+    )
+    hist_start_date = datetime.now(JST).date() - timedelta(days=import_days)
+    hist_end_date = datetime.now(JST).date()
+    if st.button("過去データを取り込む", type="primary", use_container_width=True):
+        with st.spinner("ディズニーリアルから過去待ち時間を取り込み中です。アクセスしすぎないよう、少しずつ処理します。"):
+            result = import_disneyreal_history(
+                cursor,
+                conn,
+                park,
+                hist_start_date,
+                hist_end_date,
+                max_days=int(max_days)
+            )
+        historical_import_logs = load_historical_import_logs(conn)
+        history_df = load_history(conn)
+        st.success(
+            f"処理日数 {result['processed_days']}日 / スキップ {result['skipped_days']}日 / 保存 {result['saved_count']}件"
+        )
+        if result.get("results"):
+            st.dataframe(pd.DataFrame(result["results"]), use_container_width=True)
+
+    if len(historical_import_logs) > 0:
+        park_import_logs = historical_import_logs[historical_import_logs.get("park", "") == park].copy()
+        imported_days = int(park_import_logs[park_import_logs.get("status", "") == "success"]["target_date"].nunique()) if len(park_import_logs) > 0 else 0
+        imported_rows = int(park_import_logs["saved_count"].sum()) if len(park_import_logs) > 0 and "saved_count" in park_import_logs.columns else 0
+        compact_card_grid([
+            ("取得済み日数", imported_days),
+            ("保存件数", imported_rows),
+            ("最新ログ", "あり" if len(park_import_logs) > 0 else "なし"),
+        ])
+        with st.expander("過去データ取り込みログ", expanded=False):
+            st.dataframe(safe_sort_head(park_import_logs, "imported_at", 100, ascending=False), use_container_width=True)
+    else:
+        st.info("過去待ち時間データの取り込みログはまだありません。")
 
     with st.expander("混雑指数デバッグ", expanded=False):
         debug_df = pd.DataFrame([{
