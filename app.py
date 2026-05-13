@@ -43,6 +43,9 @@ from utils import (
     get_all_attraction_crowd_stats,
     get_major_attraction_crowd_stats,
     get_crowd_index_from_major_attractions,
+    get_actual_wait_series_for_today,
+    get_attractions_by_theme_port,
+    merge_prediction_and_actual_series,
     get_emptying_candidates,
     get_guest_action_plan,
     get_prediction_risk_diagnosis,
@@ -494,6 +497,35 @@ def safe_sort_head(df, sort_column, n=100, ascending=False):
         display_df = display_df.sort_values(sort_column, ascending=ascending)
 
     return display_df.head(n)
+
+
+def render_segmented_choice(label, options, key):
+    clean_options = [str(x) for x in options if str(x).strip()]
+    if not clean_options:
+        return None
+    if key not in st.session_state or st.session_state[key] not in clean_options:
+        st.session_state[key] = clean_options[0]
+    if hasattr(st, "segmented_control"):
+        value = st.segmented_control(
+            label,
+            clean_options,
+            default=st.session_state[key],
+            key=f"{key}_segmented",
+        )
+    else:
+        value = st.radio(
+            label,
+            clean_options,
+            index=clean_options.index(st.session_state[key]),
+            horizontal=True,
+            key=f"{key}_radio",
+        )
+    if value != st.session_state[key]:
+        st.session_state[key] = value
+        st.rerun()
+    return value
+
+
 def filter_crowd_hours(df):
     if len(df) == 0 or "hour" not in df.columns:
         return df
@@ -1109,26 +1141,43 @@ if display_mode == "ダッシュボード":
         )
 
         fig, ax = plt.subplots(figsize=(10, 5))
-
+        actual_major_df = get_actual_wait_series_for_today(history_df, major_rides=settings["rides"])
         ax.plot(
             major_display_df["TimeLabel"] if "TimeLabel" in major_display_df.columns else major_display_df["Hour"],
             major_display_df["人気主要アトラクション予想平均待ち時間"],
-            linewidth=2.4
+            linewidth=2.4,
+            label="予測"
         )
+        if len(actual_major_df) > 0:
+            ax.plot(
+                actual_major_df["TimeLabel"],
+                actual_major_df["Actual Wait"],
+                linewidth=2.2,
+                linestyle="--",
+                marker="o",
+                label="実測"
+            )
+        else:
+            st.caption("実測データ蓄積中")
         if "TimeLabel" in major_display_df.columns:
             tick_df = major_display_df[major_display_df["Minute"].fillna(0).astype(int) == 0]
             ax.set_xticks(tick_df["TimeLabel"].tolist())
             ax.tick_params(axis="x", rotation=45)
 
+        y_source = major_display_df["人気主要アトラクション予想平均待ち時間"].tolist()
+        if len(actual_major_df) > 0:
+            y_source += actual_major_df["Actual Wait"].tolist()
         ax.set_ylim(
             0,
-            graph_ylim(major_display_df["人気主要アトラクション予想平均待ち時間"].tolist())
+            graph_ylim(y_source)
         )
 
         ax.set_ylabel("Predicted Wait")
         ax.set_title(f"{park} Major Attractions Average Prediction")
+        ax.legend()
 
         st.pyplot(fig)
+        plt.close(fig)
         best_row = major_display_df.sort_values("人気主要アトラクション予想平均待ち時間").iloc[0]
         peak_row = major_display_df.sort_values("人気主要アトラクション予想平均待ち時間", ascending=False).iloc[0]
         compact_card_grid([
@@ -1194,19 +1243,34 @@ if display_mode == "ダッシュボード":
             })
         ios_list_card(week_rows)
 
-    fig_week, ax_week = plt.subplots(figsize=(10, 4))
+    if len(week_df) > 0 and {"Date", "Crowd Index"}.issubset(set(week_df.columns)):
+        fig_week, ax_week = plt.subplots(figsize=(10, 4))
 
-    ax_week.plot(
-        week_df["Date"],
-        week_df["Crowd Index"],
-        marker="o"
-    )
+        ax_week.plot(
+            week_df["Date"],
+            week_df["Crowd Index"],
+            marker="o",
+            linewidth=2.2,
+            label="混雑指数"
+        )
+        for _, row in week_df.iterrows():
+            try:
+                label = get_level(float(row.get("Crowd Index", 0))).split(" ", 1)[0]
+                ax_week.annotate(label, (row["Date"], row["Crowd Index"]), textcoords="offset points", xytext=(0, 8), ha="center")
+            except Exception:
+                pass
 
-    ax_week.set_ylim(0, 10)
-    ax_week.set_ylabel("Crowd Index")
-    ax_week.set_title(f"{park} 1 Week Crowd Forecast")
+        ax_week.set_ylim(1, 10)
+        ax_week.set_ylabel("Crowd Index")
+        ax_week.set_title(f"{park} 1 Week Crowd Forecast")
+        ax_week.tick_params(axis="x", rotation=35)
+        ax_week.grid(alpha=0.18)
+        ax_week.legend()
 
-    st.pyplot(fig_week)
+        st.pyplot(fig_week)
+        plt.close(fig_week)
+    else:
+        st.info("1週間予測データがまだありません。")
 elif display_mode == "全アトラクション":
 
     st.subheader("🎡 全アトラクション待ち時間")
@@ -1432,14 +1496,41 @@ elif display_mode == "アトラクション別予測":
 
     if len(history_df) > 0:
 
-        attraction_list = sorted(
-            history_df["attraction"].unique()
-        )
+        source_attractions = []
+        if len(history_df) > 0 and "attraction" in history_df.columns:
+            source_attractions += history_df["attraction"].dropna().astype(str).tolist()
+        if len(all_df) > 0 and "Name" in all_df.columns:
+            source_attractions += all_df["Name"].dropna().astype(str).tolist()
+        source_attractions += settings.get("rides", [])
+        attraction_list = sorted({name for name in source_attractions if name})
 
-        selected_attraction = st.selectbox(
-            "🎢 予測するアトラクションを選択",
-            attraction_list
+        area_map = get_attractions_by_theme_port(park, attraction_list)
+        area_options = [area for area, names in area_map.items() if len(names) > 0]
+        if not area_options:
+            area_options = ["???"]
+            area_map = {"???": attraction_list}
+
+        selected_area = render_segmented_choice(
+            "??????/???",
+            area_options,
+            "attraction_theme_area"
         )
+        area_attractions = area_map.get(selected_area, attraction_list)
+        if not area_attractions:
+            area_attractions = attraction_list
+
+        if len(area_attractions) <= 8:
+            selected_attraction = render_segmented_choice(
+                "???????",
+                area_attractions,
+                "selected_attraction_button"
+            )
+        else:
+            selected_attraction = st.selectbox(
+                "?? ??????????????",
+                area_attractions,
+                key="selected_attraction_select"
+            )
 
         attraction_target_date = st.date_input(
             "予測する日付",
@@ -1543,19 +1634,43 @@ elif display_mode == "アトラクション別予測":
                 figsize=(10, 5)
             )
 
+            x_values = pred_df["TimeLabel"] if "TimeLabel" in pred_df.columns else pred_df["Hour"]
             ax.plot(
-                pred_df["TimeLabel"] if "TimeLabel" in pred_df.columns else pred_df["Hour"],
+                x_values,
                 pred_df["Predicted Wait"],
-                linewidth=2.4
+                linewidth=2.4,
+                label="??"
             )
+
+            actual_attraction_df = pd.DataFrame()
+            if attraction_target_date == datetime.now(JST).date():
+                actual_attraction_df = get_actual_wait_series_for_today(
+                    history_df,
+                    attraction=selected_attraction
+                )
+                if len(actual_attraction_df) > 0:
+                    ax.plot(
+                        actual_attraction_df["TimeLabel"],
+                        actual_attraction_df["Actual Wait"],
+                        linewidth=2.2,
+                        linestyle="--",
+                        marker="o",
+                        label="??"
+                    )
+                else:
+                    st.caption("????????")
+
             if "TimeLabel" in pred_df.columns:
                 tick_df = pred_df[pred_df["Minute"].fillna(0).astype(int) == 0]
                 ax.set_xticks(tick_df["TimeLabel"].tolist())
                 ax.tick_params(axis="x", rotation=45)
 
+            y_values = pred_df["Predicted Wait"].tolist()
+            if len(actual_attraction_df) > 0:
+                y_values += actual_attraction_df["Actual Wait"].tolist()
             ax.set_ylim(
                 0,
-                graph_ylim(pred_df["Predicted Wait"].tolist())
+                graph_ylim(y_values)
             )
 
             ax.set_ylabel("Predicted Wait")
@@ -1563,8 +1678,11 @@ elif display_mode == "アトラクション別予測":
             ax.set_title(
                 f"{selected_attraction} Prediction {attraction_target_date}"
             )
+            ax.legend()
 
             st.pyplot(fig)
+            plt.close(fig)
+
             best_row = pred_df.sort_values("Predicted Wait").iloc[0]
             peak_row = pred_df.sort_values("Predicted Wait", ascending=False).iloc[0]
             compact_card_grid([
@@ -2063,6 +2181,17 @@ elif display_mode == "データ管理":
             ("保存件数", imported_rows),
             ("最新ログ", "あり" if len(park_import_logs) > 0 else "なし"),
         ])
+        if len(park_import_logs) > 0 and "method" in park_import_logs.columns:
+            method_summary = (
+                park_import_logs.fillna({"method": "unknown"})
+                .groupby("method", as_index=False)
+                .agg(days=("target_date", "nunique"), saved_count=("saved_count", "sum"))
+            )
+            method_summary = method_summary.rename(columns={"method": "????", "days": "??", "saved_count": "????"})
+            with st.expander("????????", expanded=False):
+                st.dataframe(method_summary, use_container_width=True)
+        with st.expander("åå¾æ¹æ³å¥ã®ä»¶æ°", expanded=False):
+                st.dataframe(method_summary, use_container_width=True)
         with st.expander("過去データ取り込みログ", expanded=False):
             st.dataframe(safe_sort_head(park_import_logs, "imported_at", 100, ascending=False), use_container_width=True)
     else:
@@ -2354,12 +2483,7 @@ if display_mode == "データ管理":
             datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S") + "（日本時間）"
         )
 
-refresh_seconds = 900
+st.caption("??????????????????????????OCR?????????????????")
 
-st.caption(
-    f"🔄 {refresh_seconds // 60}分ごと自動更新"
-)
-
-if os.environ.get("STREAMLIT_DISABLE_AUTO_REFRESH") != "1":
-    time.sleep(refresh_seconds)
+if st.button("????????", key="manual_refresh_bottom", use_container_width=True):
     st.rerun()
