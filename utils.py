@@ -859,8 +859,7 @@ DISNEYREAL_PARK_SLUGS = {
 }
 
 MOJIBAKE_MARKERS = [
-    "????", "???", "���", "\ufffd", "繝", "縺", "譁", "譎", "豺", "蜿", "螟",
-    "鬮", "郢", "隴", "邵", "荳", "莠", "蛯", "髮", "蟆", "蠕", "驕"
+    "?" * 4, "?" * 3, "\ufffd", "\u7e3a", "\u7e5d", "\u8b41", "\u8b4e", "\u8c7a", "\u873f", "\u9aef"
 ]
 
 ALTERNATIVE_WAIT_HISTORY_SOURCES = {
@@ -1239,27 +1238,27 @@ def fetch_wait_history_from_source(source_name, source_url, park, target_date):
     try:
         html = _fetch_text(source_url)
     except Exception as exc:
-        return [], f"{source_name}: ???? {exc}", "alternative_failed", source_url
+        return [], f"{source_name}: 取得失敗 {exc}", "alternative_failed", source_url
 
     rows = extract_wait_rows_from_html_tables(html, target_date)
     if rows:
         for row in rows:
             row["source"] = source_name
-        return rows, f"{source_name}: HTML??????{len(rows)}???", "alternative_html_table", source_url
+        return rows, f"{source_name}: HTMLテーブルから{len(rows)}件取得", "alternative_html_table", source_url
 
     rows = extract_wait_rows_from_text(html, target_date)
     if rows:
         for row in rows:
             row["source"] = source_name
-        return rows, f"{source_name}: HTML??????{len(rows)}???", "alternative_html_text", source_url
+        return rows, f"{source_name}: HTMLテキストから{len(rows)}件取得", "alternative_html_text", source_url
 
     rows, image_message = extract_wait_rows_from_images(html, source_url, target_date)
     if rows:
         for row in rows:
             row["source"] = source_name
-        return rows, f"{source_name}: ??OCR??{len(rows)}???", "alternative_image_ocr", source_url
+        return rows, f"{source_name}: 画像OCRから{len(rows)}件取得", "alternative_image_ocr", source_url
 
-    return [], f"{source_name}: ?????????? / {image_message}", "alternative_failed", source_url
+    return [], f"{source_name}: 取得できませんでした / {image_message}", "alternative_failed", source_url
 
 
 def fetch_alternative_wait_history(park, target_date):
@@ -1373,7 +1372,7 @@ def import_disneyreal_history(cursor, conn, park, start_date, end_date, max_days
         url = item["url"]
         if _historical_date_imported(conn, park, target_date):
             skipped += 1
-            results.append({"date": target_date, "status": "skipped", "saved_count": 0, "message": "???????????"})
+            results.append({"date": target_date, "status": "skipped", "saved_count": 0, "message": "取得済みのためスキップ"})
             continue
 
         rows, message, method = fetch_disneyreal_daily_waits(park, target_date, url)
@@ -1388,7 +1387,7 @@ def import_disneyreal_history(cursor, conn, park, start_date, end_date, max_days
         status = "success" if saved_count > 0 else "empty"
         if method in ("failed", "skipped") and saved_count == 0:
             status = method
-        _log_historical_import(cursor, conn, park, target_date, url, status, safe_display_text(message, "??????????"), saved_count, method)
+        _log_historical_import(cursor, conn, park, target_date, url, status, safe_display_text(message, "取得できませんでした"), saved_count, method)
 
         if saved_count == 0 and should_try_alternative_source(conn, park, target_date):
             alt_rows, alt_message, alt_method, alt_url = fetch_alternative_wait_history(park, target_date)
@@ -1401,7 +1400,7 @@ def import_disneyreal_history(cursor, conn, park, start_date, end_date, max_days
                 target_date,
                 alt_url,
                 alt_status,
-                safe_display_text(alt_message, "?????????????????"),
+                safe_display_text(alt_message, "代替サイトでも取得できませんでした"),
                 alt_saved,
                 alt_method,
             )
@@ -1413,7 +1412,7 @@ def import_disneyreal_history(cursor, conn, park, start_date, end_date, max_days
 
         total_saved += saved_count
         processed += 1
-        results.append({"date": target_date, "status": status, "saved_count": saved_count, "message": safe_display_text(message, "??????????"), "method": method})
+        results.append({"date": target_date, "status": status, "saved_count": saved_count, "message": safe_display_text(message, "取得できませんでした"), "method": method})
         time.sleep(0.35)
     return {
         "processed_days": processed,
@@ -2407,35 +2406,33 @@ def _is_broken_show_text(value):
 def _safe_show_text(value, fallback):
     return safe_display_text(value, fallback)
 
-def _sanitize_show_rows(show_df, fallback_name="ショー/パレード（時刻のみ）"):
+def _sanitize_show_rows(show_df, fallback_name='ショー/パレード（時刻のみ）'):
     if show_df is None or len(show_df) == 0:
         return pd.DataFrame()
-
     df = show_df.copy()
     if "show_name" in df.columns:
         df["show_name"] = df["show_name"].apply(lambda x: _safe_show_text(x, fallback_name))
     if "category" in df.columns:
-        df["category"] = df["category"].apply(lambda x: _safe_show_text(x, "ショー/パレード"))
+        df["category"] = df["category"].apply(lambda x: _safe_show_text(x, 'ショー/パレード'))
     if "note" in df.columns:
-        df["note"] = df["note"].apply(lambda x: _safe_show_text(x, "公式または推定時刻"))
+        df["note"] = df["note"].apply(lambda x: _safe_show_text(x, '公式日別ページから取得'))
     return df
 
 
 SHOW_NAME_BY_ID = {
-    "967": "??????????????????",
-    "7801": "???????????????",
-    "7602": "??????????????????????",
-    "7604": "??????????????????",
-    "7405": "??????????????",
-    "7800": "???????????????",
-    "913": "??????????????????????????????",
-    "895": "???????????????????",
-    "7000": "?????????",
-    "7202": "Reach for the Stars",
-    "7002": "??????????????????",
-    "985": "??????????????????",
+    '967': 'ビリーヴ！～シー・オブ・ドリームス～',
+    '7801': 'ディズニー・ライト・ザ・ナイト',
+    '7602': 'ビッグバンドビート～ア・スペシャルトリート～',
+    '7604': 'ジャンボリミッキー！レッツ・ダンス！',
+    '7405': 'スカイ・フル・オブ・カラーズ',
+    '7800': 'ディズニー・ライト・ザ・ナイト',
+    '913': '東京ディズニーランド・エレクトリカルパレード・ドリームライツ',
+    '895': 'ミッキーのマジカルミュージックワールド',
+    '7000': 'クラブマウスビート',
+    '7202': 'Reach for the Stars',
+    '7002': 'ディズニー・ハーモニー・イン・カラー',
+    '985': 'ジャンボリミッキー！レッツ・ダンス！',
 }
-
 
 
 def _known_show_schedule_fallback(park, target_date):
@@ -2453,7 +2450,6 @@ def _parse_monthly_show_page(html, url, target_date):
     show_name = _show_name_from_url(url)
     if not show_name:
         return []
-
     text = re.sub(r"<script.*?</script>", " ", html, flags=re.S | re.I)
     text = re.sub(r"<style.*?</style>", " ", text, flags=re.S | re.I)
     text = re.sub(r"<[^>]+>", "\n", text)
@@ -2470,14 +2466,7 @@ def _parse_monthly_show_page(html, url, target_date):
             continue
         times = re.findall(r"\d{1,2}:\d{2}\s*(?:a\.m\.|p\.m\.|am|pm)?", value, re.I)
         for show_time in times:
-            rows.append({
-                "target_date": target_date,
-                "show_name": show_name,
-                "show_time": show_time.replace("a.m.", "am").replace("p.m.", "pm"),
-                "category": "ショー/パレード",
-                "source": url,
-                "note": "公式月間スケジュールから取得",
-            })
+            rows.append({"target_date": target_date, "show_name": show_name, "show_time": show_time.replace("a.m.", "am").replace("p.m.", "pm"), "category": 'ショー/パレード', "source": url, "note": '公式月間スケジュールから取得'})
     return rows
 
 
@@ -2490,11 +2479,10 @@ def _parse_daily_show_page(html, url, target_date):
     rows = []
     seen = set()
     time_pattern = re.compile(r"\d{1,2}:\d{2}\s*(?:a\.m\.|p\.m\.|am|pm)?", re.I)
-    stop_words = ["アトラクション", "レストラン", "ショップ", "休止", "運営時間"]
-
+    stop_words = ['アトラクション', 'レストラン', 'ショップ', '休止', '運営時間']
     in_show_section = False
     for line in lines:
-        if "ショー/パレード" in line or "Parades and Shows" in line:
+        if 'ショー/パレード' in line or "Parades and Shows" in line:
             in_show_section = True
             continue
         if in_show_section and any(word in line for word in stop_words):
@@ -2505,7 +2493,7 @@ def _parse_daily_show_page(html, url, target_date):
         if not times:
             continue
         name = time_pattern.sub("", line)
-        name = re.sub(r"エントリー受付|ディズニー・プレミアアクセス|NEW", "", name)
+        name = re.sub('エントリー受付|ディズニー・プレミアアクセス|NEW', "", name)
         name = re.sub(r"\s*/\s*", " / ", name).strip(" ?/")
         name = _clean_show_name(name)
         if not name:
@@ -2515,14 +2503,7 @@ def _parse_daily_show_page(html, url, target_date):
             if key in seen:
                 continue
             seen.add(key)
-            rows.append({
-                "target_date": target_date,
-                "show_name": name[:80],
-                "show_time": show_time,
-                "category": "ショー/パレード",
-                "source": url,
-                "note": "公式日別ページから取得",
-            })
+            rows.append({"target_date": target_date, "show_name": name[:80], "show_time": show_time, "category": 'ショー/パレード', "source": url, "note": '公式日別ページから取得'})
     return rows
 
 
@@ -2531,18 +2512,13 @@ def fetch_official_show_schedule(settings, target_date=None):
     urls = settings.get("show_urls") or [settings.get("show_url", "")]
     urls = [url for url in urls if url]
     if not urls:
-        return pd.DataFrame(), "ショー/パレード取得URLが設定されていません"
-
+        return pd.DataFrame(), 'ショー/パレード取得URLが設定されていません'
     rows = []
     messages = []
     failed_count = 0
     for url in urls:
         try:
-            res = requests.get(
-                url,
-                headers={"User-Agent": "Mozilla/5.0"},
-                timeout=4,
-            )
+            res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=4)
             if not res.encoding or res.encoding.lower() in ("iso-8859-1", "ascii"):
                 res.encoding = res.apparent_encoding or "utf-8"
             res.raise_for_status()
@@ -2552,22 +2528,19 @@ def fetch_official_show_schedule(settings, target_date=None):
             if failed_count >= 2 and not rows:
                 break
             continue
-
         if "/show/schedule/" in url:
             rows.extend(_parse_monthly_show_page(res.text, url, target_date))
         else:
             rows.extend(_parse_daily_show_page(res.text, url, target_date))
-
     if not rows:
-        return pd.DataFrame(), "公式ショー時刻を取得できませんでした"
-
+        return pd.DataFrame(), '公式ショー時刻を取得できませんでした'
     df = pd.DataFrame(rows).drop_duplicates(["show_name", "show_time"], keep="first")
     df = _sanitize_show_rows(df)
     df["_hour"] = df["show_time"].apply(_parse_show_time_to_hour)
     df = df[df["_hour"].notna()].sort_values("_hour").drop(columns=["_hour"])
     if len(df) == 0:
-        return pd.DataFrame(), "公式ショー時刻を取得できませんでした"
-    return df.reset_index(drop=True), f"公式ショー/パレード時刻を{len(df)}件取得"
+        return pd.DataFrame(), '公式ショー時刻を取得できませんでした'
+    return df.reset_index(drop=True), f"ショー/パレードを{len(df)}件取得しました"
 
 def save_show_schedule_rows(cursor, conn, park, show_df, target_date=None):
     if show_df is None or len(show_df) == 0:
@@ -3366,9 +3339,9 @@ def get_attraction_prediction_confidence(history_df, prediction_history, attract
     score += min(25, history_days * 2)
     score += min(15, history_count / 20)
     if history_days < 7:
-        notes.append("????????????????????????")
+        notes.append("このアトラクションは履歴が少ないため、同エリア傾向で補完しています")
     else:
-        notes.append(f"??{history_days}?????")
+        notes.append(f"履歴{history_days}日分を使用")
 
     error_count = 0
     mae = None
@@ -3382,14 +3355,14 @@ def get_attraction_prediction_confidence(history_df, prediction_history, attract
                 score += 10
             elif mae >= 30:
                 score -= 10
-            notes.append(f"?????? ?{mae:.0f}?")
+            notes.append(f"直近平均誤差 約{mae:.0f}分")
         else:
-            notes.append("??????????")
+            notes.append("予測誤差はまだ蓄積中")
     if used_fallback:
         score -= 12
-        notes.append("????????/????????")
+        notes.append("不足分は同エリア/全体時間帯で補完")
     score = int(max(0, min(100, round(score))))
-    label = "??" if score >= 75 else "????" if score >= 50 else "??"
+    label = "高い" if score >= 75 else "中くらい" if score >= 50 else "低い"
     return {
         "score": score,
         "label": label,
@@ -3627,10 +3600,9 @@ def get_all_attraction_crowd_stats(valid_all_df=None, history_df=None, target_da
     waits = pd.Series(dtype=float)
     open_count = 0
     closed_count = 0
-    source = "???????"
+    source = "未判定"
     target_names = []
 
-    # ????????????????????? live ?????????
     if valid_all_df is not None and len(valid_all_df) > 0:
         df = valid_all_df.copy()
         open_mask = df.get("Open", True) == True
@@ -3639,7 +3611,7 @@ def get_all_attraction_crowd_stats(valid_all_df=None, history_df=None, target_da
         target_names = open_df["Attraction"].dropna().astype(str).unique().tolist() if "Attraction" in open_df.columns else []
         open_count = int(len(target_names)) if target_names else int(len(open_df))
         closed_count = int(len(df) - len(open_df))
-        source = "?????????????????"
+        source = "現在の全アトラクション"
 
     if len(waits) == 0 and history_df is not None and len(history_df) > 0:
         hist = filter_crowd_history(history_df.copy())
@@ -3650,7 +3622,7 @@ def get_all_attraction_crowd_stats(valid_all_df=None, history_df=None, target_da
             waits = pd.to_numeric(day_df["wait_time"], errors="coerce").dropna().astype(float)
             target_names = day_df["attraction"].dropna().astype(str).unique().tolist() if "attraction" in day_df.columns else []
             open_count = int(len(target_names)) if target_names else 0
-            source = "???9:00?20:59???????????"
+            source = "当日9:00〜20:59の全履歴データ"
 
     if len(waits) == 0:
         return {
@@ -3858,7 +3830,7 @@ def predict_crowd_index_for_date(
     target_bonus += event_bonus + hours_bonus
     reasons.extend(event_reasons)
     reasons.extend(hours_reasons)
-    weather_score = get_weather_score("?" if rain_mm > 0 else "??", rain_mm, temperature)
+    weather_score = get_weather_score("雨" if rain_mm > 0 else "晴れ", rain_mm, temperature)
     feedback_error = get_feedback_error(prediction_history, GLOBAL_PREDICTION_NAME)
     daily_feedback = get_daily_crowd_feedback_error(daily_prediction_history)
 
@@ -4504,64 +4476,43 @@ def get_emptying_candidates(history_df, current_df, settings, limit=5):
 
 
 DISNEYSEA_AREA_RULES = {
-    "ファンタジースプリングス": ["Anna", "Elsa", "Rapunzel", "Peter Pan", "Tinker Bell"],
-    "メディテレーニアンハーバー": ["Soaring", "Transit Steamer", "Gondolas", "Fortress"],
-    "アメリカンウォーターフロント": ["Tower of Terror", "Toy Story", "Turtle Talk", "Electric Railway", "Big City"],
-    "ポートディスカバリー": ["Aquatopia", "Nemo", "SeaRider"],
-    "ロストリバーデルタ": ["Indiana Jones", "Raging Spirits"],
-    "アラビアンコースト": ["Sinbad", "Magic Lamp", "Caravan", "Jasmine"],
-    "マーメイドラグーン": ["Mermaid", "Flounder", "Scuttle", "Jumpin", "Blowfish", "Whirlpool"],
-    "ミステリアスアイランド": ["Journey to the Center", "20,000 Leagues"],
+    'ファンタジースプリングス': ['Anna', 'Elsa', 'Frozen', 'Rapunzel', 'Peter Pan', 'Tinker Bell', 'Fairy Tinker'],
+    'メディテレーニアンハーバー': ['Soaring', 'Transit Steamer', 'Gondolas', 'Fortress', 'Venetian'],
+    'アメリカンウォーターフロント': ['Tower of Terror', 'Toy Story', 'Turtle Talk', 'Electric Railway', 'Big City'],
+    'ポートディスカバリー': ['Aquatopia', 'Nemo', 'SeaRider', 'Port Discovery'],
+    'ロストリバーデルタ': ['Indiana Jones', 'Raging Spirits', 'Lost River'],
+    'アラビアンコースト': ['Sinbad', 'Sindbad', 'Magic Lamp', 'Caravan', 'Jasmine'],
+    'マーメイドラグーン': ['Mermaid', 'Ariel', 'Flounder', 'Scuttle', 'Jumpin', 'Blowfish', 'Whirlpool'],
+    'ミステリアスアイランド': ['Journey to the Center', '20,000 Leagues'],
 }
 
 
 DISNEYLAND_AREA_RULES = {
-    "ワールドバザール": ["Omnibus", "Penny Arcade"],
-    "アドベンチャーランド": ["Pirates", "Jungle Cruise", "Tiki", "Western River"],
-    "ウエスタンランド": ["Big Thunder", "Country Bear", "Mark Twain", "Tom Sawyer"],
-    "クリッターカントリー": ["Splash Mountain", "Beaver Brothers"],
-    "ファンタジーランド": ["Pooh", "Peter Pan", "Pinocchio", "Snow White", "Small World", "Haunted Mansion", "Castle Carrousel", "Dumbo", "PhilharMagic"],
-    "トゥーンタウン": ["Roger Rabbit", "Gadget", "Go Coaster", "Minnie's House", "Donald's Boat", "Chip"],
-    "トゥモローランド": ["Baymax", "Monsters", "Space Mountain", "Buzz", "Star Tours", "Stitch"],
-    "美女と野獣エリア": ["Beauty and the Beast", "Enchanted Tale"],
+    'ワールドバザール': ['Omnibus', 'Penny Arcade'],
+    'アドベンチャーランド': ['Pirates', 'Jungle Cruise', 'Tiki', 'Western River', 'Swiss Family'],
+    'ウエスタンランド': ['Big Thunder', 'Country Bear', 'Mark Twain', 'Tom Sawyer', 'Shooting Gallery'],
+    'クリッターカントリー': ['Splash Mountain', 'Beaver Brothers'],
+    'ファンタジーランド': ['Pooh', 'Peter Pan', 'Pinocchio', 'Snow White', 'Small World', 'Haunted Mansion', 'Castle Carrousel', 'Dumbo', 'PhilharMagic', 'Alice'],
+    'トゥーンタウン': ['Roger Rabbit', 'Gadget', 'Go Coaster', 'Minnie', 'Donald', 'Chip', 'Goofy'],
+    'トゥモローランド': ['Baymax', 'Monsters', 'Space Mountain', 'Buzz', 'Star Tours', 'Stitch'],
+    '美女と野獣エリア': ['Beauty and the Beast', 'Enchanted Tale'],
 }
 
 
 def classify_attraction_area(attraction, park):
     rules = DISNEYSEA_AREA_RULES if park == "DisneySea" else DISNEYLAND_AREA_RULES
-
     for area, keywords in rules.items():
         for keyword in keywords:
             if keyword.lower() in str(attraction).lower():
                 return area
-
-    return "その他"
+    return 'その他'
 
 
 def get_theme_port_map(park):
-    if park == "DisneySea":
-        return {
-            "メディテレーニアンハーバー": ["Transit Steamer", "Venetian", "Fortress", "Soaring"],
-            "アメリカンウォーターフロント": ["Tower of Terror", "Toy Story", "Big City", "Electric Railway (American Waterfront)", "Turtle Talk"],
-            "ポートディスカバリー": ["Aquatopia", "Nemo", "Electric Railway (Port Discovery)"],
-            "ロストリバーデルタ": ["Indiana Jones", "Raging Spirits", "Steamer Line (Lost River Delta)"],
-            "アラビアンコースト": ["Caravan", "Jasmine", "Magic Lamp", "Sindbad"],
-            "マーメイドラグーン": ["Ariel", "Blowfish", "Flounder", "Jumpin", "Scuttle", "The Whirlpool"],
-            "ミステリアスアイランド": ["Journey to the Center", "20,000 Leagues"],
-            "ファンタジースプリングス": ["Anna and Elsa", "Rapunzel", "Peter Pan", "Fairy Tinker"],
-            "その他": [],
-        }
-    return {
-        "ワールドバザール": ["Omnibus", "Penny Arcade"],
-        "アドベンチャーランド": ["Pirates", "Jungle Cruise", "Tiki", "Swiss Family"],
-        "ウエスタンランド": ["Big Thunder", "Country Bear", "Mark Twain", "Western River", "Shooting Gallery"],
-        "クリッターカントリー": ["Splash Mountain", "Beaver Brothers"],
-        "ファンタジーランド": ["Beauty and the Beast", "Pooh", "Peter Pan", "Snow White", "Dumbo", "Carrousel", "Small World", "PhilharMagic", "Pinocchio", "Alice"],
-        "トゥーンタウン": ["Roger Rabbit", "Gadget", "Donald's Boat", "Minnie", "Goofy's", "Chip 'n Dale"],
-        "トゥモローランド": ["Baymax", "Monsters", "Star Tours", "Stitch"],
-        "美女と野獣エリア": ["Beauty and the Beast"],
-        "その他": [],
-    }
+    rules = DISNEYSEA_AREA_RULES if park == "DisneySea" else DISNEYLAND_AREA_RULES
+    area_map = {area: keywords[:] for area, keywords in rules.items()}
+    area_map.setdefault('その他', [])
+    return area_map
 
 
 def get_attractions_by_theme_port(park, all_attractions):
@@ -4569,10 +4520,9 @@ def get_attractions_by_theme_port(park, all_attractions):
     for attraction in sorted([str(x) for x in all_attractions if str(x).strip()]):
         area = classify_attraction_area(attraction, park)
         if area not in area_map:
-            area = "その他"
+            area = 'その他'
         area_map.setdefault(area, []).append(attraction)
     return area_map
-
 
 def get_area_crowd_map(all_df, park):
     if len(all_df) == 0 or "Attraction" not in all_df.columns:
