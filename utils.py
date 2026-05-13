@@ -334,7 +334,8 @@ def connect_db(db_name):
         source_url TEXT,
         status TEXT,
         message TEXT,
-        saved_count INTEGER
+        saved_count INTEGER,
+        method TEXT
     )
     """)
 
@@ -350,6 +351,12 @@ def connect_db(db_name):
         conn.commit()
     if "source" not in wait_columns:
         cursor.execute("ALTER TABLE wait_times ADD COLUMN source TEXT DEFAULT 'queue-times'")
+        conn.commit()
+
+    cursor.execute("PRAGMA table_info(historical_import_logs)")
+    historical_log_columns = [row[1] for row in cursor.fetchall()]
+    if "method" not in historical_log_columns:
+        cursor.execute("ALTER TABLE historical_import_logs ADD COLUMN method TEXT DEFAULT 'unknown'")
         conn.commit()
 
     cursor.execute("PRAGMA table_info(predictions)")
@@ -944,21 +951,123 @@ def _extract_disneyreal_image_attractions(html):
     return sorted(set([x for x in names if x]))
 
 
-def fetch_disneyreal_daily_waits(park, target_date, url):
+def normalize_disneyreal_wait_rows(raw_rows, target_date):
     target_date = target_date.date() if isinstance(target_date, datetime) else target_date
-    try:
-        html = _fetch_text(url)
-    except Exception as exc:
-        return [], f"取得失敗: {exc}"
+    rows = []
+    seen = set()
+    for row in raw_rows or []:
+        attraction = _normalize_disneyreal_attraction_name(row.get("attraction", row.get("Attraction", "")))
+        wait = pd.to_numeric(row.get("wait_time", row.get("Wait", None)), errors="coerce")
+        if not attraction or pd.isna(wait):
+            continue
+        wait = int(wait)
+        if wait <= 0:
+            continue
+        dt_value = row.get("datetime")
+        if isinstance(dt_value, datetime):
+            dt = dt_value
+        else:
+            time_text = str(row.get("time", row.get("Time", ""))).strip()
+            match = re.search(r"(\d{1,2}):(\d{2})", str(dt_value) if dt_value else time_text)
+            if not match:
+                continue
+            hour = int(match.group(1))
+            minute = int(match.group(2))
+            if not (OPEN_HOUR <= hour < CROWD_END_HOUR):
+                continue
+            dt = datetime.combine(target_date, datetime.min.time()).replace(hour=hour, minute=minute)
+        if not is_crowd_hour(dt):
+            continue
+        key = (dt.strftime("%Y-%m-%d %H:%M:%S"), attraction)
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append({
+            "datetime": key[0],
+            "attraction": attraction,
+            "wait_time": wait,
+            "temperature": None,
+            "rain": None,
+            "is_open": 1,
+            "source": row.get("source", "disneyreal"),
+        })
+    return rows
 
+
+def extract_wait_rows_from_html_tables(html, target_date):
+    try:
+        tables = pd.read_html(html)
+    except Exception:
+        table_blocks = re.findall(r"<table[\s\S]*?</table>", html, flags=re.I)
+        tables = []
+        for block in table_blocks:
+            parsed_rows = []
+            for tr in re.findall(r"<tr[\s\S]*?</tr>", block, flags=re.I):
+                cells = re.findall(r"<t[dh][^>]*>([\s\S]*?)</t[dh]>", tr, flags=re.I)
+                clean_cells = [
+                    re.sub(r"\s+", " ", unescape(re.sub(r"<[^>]+>", " ", cell))).strip()
+                    for cell in cells
+                ]
+                if clean_cells:
+                    parsed_rows.append(clean_cells)
+            if len(parsed_rows) >= 2:
+                headers = parsed_rows[0]
+                rows = parsed_rows[1:]
+                max_len = max(len(headers), *(len(r) for r in rows))
+                headers = headers + [f"col_{i}" for i in range(len(headers), max_len)]
+                padded = [r + [""] * (max_len - len(r)) for r in rows]
+                tables.append(pd.DataFrame(padded, columns=headers))
+        if not tables:
+            return []
+
+    raw_rows = []
+    for table in tables:
+        if table is None or len(table) == 0:
+            continue
+        df = table.copy()
+        df.columns = [str(c).strip() for c in df.columns]
+        if all(str(c).isdigit() for c in df.columns) and len(df) > 1:
+            first_row = [str(v).strip() for v in df.iloc[0].tolist()]
+            if any(re.search(r"Time|時|更新|譎|譖", v, flags=re.I) for v in first_row):
+                df = df.iloc[1:].copy()
+                df.columns = first_row
+        time_col = None
+        for col in df.columns:
+            if "更新" in col or "時間" in col or str(col).lower() in ("time", "時刻"):
+                time_col = col
+                break
+        if time_col is None:
+            first_col = df.columns[0]
+            if df[first_col].astype(str).str.contains(r"\d{1,2}:\d{2}", regex=True).any():
+                time_col = first_col
+        if time_col is None:
+            continue
+        for _, row in df.iterrows():
+            time_text = str(row.get(time_col, "")).strip()
+            if not re.search(r"\d{1,2}:\d{2}", time_text):
+                continue
+            for col in df.columns:
+                if col == time_col:
+                    continue
+                value = str(row.get(col, "")).strip()
+                if re.fullmatch(r"\d{1,3}", value):
+                    raw_rows.append({
+                        "time": time_text,
+                        "attraction": col,
+                        "wait_time": int(value),
+                        "source": "disneyreal_html_table",
+                    })
+    return normalize_disneyreal_wait_rows(raw_rows, target_date)
+
+
+def extract_wait_rows_from_text(html, target_date):
     plain = re.sub(r"<script.*?</script>", " ", html, flags=re.S | re.I)
     plain = re.sub(r"<style.*?</style>", " ", plain, flags=re.S | re.I)
     plain = re.sub(r"<[^>]+>", "\n", plain)
     plain = unescape(plain).replace("\u00a0", " ")
     lines = [re.sub(r"\s+", " ", x).strip() for x in plain.splitlines() if re.sub(r"\s+", " ", x).strip()]
 
-    rows = []
-    headers = []
+    raw_rows = []
     i = 0
     time_re = re.compile(r"^\d{1,2}:\d{2}$")
     skip_tokens = {"-", "休", "止", "案内終了", "終了", "平均", "平 均", "PP", "SP", ""}
@@ -980,7 +1089,7 @@ def fetch_disneyreal_daily_waits(park, target_date, url):
             if not time_re.match(line):
                 i += 1
                 continue
-            hour, minute = [int(x) for x in line.split(":")]
+            time_text = line
             i += 1
             values = []
             while i < len(lines) and not time_re.match(lines[i]) and lines[i] not in ("平 均", "平均", "終了"):
@@ -988,42 +1097,90 @@ def fetch_disneyreal_daily_waits(park, target_date, url):
                 i += 1
                 if len(values) >= len(headers):
                     break
-            if not (OPEN_HOUR <= hour < CROWD_END_HOUR):
-                continue
-            dt = datetime.combine(target_date, datetime.min.time()).replace(hour=hour, minute=minute)
             for attraction, value in zip(headers, values):
                 value = str(value).strip()
                 if value in skip_tokens or not re.fullmatch(r"\d{1,3}", value):
                     continue
-                wait = int(value)
-                if wait <= 0:
-                    continue
-                rows.append({
-                    "datetime": dt.strftime("%Y-%m-%d %H:%M:%S"),
+                raw_rows.append({
+                    "time": time_text,
                     "attraction": attraction,
-                    "wait_time": wait,
-                    "temperature": None,
-                    "rain": None,
-                    "is_open": 1,
-                    "park": park,
-                    "source": "disneyreal",
+                    "wait_time": int(value),
+                    "source": "disneyreal_html_text",
                 })
         i += 1
+    return normalize_disneyreal_wait_rows(raw_rows, target_date)
 
+
+def ocr_wait_table_image(image_bytes, target_date):
+    try:
+        from PIL import Image
+        import pytesseract
+        import io
+        image = Image.open(io.BytesIO(image_bytes))
+        text = pytesseract.image_to_string(image, lang="jpn+eng")
+    except Exception as exc:
+        return [], f"画像OCR未対応/失敗: {exc}"
+    rows = extract_wait_rows_from_text(text, target_date)
+    return rows, f"OCRで{len(rows)}件取得" if rows else "画像OCRで数値を取得できませんでした"
+
+
+def extract_wait_rows_from_images(html, base_url, target_date):
+    image_urls = []
+    for src in re.findall(r"<img[^>]+src=['\"]([^'\"]+)['\"]", html, flags=re.I):
+        if "wait" not in src and "realtime" not in src:
+            continue
+        if src.startswith("//"):
+            src = "https:" + src
+        elif src.startswith("/"):
+            src = "https://disneyreal.asumirai.info" + src
+        elif not src.startswith("http"):
+            src = base_url.rstrip("/") + "/" + src.lstrip("/")
+        image_urls.append(src)
+
+    all_rows = []
+    messages = []
+    for image_url in image_urls[:6]:
+        try:
+            res = requests.get(image_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=12)
+            res.raise_for_status()
+            rows, message = ocr_wait_table_image(res.content, target_date)
+            all_rows.extend(rows)
+            messages.append(f"{image_url}: {message}")
+            time.sleep(0.2)
+        except Exception as exc:
+            messages.append(f"{image_url}: 画像取得失敗 {exc}")
+    return normalize_disneyreal_wait_rows(all_rows, target_date), " / ".join(messages) if messages else "画像URLなし"
+
+
+def fetch_disneyreal_daily_waits(park, target_date, url):
+    target_date = target_date.date() if isinstance(target_date, datetime) else target_date
+    try:
+        html = _fetch_text(url)
+    except Exception as exc:
+        return [], f"取得失敗: {exc}", "failed"
+
+    rows = extract_wait_rows_from_html_tables(html, target_date)
     if rows:
-        return rows, f"ディズニーリアルから{len(rows)}件取得"
+        return rows, f"HTMLテーブルから{len(rows)}件取得", "html_table"
+
+    rows = extract_wait_rows_from_text(html, target_date)
+    if rows:
+        return rows, f"HTMLテキストから{len(rows)}件取得", "html_text"
 
     image_names = _extract_disneyreal_image_attractions(html)
+    rows, image_message = extract_wait_rows_from_images(html, "https://disneyreal.asumirai.info", target_date)
+    if rows:
+        return rows, f"画像OCRから{len(rows)}件取得", "image_ocr"
     if image_names:
-        return [], f"数値表なし（画像表のみ）。対象候補: {len(image_names)}施設"
-    return [], "数値表なし"
+        return [], f"数値表なし（画像表のみ）。対象候補: {len(image_names)}施設 / {image_message}", "skipped"
+    return [], f"数値表なし / {image_message}", "skipped"
 
 
-def _log_historical_import(cursor, conn, park, target_date, source_url, status, message, saved_count):
+def _log_historical_import(cursor, conn, park, target_date, source_url, status, message, saved_count, method="unknown"):
     cursor.execute("""
     INSERT INTO historical_import_logs
-    (imported_at, park, target_date, source_url, status, message, saved_count)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    (imported_at, park, target_date, source_url, status, message, saved_count, method)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S"),
         park,
@@ -1032,6 +1189,7 @@ def _log_historical_import(cursor, conn, park, target_date, source_url, status, 
         status,
         message,
         int(saved_count or 0),
+        method,
     ))
     conn.commit()
 
@@ -1104,10 +1262,12 @@ def import_disneyreal_history(cursor, conn, park, start_date, end_date, max_days
             skipped += 1
             results.append({"date": target_date, "status": "skipped", "saved_count": 0, "message": "取得済みのためスキップ"})
             continue
-        rows, message = fetch_disneyreal_daily_waits(park, target_date, url)
+        rows, message, method = fetch_disneyreal_daily_waits(park, target_date, url)
         saved_count = save_historical_wait_rows(cursor, conn, rows, park, url)
         status = "success" if saved_count > 0 else "empty"
-        _log_historical_import(cursor, conn, park, target_date, url, status, message, saved_count)
+        if method in ("failed", "skipped") and saved_count == 0:
+            status = method
+        _log_historical_import(cursor, conn, park, target_date, url, status, message, saved_count, method)
         total_saved += saved_count
         processed += 1
         results.append({"date": target_date, "status": status, "saved_count": saved_count, "message": message})
@@ -3156,6 +3316,52 @@ def make_major_average_prediction(wait_prediction_df, major_rides=None):
     return avg_df.sort_values(group_cols).rename(columns={"Predicted Wait": "Predicted Wait"})
 
 
+def get_actual_wait_series_for_today(history_df, attraction=None, major_rides=None):
+    columns = ["Time", "TimeLabel", "Hour", "Minute", "Actual Wait"]
+    if history_df is None or len(history_df) == 0:
+        return pd.DataFrame(columns=columns)
+    df = filter_crowd_history(history_df.copy())
+    today = datetime.now(JST).date()
+    if "date" not in df.columns and "datetime" in df.columns:
+        df["date"] = pd.to_datetime(df["datetime"]).dt.date
+    if "datetime" not in df.columns or "wait_time" not in df.columns:
+        return pd.DataFrame(columns=columns)
+    df = df[(df["date"] == today) & (pd.to_numeric(df["wait_time"], errors="coerce") > 0)].copy()
+    if "is_open" in df.columns:
+        df = df[pd.to_numeric(df["is_open"], errors="coerce").fillna(1).astype(int) == 1].copy()
+    if attraction is not None:
+        df = df[df["attraction"] == attraction].copy()
+    elif major_rides is not None:
+        df = df[df["attraction"].isin(major_rides)].copy()
+    if len(df) == 0:
+        return pd.DataFrame(columns=columns)
+    df["datetime"] = pd.to_datetime(df["datetime"])
+    df["Hour"] = df["datetime"].dt.hour
+    df["Minute"] = (df["datetime"].dt.minute // 15) * 15
+    df["Time"] = df["Hour"] + df["Minute"] / 60
+    df["TimeLabel"] = df["Hour"].astype(str).str.zfill(2) + ":" + df["Minute"].astype(str).str.zfill(2)
+    actual_df = df.groupby(["Time", "TimeLabel", "Hour", "Minute"])["wait_time"].mean().reset_index()
+    actual_df = actual_df.rename(columns={"wait_time": "Actual Wait"})
+    return actual_df.sort_values(["Hour", "Minute"])[columns]
+
+
+def merge_prediction_and_actual_series(pred_df, actual_df):
+    if pred_df is None or len(pred_df) == 0:
+        return pd.DataFrame()
+    left = pred_df.copy()
+    if "Predicted Wait" not in left.columns:
+        return pd.DataFrame()
+    right = actual_df.copy() if actual_df is not None else pd.DataFrame()
+    if len(right) == 0 or "TimeLabel" not in right.columns:
+        left["Actual Wait"] = np.nan
+        return left
+    return left.merge(right[["TimeLabel", "Actual Wait"]], on="TimeLabel", how="left")
+
+
+def plot_prediction_vs_actual(pred_df, actual_df, title):
+    return merge_prediction_and_actual_series(pred_df, actual_df)
+
+
 def get_all_attraction_crowd_stats(valid_all_df=None, history_df=None, target_date=None):
     if target_date is None:
         target_date = datetime.now(JST).date()
@@ -4073,6 +4279,42 @@ def classify_attraction_area(attraction, park):
                 return area
 
     return "その他"
+
+
+def get_theme_port_map(park):
+    if park == "DisneySea":
+        return {
+            "メディテレーニアンハーバー": ["Transit Steamer", "Venetian", "Fortress", "Soaring"],
+            "アメリカンウォーターフロント": ["Tower of Terror", "Toy Story", "Big City", "Electric Railway (American Waterfront)", "Turtle Talk"],
+            "ポートディスカバリー": ["Aquatopia", "Nemo", "Electric Railway (Port Discovery)"],
+            "ロストリバーデルタ": ["Indiana Jones", "Raging Spirits", "Steamer Line (Lost River Delta)"],
+            "アラビアンコースト": ["Caravan", "Jasmine", "Magic Lamp", "Sindbad"],
+            "マーメイドラグーン": ["Ariel", "Blowfish", "Flounder", "Jumpin", "Scuttle", "The Whirlpool"],
+            "ミステリアスアイランド": ["Journey to the Center", "20,000 Leagues"],
+            "ファンタジースプリングス": ["Anna and Elsa", "Rapunzel", "Peter Pan", "Fairy Tinker"],
+            "その他": [],
+        }
+    return {
+        "ワールドバザール": ["Omnibus", "Penny Arcade"],
+        "アドベンチャーランド": ["Pirates", "Jungle Cruise", "Tiki", "Swiss Family"],
+        "ウエスタンランド": ["Big Thunder", "Country Bear", "Mark Twain", "Western River", "Shooting Gallery"],
+        "クリッターカントリー": ["Splash Mountain", "Beaver Brothers"],
+        "ファンタジーランド": ["Beauty and the Beast", "Pooh", "Peter Pan", "Snow White", "Dumbo", "Carrousel", "Small World", "PhilharMagic", "Pinocchio", "Alice"],
+        "トゥーンタウン": ["Roger Rabbit", "Gadget", "Donald's Boat", "Minnie", "Goofy's", "Chip 'n Dale"],
+        "トゥモローランド": ["Baymax", "Monsters", "Star Tours", "Stitch"],
+        "美女と野獣エリア": ["Beauty and the Beast"],
+        "その他": [],
+    }
+
+
+def get_attractions_by_theme_port(park, all_attractions):
+    area_map = {area: [] for area in get_theme_port_map(park).keys()}
+    for attraction in sorted([str(x) for x in all_attractions if str(x).strip()]):
+        area = classify_attraction_area(attraction, park)
+        if area not in area_map:
+            area = "その他"
+        area_map.setdefault(area, []).append(attraction)
+    return area_map
 
 
 def get_area_crowd_map(all_df, park):
