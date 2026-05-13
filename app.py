@@ -44,8 +44,11 @@ from utils import (
     get_major_attraction_crowd_stats,
     get_crowd_index_from_major_attractions,
     get_actual_wait_series_for_today,
+    get_attraction_prediction_confidence,
     get_attractions_by_theme_port,
+    is_mojibake_text,
     merge_prediction_and_actual_series,
+    safe_display_text,
     get_emptying_candidates,
     get_guest_action_plan,
     get_prediction_risk_diagnosis,
@@ -101,6 +104,7 @@ JST = ZoneInfo("Asia/Tokyo")
 
 OPEN_HOUR = 9
 CROWD_END_HOUR = 21
+AUTO_REFRESH_SECONDS = 900
 
 st.set_page_config(
     page_title="ディズニー混雑AI",
@@ -403,6 +407,34 @@ hr { border-color: rgba(60,60,67,0.12) !important; }
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
+def clean_text(value, fallback="??????????"):
+    if isinstance(value, str):
+        return safe_display_text(value, fallback)
+    return value
+
+
+def clean_records(records):
+    if isinstance(records, list):
+        return [clean_records(x) for x in records]
+    if isinstance(records, dict):
+        return {clean_text(k, str(k)): clean_records(v) for k, v in records.items()}
+    if isinstance(records, str):
+        return clean_text(records)
+    return records
+
+
+def clean_dataframe(df):
+    if df is None or not isinstance(df, pd.DataFrame) or len(df) == 0:
+        return df
+    out = df.copy()
+    out.columns = [safe_display_text(c, str(c)) for c in out.columns]
+    for col in out.select_dtypes(include=["object"]).columns:
+        out[col] = out[col].apply(lambda x: safe_display_text(x, "") if isinstance(x, str) else x)
+    return out
+
+
+
+
 def graph_ylim(values):
     if len(values) == 0:
         return 200
@@ -608,6 +640,30 @@ else:
     )
 if display_mode != st.session_state["display_mode_value"]:
     st.session_state["display_mode_value"] = display_mode
+    st.rerun()
+
+
+if "auto_refresh_enabled" not in st.session_state:
+    st.session_state["auto_refresh_enabled"] = True
+
+auto_refresh_enabled = st.sidebar.toggle(
+    "?????15????",
+    value=st.session_state["auto_refresh_enabled"],
+    key="auto_refresh_toggle",
+)
+st.session_state["auto_refresh_enabled"] = auto_refresh_enabled
+last_update_text = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
+next_update_text = (datetime.now(JST) + timedelta(seconds=AUTO_REFRESH_SECONDS)).strftime("%H:%M??")
+st.sidebar.caption(f"????: {last_update_text}")
+st.sidebar.caption(f"??????: {next_update_text}")
+if auto_refresh_enabled and display_mode != "?????":
+    st.markdown(
+        f"<meta http-equiv='refresh' content='{AUTO_REFRESH_SECONDS}'>",
+        unsafe_allow_html=True,
+    )
+elif display_mode == "?????":
+    st.sidebar.caption("?????????????????????????????????")
+if st.sidebar.button("?????"):
     st.rerun()
 
 ticket_price_map, ticket_map_source = cached_fetch_ticket_prices()
@@ -1580,21 +1636,20 @@ elif display_mode == "アトラクション別予測":
         ].copy()
 
         if len(pred_df) > 0:
-            attraction_confidence = get_prediction_confidence(
+            attraction_confidence = get_attraction_prediction_confidence(
                 history_df,
                 prediction_history,
-                dpa_sellout_history,
-                settings,
-                attraction_target_date,
-                attraction_weather_source
+                selected_attraction,
+                pred_df,
+                pred_df.get("??", pd.Series(dtype=str)).astype(str).str.contains("??").any() if "??" in pred_df.columns else False
             )
 
             c_att_conf1, c_att_conf2 = st.columns(2)
             with c_att_conf1:
-                st.metric("予測信頼度", f"{attraction_confidence['score']}%")
+                st.metric("?????", f"{attraction_confidence['score']}%")
             with c_att_conf2:
-                st.metric("信頼度レベル", attraction_confidence["label"])
-            st.caption("信頼度の理由: " + " / ".join(attraction_confidence["notes"]))
+                st.metric("??????", attraction_confidence["label"])
+            st.caption("??????: " + " / ".join(attraction_confidence["notes"]))
 
             save_prediction_rows(
                 cursor,
@@ -2177,25 +2232,106 @@ elif display_mode == "データ管理":
         imported_days = int(park_import_logs[park_import_logs.get("status", "") == "success"]["target_date"].nunique()) if len(park_import_logs) > 0 else 0
         imported_rows = int(park_import_logs["saved_count"].sum()) if len(park_import_logs) > 0 and "saved_count" in park_import_logs.columns else 0
         compact_card_grid([
-            ("取得済み日数", imported_days),
-            ("保存件数", imported_rows),
-            ("最新ログ", "あり" if len(park_import_logs) > 0 else "なし"),
+            ("??????", imported_days),
+            ("????", imported_rows),
+            ("????", "??" if len(park_import_logs) > 0 else "??"),
         ])
         if len(park_import_logs) > 0 and "method" in park_import_logs.columns:
             method_summary = (
                 park_import_logs.fillna({"method": "unknown"})
                 .groupby("method", as_index=False)
                 .agg(days=("target_date", "nunique"), saved_count=("saved_count", "sum"))
+                .rename(columns={"method": "????", "days": "??", "saved_count": "????"})
             )
-            method_summary = method_summary.rename(columns={"method": "????", "days": "??", "saved_count": "????"})
+            method_values = park_import_logs["method"].fillna("").astype(str)
+            compact_card_grid([
+                ("DisneyReal????", int(method_values.str.startswith("disneyreal_").sum())),
+                ("??OCR????", int((method_values == "disneyreal_image_ocr").sum())),
+                ("?????????", int(method_values.str.startswith("alternative_").sum())),
+            ])
             with st.expander("????????", expanded=False):
                 st.dataframe(method_summary, use_container_width=True)
-        with st.expander("åå¾æ¹æ³å¥ã®ä»¶æ°", expanded=False):
-                st.dataframe(method_summary, use_container_width=True)
-        with st.expander("過去データ取り込みログ", expanded=False):
-            st.dataframe(safe_sort_head(park_import_logs, "imported_at", 100, ascending=False), use_container_width=True)
+        with st.expander("???????????", expanded=False):
+            st.dataframe(safe_sort_head(clean_dataframe(park_import_logs), "imported_at", 100, ascending=False), use_container_width=True)
     else:
-        st.info("過去待ち時間データの取り込みログはまだありません。")
+        st.info("?????????????????????????")
+
+    with st.expander("??????????????????", expanded=False):
+        if len(history_df) > 0 and "attraction" in history_df.columns:
+            history_count_df = history_df.groupby("attraction").agg(
+                history_count=("wait_time", "count"),
+                history_days=("date", "nunique"),
+            ).reset_index().rename(columns={"attraction": "???????"})
+            if "source" in history_df.columns:
+                disneyreal_counts = (
+                    history_df[history_df["source"].astype(str).str.contains("disneyreal", case=False, na=False)]
+                    .groupby("attraction")["wait_time"].count()
+                    .reset_index()
+                    .rename(columns={"attraction": "???????", "wait_time": "????????????"})
+                )
+                history_count_df = history_count_df.merge(disneyreal_counts, on="???????", how="left")
+                history_count_df["????????????"] = history_count_df["????????????"].fillna(0).astype(int)
+            history_count_df = history_count_df.rename(columns={"history_count": "????", "history_days": "????"})
+            history_count_df["??"] = history_count_df["????"].apply(lambda x: "?????" if x < 30 else "????")
+            st.dataframe(history_count_df.sort_values("????", ascending=False).head(150), use_container_width=True)
+        else:
+            st.info("??????????????")
+
+        if len(prediction_history) > 0 and {"attraction", "error"}.issubset(prediction_history.columns):
+            err_df = prediction_history[prediction_history["error"].notna()].copy()
+            if len(err_df) > 0:
+                err_summary = err_df.groupby("attraction").agg(
+                    error_count=("error", "count"),
+                    mean_error=("error", "mean"),
+                    mean_abs_error=("error", lambda s: s.abs().mean()),
+                ).reset_index().rename(columns={
+                    "attraction": "???????",
+                    "error_count": "????",
+                    "mean_error": "????",
+                    "mean_abs_error": "??????",
+                })
+                st.dataframe(err_summary.sort_values("????", ascending=False).head(150), use_container_width=True)
+            else:
+                st.info("?????????????")
+
+    with st.expander("??????????????????", expanded=False):
+        if len(history_df) > 0 and "attraction" in history_df.columns:
+            history_count_df = history_df.groupby("attraction").agg(
+                history_count=("wait_time", "count"),
+                history_days=("date", "nunique"),
+            ).reset_index().rename(columns={"attraction": "???????"})
+            if "source" in history_df.columns:
+                disneyreal_counts = (
+                    history_df[history_df["source"].astype(str).str.contains("disneyreal", case=False, na=False)]
+                    .groupby("attraction")["wait_time"].count()
+                    .reset_index()
+                    .rename(columns={"attraction": "???????", "wait_time": "????????????"})
+                )
+                history_count_df = history_count_df.merge(disneyreal_counts, on="???????", how="left")
+                history_count_df["????????????"] = history_count_df["????????????"].fillna(0).astype(int)
+            history_count_df = history_count_df.rename(columns={"history_count": "????", "history_days": "????"})
+            history_count_df["??"] = history_count_df["????"].apply(lambda x: "?????" if x < 30 else "????")
+            st.dataframe(history_count_df.sort_values("????", ascending=False).head(150), use_container_width=True)
+        else:
+            st.info("??????????????")
+
+        if len(prediction_history) > 0 and {"attraction", "error"}.issubset(prediction_history.columns):
+            err_df = prediction_history[prediction_history["error"].notna()].copy()
+            if len(err_df) > 0:
+                err_summary = err_df.groupby("attraction").agg(
+                    error_count=("error", "count"),
+                    mean_error=("error", "mean"),
+                    mean_abs_error=("error", lambda s: s.abs().mean()),
+                ).reset_index().rename(columns={
+                    "attraction": "???????",
+                    "error_count": "????",
+                    "mean_error": "????",
+                    "mean_abs_error": "??????",
+                })
+                st.dataframe(err_summary.sort_values("????", ascending=False).head(150), use_container_width=True)
+            else:
+                st.info("?????????????")
+
 
     with st.expander("混雑指数デバッグ", expanded=False):
         debug_df = pd.DataFrame([{
