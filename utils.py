@@ -1,5 +1,6 @@
 import re
 import sqlite3
+import time
 from datetime import date, datetime, timedelta
 from html import unescape
 from zoneinfo import ZoneInfo
@@ -103,6 +104,24 @@ PARK_CROWD_BASELINES = {
         "park_bias": 0.0,
         "score_offset": -2.0,
         "demand_scale": 0.12,
+    },
+}
+MAJOR_CROWD_BASELINES = {
+    "DisneySea": {
+        "avg_wait_normal": 90,
+        "max_wait_normal": 150,
+        "std_wait_normal": 35,
+        "park_bias": 0.4,
+        "score_offset": -3.1,
+        "demand_scale": 0.10,
+    },
+    "Disneyland": {
+        "avg_wait_normal": 70,
+        "max_wait_normal": 130,
+        "std_wait_normal": 30,
+        "park_bias": 0.0,
+        "score_offset": -3.5,
+        "demand_scale": 0.10,
     },
 }
 HOUR_PROFILE = {
@@ -304,6 +323,18 @@ def connect_db(db_name):
         max_major_wait REAL,
         open_major_count INTEGER,
         source TEXT
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS historical_import_logs (
+        imported_at TEXT,
+        park TEXT,
+        target_date TEXT,
+        source_url TEXT,
+        status TEXT,
+        message TEXT,
+        saved_count INTEGER
     )
     """)
 
@@ -807,6 +838,288 @@ def save_wait_times(cursor, conn, wait_df, temperature, rain_mm, park=None):
         conn.commit()
 
 
+DISNEYREAL_PARK_SLUGS = {
+    "DisneySea": "disneysea",
+    "Disneyland": "disneyland",
+}
+
+DISNEYREAL_ATTRACTION_NAME_MAP = {
+    "センターオブジアース": "Journey to the Center of the Earth",
+    "センター": "Journey to the Center of the Earth",
+    "タワーオブテラー": "Tower of Terror",
+    "タワテラ": "Tower of Terror",
+    "アナとエルサのフローズンジャーニー": "Anna and Elsa's Frozen Journey",
+    "アナ雪": "Anna and Elsa's Frozen Journey",
+    "ソアリン": "Soaring: Fantastic Flight",
+    "トイストーリーマニア": "Toy Story Mania!",
+    "トイマニ": "Toy Story Mania!",
+    "ラプンツェルのランタンフェスティバル": "Rapunzel's Lantern Festival",
+    "ピーターパンのネバーランドアドベンチャー": "Peter Pan's Never Land Adventure",
+    "インディジョーンズ": "Indiana Jones Adventure: Temple of the Crystal Skull",
+    "レイジングスピリッツ": "Raging Spirits",
+    "ニモ": "Nemo & Friends SeaRider",
+    "海底2万マイル": "20,000 Leagues Under the Sea",
+    "アクアトピア": "Aquatopia",
+    "タートルトーク": "Turtle Talk",
+    "マジックランプシアター": "Magic Lamp Theater",
+    "シンドバッド": "Sindbad's Storybook Voyage",
+    "美女と野獣": "Enchanted Tale of Beauty and the Beast",
+    "ベイマックス": "The Happy Ride with Baymax",
+    "モンスターズインク": "Monsters, Inc. Ride & Go Seek!",
+    "モンスターズ インク": "Monsters, Inc. Ride & Go Seek!",
+    "プーさん": "Pooh's Hunny Hunt",
+    "スプラッシュマウンテン": "Splash Mountain",
+    "スプラッシュ": "Splash Mountain",
+    "ビッグサンダーマウンテン": "Big Thunder Mountain",
+    "ビッグサンダー": "Big Thunder Mountain",
+    "ホーンテッドマンション": "Haunted Mansion",
+    "スター ツアーズ": "Star Tours: The Adventures Continue",
+    "スターツアーズ": "Star Tours: The Adventures Continue",
+    "カリブの海賊": "Pirates of the Caribbean",
+    "ジャングルクルーズ": "Jungle Cruise: Wildlife Expeditions",
+    "ウエスタンリバー鉄道": "Western River Railroad",
+    "スモールワールド": "“it’s a small world with Groot”",
+    "ピーターパン空の旅": "Peter Pan's Flight",
+    "空飛ぶダンボ": "Dumbo The Flying Elephant",
+    "キャッスルカルーセル": "Castle Carrousel",
+    "アリスのティーパーティー": "Alice's Tea Party",
+    "フィルハーマジック": "Mickey's PhilharMagic",
+    "ロジャーラビット": "Roger Rabbit's Car Toon Spin",
+    "ガジェット": "Gadget's Go Coaster",
+    "スティッチ": "Stitch Encounter",
+}
+
+
+def _normalize_disneyreal_attraction_name(name):
+    text = re.sub(r"\s+", "", str(name or ""))
+    text = text.replace("・", "").replace("！", "!").replace("　", "")
+    for key, value in DISNEYREAL_ATTRACTION_NAME_MAP.items():
+        if key.replace(" ", "") in text:
+            return value
+    return str(name or "").strip()
+
+
+def _disneyreal_history_url(park, target_date):
+    slug = DISNEYREAL_PARK_SLUGS.get(park, "disneyland")
+    d = target_date.date() if isinstance(target_date, datetime) else target_date
+    if d == datetime.now(JST).date():
+        return f"https://disneyreal.asumirai.info/realtime/{slug}-wait-today-ls.html"
+    return f"https://disneyreal.asumirai.info/realtime/{slug}-wait-{d.year}-{d.month}-{d.day}.html"
+
+
+def _fetch_text(url, timeout=12):
+    res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=timeout)
+    if not res.encoding or res.encoding.lower() in ("iso-8859-1", "ascii"):
+        res.encoding = res.apparent_encoding or "utf-8"
+    res.raise_for_status()
+    return res.text
+
+
+def fetch_disneyreal_history_calendar(park, start_date, end_date):
+    start_date = start_date.date() if isinstance(start_date, datetime) else start_date
+    end_date = end_date.date() if isinstance(end_date, datetime) else end_date
+    rows = []
+    current = start_date
+    while current <= end_date:
+        rows.append({
+            "park": park,
+            "target_date": current,
+            "url": _disneyreal_history_url(park, current),
+        })
+        current += timedelta(days=1)
+    return pd.DataFrame(rows)
+
+
+def _extract_disneyreal_image_attractions(html):
+    names = []
+    for alt in re.findall(r"<img[^>]+alt=['\"]([^'\"]+)['\"]", html, flags=re.I):
+        if "待ち時間" not in alt:
+            continue
+        body = re.sub(r"^\d{4}年\d{1,2}月\d{1,2}日[^の]*の", "", unescape(alt))
+        body = re.sub(r"の待ち時間.*$", "", body)
+        for part in re.split(r"\s+", body):
+            part = part.strip("、。 ")
+            if len(part) >= 2 and part not in ("東京ディズニーランド", "東京ディズニーシー"):
+                names.append(_normalize_disneyreal_attraction_name(part))
+    return sorted(set([x for x in names if x]))
+
+
+def fetch_disneyreal_daily_waits(park, target_date, url):
+    target_date = target_date.date() if isinstance(target_date, datetime) else target_date
+    try:
+        html = _fetch_text(url)
+    except Exception as exc:
+        return [], f"取得失敗: {exc}"
+
+    plain = re.sub(r"<script.*?</script>", " ", html, flags=re.S | re.I)
+    plain = re.sub(r"<style.*?</style>", " ", plain, flags=re.S | re.I)
+    plain = re.sub(r"<[^>]+>", "\n", plain)
+    plain = unescape(plain).replace("\u00a0", " ")
+    lines = [re.sub(r"\s+", " ", x).strip() for x in plain.splitlines() if re.sub(r"\s+", " ", x).strip()]
+
+    rows = []
+    headers = []
+    i = 0
+    time_re = re.compile(r"^\d{1,2}:\d{2}$")
+    skip_tokens = {"-", "休", "止", "案内終了", "終了", "平均", "平 均", "PP", "SP", ""}
+    while i < len(lines):
+        if lines[i] != "更新時間":
+            i += 1
+            continue
+        i += 1
+        headers = []
+        while i < len(lines) and not time_re.match(lines[i]) and lines[i] not in ("平 均", "平均", "終了"):
+            if not any(token in lines[i] for token in ("アトラクション", "待ち時間", "混雑状況")):
+                headers.append(_normalize_disneyreal_attraction_name(lines[i]))
+            i += 1
+        headers = [h for h in headers if h]
+        while i < len(lines):
+            line = lines[i]
+            if line in ("平 均", "平均", "終了") or line.startswith("###"):
+                break
+            if not time_re.match(line):
+                i += 1
+                continue
+            hour, minute = [int(x) for x in line.split(":")]
+            i += 1
+            values = []
+            while i < len(lines) and not time_re.match(lines[i]) and lines[i] not in ("平 均", "平均", "終了"):
+                values.append(lines[i])
+                i += 1
+                if len(values) >= len(headers):
+                    break
+            if not (OPEN_HOUR <= hour < CROWD_END_HOUR):
+                continue
+            dt = datetime.combine(target_date, datetime.min.time()).replace(hour=hour, minute=minute)
+            for attraction, value in zip(headers, values):
+                value = str(value).strip()
+                if value in skip_tokens or not re.fullmatch(r"\d{1,3}", value):
+                    continue
+                wait = int(value)
+                if wait <= 0:
+                    continue
+                rows.append({
+                    "datetime": dt.strftime("%Y-%m-%d %H:%M:%S"),
+                    "attraction": attraction,
+                    "wait_time": wait,
+                    "temperature": None,
+                    "rain": None,
+                    "is_open": 1,
+                    "park": park,
+                    "source": "disneyreal",
+                })
+        i += 1
+
+    if rows:
+        return rows, f"ディズニーリアルから{len(rows)}件取得"
+
+    image_names = _extract_disneyreal_image_attractions(html)
+    if image_names:
+        return [], f"数値表なし（画像表のみ）。対象候補: {len(image_names)}施設"
+    return [], "数値表なし"
+
+
+def _log_historical_import(cursor, conn, park, target_date, source_url, status, message, saved_count):
+    cursor.execute("""
+    INSERT INTO historical_import_logs
+    (imported_at, park, target_date, source_url, status, message, saved_count)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S"),
+        park,
+        str(target_date),
+        source_url,
+        status,
+        message,
+        int(saved_count or 0),
+    ))
+    conn.commit()
+
+
+def load_historical_import_logs(conn):
+    try:
+        df = pd.read_sql_query("SELECT * FROM historical_import_logs", conn)
+    except Exception:
+        return pd.DataFrame()
+    if len(df) > 0:
+        df["imported_at"] = pd.to_datetime(df["imported_at"])
+        df["target_date"] = pd.to_datetime(df["target_date"]).dt.date
+    return df
+
+
+def _historical_date_imported(conn, park, target_date):
+    logs = load_historical_import_logs(conn)
+    if len(logs) == 0:
+        return False
+    done = logs[
+        (logs.get("park", "") == park)
+        & (logs.get("target_date", "") == target_date)
+        & (logs.get("status", "").isin(["success", "empty", "skipped"]))
+    ]
+    return len(done) > 0
+
+
+def save_historical_wait_rows(cursor, conn, rows, park, source_url):
+    if not rows:
+        return 0
+    saved = 0
+    for row in rows:
+        cursor.execute(
+            "SELECT 1 FROM wait_times WHERE datetime = ? AND attraction = ? LIMIT 1",
+            (row["datetime"], row["attraction"]),
+        )
+        if cursor.fetchone():
+            continue
+        cursor.execute("""
+        INSERT INTO wait_times
+        (datetime, attraction, wait_time, temperature, rain, is_open, park, source)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            row["datetime"],
+            row["attraction"],
+            int(row["wait_time"]),
+            row.get("temperature"),
+            row.get("rain"),
+            int(row.get("is_open", 1)),
+            park,
+            source_url,
+        ))
+        saved += 1
+    conn.commit()
+    return saved
+
+
+def import_disneyreal_history(cursor, conn, park, start_date, end_date, max_days=None):
+    calendar_df = fetch_disneyreal_history_calendar(park, start_date, end_date)
+    if max_days is not None:
+        calendar_df = calendar_df.tail(int(max_days))
+    total_saved = 0
+    processed = 0
+    skipped = 0
+    results = []
+    for _, item in calendar_df.iterrows():
+        target_date = item["target_date"]
+        url = item["url"]
+        if _historical_date_imported(conn, park, target_date):
+            skipped += 1
+            results.append({"date": target_date, "status": "skipped", "saved_count": 0, "message": "取得済みのためスキップ"})
+            continue
+        rows, message = fetch_disneyreal_daily_waits(park, target_date, url)
+        saved_count = save_historical_wait_rows(cursor, conn, rows, park, url)
+        status = "success" if saved_count > 0 else "empty"
+        _log_historical_import(cursor, conn, park, target_date, url, status, message, saved_count)
+        total_saved += saved_count
+        processed += 1
+        results.append({"date": target_date, "status": status, "saved_count": saved_count, "message": message})
+        time.sleep(0.35)
+    return {
+        "processed_days": processed,
+        "skipped_days": skipped,
+        "saved_count": total_saved,
+        "results": results,
+    }
+
+
 def save_prediction_rows(cursor, conn, pred_df, attraction_name):
     created_at = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -1075,14 +1388,13 @@ def update_daily_crowd_feedback(cursor, conn, history_df, settings, park=None):
         if stats["sample_count"] < 24 or stats["open_count"] < 3:
             continue
 
-        actual_index = get_crowd_index_for_park(
+        actual_index = get_crowd_index_from_major_attractions(
             park or settings.get("park", "DisneySea"),
             stats["avg_wait"],
             stats["max_wait"],
-            stats["top_quartile_wait"],
             stats["std_wait"],
             stats["open_count"],
-            stats["closed_count"],
+            get_dpa_score(stats["avg_wait"], stats["max_wait"]),
             0,
             0,
             0,
@@ -2910,6 +3222,91 @@ def get_all_attraction_crowd_stats(valid_all_df=None, history_df=None, target_da
         "source": source,
     }
 
+
+def get_major_attraction_crowd_stats(target_df=None, history_df=None, target_date=None):
+    stats = get_all_attraction_crowd_stats(target_df, history_df, target_date)
+    return {
+        "major_avg_wait": stats["avg_wait"],
+        "major_max_wait": stats["max_wait"],
+        "major_std_wait": stats["std_wait"],
+        "major_count": stats["open_count"],
+        "sample_count": stats["sample_count"],
+        "attraction_names": stats.get("attraction_names", []),
+        "source": stats.get("source", "人気主要アトラクション"),
+    }
+
+
+def get_crowd_index_from_major_attractions(
+    park,
+    major_avg_wait,
+    major_max_wait,
+    major_std_wait,
+    major_count,
+    dpa_score,
+    demand_bonus,
+    weather_score,
+    feedback_error,
+    return_debug=False,
+):
+    baseline = MAJOR_CROWD_BASELINES.get(park, MAJOR_CROWD_BASELINES["DisneySea"])
+    avg_ratio = major_avg_wait / baseline["avg_wait_normal"] if baseline["avg_wait_normal"] else 0
+    max_ratio = major_max_wait / baseline["max_wait_normal"] if baseline["max_wait_normal"] else 0
+    std_ratio = major_std_wait / baseline["std_wait_normal"] if baseline["std_wait_normal"] else 0
+    avg_ratio_clipped = float(np.clip(avg_ratio, 0, 2.2))
+    max_ratio_clipped = float(np.clip(max_ratio, 0, 2.0))
+    std_ratio_clipped = float(np.clip(std_ratio, 0, 2.0))
+    base_score = (
+        avg_ratio_clipped * 4.0
+        + max_ratio_clipped * 2.2
+        + std_ratio_clipped * 0.8
+    )
+    dpa_adjustment = min(0.8, max(0, float(dpa_score or 0) * 0.25))
+    demand_adjustment = min(0.8, max(0, float(demand_bonus or 0) * baseline.get("demand_scale", 0.10)))
+    weather_adjustment = max(-0.3, min(0.3, float(weather_score or 0) * 0.15))
+    feedback_adjustment = max(-0.7, min(0.7, float(feedback_error or 0) * 0.03))
+    corrected_score = (
+        base_score
+        + baseline.get("score_offset", 0.0)
+        + baseline.get("park_bias", 0.0)
+        + dpa_adjustment
+        + demand_adjustment
+        + weather_adjustment
+        + feedback_adjustment
+    )
+    if major_count and major_count < 3:
+        corrected_score = min(corrected_score, 4.9)
+    final_score = round(min(10, max(1, corrected_score)), 1)
+    debug = {
+        "park": park,
+        "target": "人気主要アトラクション",
+        "major_avg_wait": round(float(major_avg_wait or 0), 2),
+        "major_max_wait": round(float(major_max_wait or 0), 2),
+        "major_std_wait": round(float(major_std_wait or 0), 2),
+        "major_count": int(major_count or 0),
+        "avg_ratio": round(float(avg_ratio), 3),
+        "max_ratio": round(float(max_ratio), 3),
+        "std_ratio": round(float(std_ratio), 3),
+        "avg_ratio_clipped": round(float(avg_ratio_clipped), 3),
+        "max_ratio_clipped": round(float(max_ratio_clipped), 3),
+        "std_ratio_clipped": round(float(std_ratio_clipped), 3),
+        "park_bias": baseline.get("park_bias", 0.0),
+        "score_offset": baseline.get("score_offset", 0.0),
+        "dpa_score": round(float(dpa_score or 0), 2),
+        "dpa_adjustment": round(float(dpa_adjustment), 3),
+        "demand_bonus": round(float(demand_bonus or 0), 2),
+        "demand_adjustment": round(float(demand_adjustment), 3),
+        "weather_score": round(float(weather_score or 0), 2),
+        "weather_adjustment": round(float(weather_adjustment), 3),
+        "feedback_error": round(float(feedback_error or 0), 2),
+        "feedback_adjustment": round(float(feedback_adjustment), 3),
+        "base_score": round(float(base_score), 3),
+        "corrected_score": round(float(corrected_score), 3),
+        "final_crowd_index": final_score,
+        "baseline": park,
+        "warnings": ["人気主要アトラクションの有効データが少なめです。"] if major_count and major_count < 3 else [],
+    }
+    return (final_score, debug) if return_debug else final_score
+
 def get_prediction_crowd_stats(wait_prediction_df):
     if wait_prediction_df is None or len(wait_prediction_df) == 0 or "Predicted Wait" not in wait_prediction_df.columns:
         return {
@@ -3002,17 +3399,17 @@ def predict_crowd_index_for_date(
     feedback_error = get_feedback_error(prediction_history, GLOBAL_PREDICTION_NAME)
     daily_feedback = get_daily_crowd_feedback_error(daily_prediction_history)
 
-    crowd_index = get_crowd_index_for_park(
+    dpa_score = get_dpa_score(major_stats["avg_wait"], major_stats["max_wait"])
+    crowd_index = get_crowd_index_from_major_attractions(
         park or settings.get("park", "DisneySea"),
         major_stats["avg_wait"],
         major_stats["max_wait"],
-        major_stats["top_quartile_wait"],
         major_stats["std_wait"],
         major_stats["open_count"],
-        major_stats["closed_count"],
+        dpa_score,
+        target_bonus,
         weather_score,
         feedback_error + daily_feedback,
-        target_bonus,
     )
 
     major_avg = float(major_df["Predicted Wait"].mean()) if len(major_df) > 0 else 0
@@ -4257,7 +4654,7 @@ def make_x_post_summary(
     text = (
         f"{title}\n"
         f"混雑指数{format_crowd_index(crowd_index)}/10（{level_text}）。\n"
-        f"全体平均は約{stats['avg_wait']:.0f}分、人気主要アトラクション平均は約{major_avg:.0f}分。ピークは{peak_hour}時台で、{mood}。\n"
+        f"人気主要アトラクション平均は約{major_avg:.0f}分、全体平均は約{stats['avg_wait']:.0f}分。ピークは{peak_hour}時台で、{mood}。\n"
         f"{aim_text}人気施設は午前〜昼過ぎに伸びやすいので、夜の下がる時間も活用がおすすめです。"
     )
     if _is_broken_show_text(text):
