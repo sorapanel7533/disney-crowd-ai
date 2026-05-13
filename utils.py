@@ -3302,8 +3302,8 @@ def get_area_prediction_baseline(history_df, park, attraction, target_hour, targ
     df = prepare_prediction_history(history_df, park)
     if len(df) == 0:
         return None
-    area = classify_attraction_area(park, attraction)
-    df["area"] = df["attraction"].apply(lambda name: classify_attraction_area(park, name))
+    area = classify_attraction_area(attraction, park)
+    df["area"] = df["attraction"].apply(lambda name: classify_attraction_area(name, park))
     slot = int(target_hour) + (int(target_minute) // 15) * 15 / 60
     rows = df[(df["area"] == area) & (df["time_slot"] == slot)]
     if len(rows) == 0:
@@ -3394,7 +3394,7 @@ def predict_wait_times_for_date(
             attractions = _prediction_attractions(history_df, settings, current_target_df)
     else:
         attractions = [str(a) for a in attraction_list if str(a).strip()]
-    model_df = prepare_prediction_history(history_df, None, attractions)
+    model_df = prepare_prediction_history(history_df, park_name, attractions)
     today = datetime.now(JST).date()
     now = datetime.now(JST)
     target_bonus, target_reasons = get_calendar_bonus(target_date, ticket_price)
@@ -3409,6 +3409,10 @@ def predict_wait_times_for_date(
         same_weekday = model_df[model_df["weekday"] == target_date.weekday()]
         same_month = model_df[model_df["month"] == target_date.month]
         overall = model_df["wait_time"].median()
+        area_model_df = model_df.copy()
+        area_model_df["area"] = area_model_df["attraction"].apply(lambda name: classify_attraction_area(name, park_name))
+        area_time = area_model_df.groupby(["area", "time_slot"])["wait_time"].median()
+        area_hour = area_model_df.groupby(["area", "hour"])["wait_time"].median()
     else:
         time_all = pd.Series(dtype=float)
         hour_all = pd.Series(dtype=float)
@@ -3417,6 +3421,8 @@ def predict_wait_times_for_date(
         attraction_hour = pd.Series(dtype=float)
         same_weekday = pd.DataFrame()
         same_month = pd.DataFrame()
+        area_time = pd.Series(dtype=float)
+        area_hour = pd.Series(dtype=float)
         overall = 45
 
     current_map = {}
@@ -3438,8 +3444,13 @@ def predict_wait_times_for_date(
             hour_specific = attraction_hour.get((attraction, hour), None) if len(attraction_hour) > 0 else None
             hour_base = hour_all.get(hour, None) if len(hour_all) > 0 else None
             time_base = time_all.get(time_value, None) if len(time_all) > 0 else None
-            area_base = get_area_prediction_baseline(model_df, park_name, attraction, hour, minute)
-            park_base = get_park_time_baseline(model_df, hour, minute)
+            attraction_area = classify_attraction_area(attraction, park_name)
+            area_base = area_time.get((attraction_area, time_value), None) if len(area_time) > 0 else None
+            if area_base is None or pd.isna(area_base):
+                area_base = area_hour.get((attraction_area, hour), None) if len(area_hour) > 0 else None
+            park_base = time_base
+            if park_base is None or pd.isna(park_base):
+                park_base = hour_base
 
             weekday_value = None
             if len(same_weekday) > 0:
@@ -3809,6 +3820,7 @@ def predict_crowd_index_for_date(
     park_hours_df=None,
     park=None,
     daily_weather=None,
+    attraction_list=None,
 ):
     wait_df = predict_wait_times_for_date(
         history_df,
@@ -3819,6 +3831,7 @@ def predict_crowd_index_for_date(
         prediction_history,
         ticket_price,
         current_target_df,
+        attraction_list=attraction_list,
     )
 
     stats = get_prediction_crowd_stats(wait_df)
@@ -3921,6 +3934,7 @@ def make_week_forecast(
                 event_signals,
                 park_hours_df,
                 park,
+                attraction_list=settings.get("rides", []),
             )
             save_locked_daily_prediction(cursor, conn, d, crowd_index)
             prediction_source = "新規固定保存" if conn is not None else "一時予測"
