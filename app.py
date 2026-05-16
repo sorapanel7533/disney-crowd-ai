@@ -581,24 +581,71 @@ if manual_data_refresh:
     st.session_state["run_heavy_data_refresh"] = True
     st.rerun()
 
-ticket_price_map, ticket_map_source = cached_fetch_ticket_prices()
-
-ticket_price, ticket_source = get_ticket_price_from_castel(
-    datetime.now(JST),
-    ticket_price_map
-)
-
-today_bonus, today_reasons = get_calendar_bonus(
-    datetime.now(JST),
-    ticket_price
-)
-temperature, rain_mm, weather_text, hourly_weather, daily_weather = get_weather()
-
 conn, cursor = connect_db(settings["db"])
 run_heavy_data_refresh = (
     display_mode == "データ管理"
     or bool(st.session_state.pop("run_heavy_data_refresh", False))
 )
+
+data_fetch_logs = load_data_fetch_logs(conn)
+weather_snapshots = load_weather_snapshots(conn)
+ticket_price_snapshots = load_ticket_price_snapshots(conn)
+park_hours_df = load_park_hours(conn)
+event_signals = load_event_signals(conn)
+show_schedules = load_show_schedules(conn)
+show_wait_context = load_show_wait_context(conn)
+historical_import_logs = load_historical_import_logs(conn)
+
+ticket_price_map = {}
+ticket_map_source = "初期表示では外部取得を行いません"
+if run_heavy_data_refresh:
+    try:
+        ticket_price_map, ticket_map_source = cached_fetch_ticket_prices()
+    except Exception as exc:
+        st.warning(f"チケット価格の取得に失敗しました。推定価格で表示します: {exc}")
+
+ticket_price, ticket_source = get_ticket_price_from_castel(
+    datetime.now(JST),
+    ticket_price_map
+)
+if not run_heavy_data_refresh and len(ticket_price_snapshots) > 0 and "price" in ticket_price_snapshots.columns:
+    today_ticket_rows = ticket_price_snapshots.copy()
+    if "target_date" in today_ticket_rows.columns:
+        today_ticket_rows = today_ticket_rows[today_ticket_rows["target_date"].astype(str) == str(datetime.now(JST).date())]
+    if "park" in today_ticket_rows.columns:
+        today_ticket_rows = today_ticket_rows[today_ticket_rows["park"].astype(str) == park]
+    if len(today_ticket_rows) > 0:
+        latest_ticket_row = today_ticket_rows.sort_values("observed_at").tail(1).iloc[0]
+        if not pd.isna(latest_ticket_row.get("price")):
+            ticket_price = int(latest_ticket_row.get("price"))
+            ticket_source = "保存済みチケット価格"
+
+today_bonus, today_reasons = get_calendar_bonus(
+    datetime.now(JST),
+    ticket_price
+)
+
+temperature = 0
+rain_mm = 0
+weather_text = "未取得"
+hourly_weather = pd.DataFrame()
+daily_weather = pd.DataFrame()
+if not run_heavy_data_refresh and len(weather_snapshots) > 0:
+    today_weather_rows = weather_snapshots.copy()
+    if "target_date" in today_weather_rows.columns:
+        today_weather_rows = today_weather_rows[today_weather_rows["target_date"].astype(str) == str(datetime.now(JST).date())]
+    if "park" in today_weather_rows.columns:
+        today_weather_rows = today_weather_rows[today_weather_rows["park"].astype(str) == park]
+    if len(today_weather_rows) > 0:
+        latest_weather_row = today_weather_rows.sort_values("observed_at").tail(1).iloc[0]
+        temperature = float(latest_weather_row.get("temperature", 0) or 0)
+        rain_mm = float(latest_weather_row.get("rain", 0) or 0)
+        weather_text = safe_display_text(latest_weather_row.get("weather_text", "保存済み"), "保存済み")
+if run_heavy_data_refresh:
+    try:
+        temperature, rain_mm, weather_text, hourly_weather, daily_weather = get_weather()
+    except Exception as exc:
+        st.warning(f"天気の取得に失敗しました。保存済みまたは初期値で表示します: {exc}")
 
 auto_context_results = []
 if run_heavy_data_refresh:
@@ -623,24 +670,25 @@ if run_heavy_data_refresh:
             )
         except Exception as exc:
             st.warning(f"自動データ取得を完了できませんでした: {exc}")
-data_fetch_logs = load_data_fetch_logs(conn)
-weather_snapshots = load_weather_snapshots(conn)
-ticket_price_snapshots = load_ticket_price_snapshots(conn)
-park_hours_df = load_park_hours(conn)
-event_signals = load_event_signals(conn)
-show_schedules = load_show_schedules(conn)
-show_wait_context = load_show_wait_context(conn)
-historical_import_logs = load_historical_import_logs(conn)
+        data_fetch_logs = load_data_fetch_logs(conn)
+        weather_snapshots = load_weather_snapshots(conn)
+        ticket_price_snapshots = load_ticket_price_snapshots(conn)
+        park_hours_df = load_park_hours(conn)
+        event_signals = load_event_signals(conn)
+        show_schedules = load_show_schedules(conn)
+        show_wait_context = load_show_wait_context(conn)
+        historical_import_logs = load_historical_import_logs(conn)
 
-try:
-    all_df, target_df = fetch_wait_times(settings)
-except Exception as exc:
-    st.warning(f"現在の待ち時間データを取得できませんでした。保存済みデータを使って表示を続けます: {exc}")
-    all_df = pd.DataFrame(columns=["Attraction", "Wait", "Open"])
-    target_df = pd.DataFrame(columns=["Attraction", "Wait", "Open"])
+all_df = pd.DataFrame(columns=["Attraction", "Wait", "Open"])
+target_df = pd.DataFrame(columns=["Attraction", "Wait", "Open"])
+if run_heavy_data_refresh:
+    try:
+        all_df, target_df = fetch_wait_times(settings)
+    except Exception as exc:
+        st.warning(f"現在の待ち時間データを取得できませんでした。保存済みデータを使って表示を続けます: {exc}")
 
 if all_df.empty:
-    st.warning("現在のアトラクションデータが空です。保存済みデータを優先して表示します。")
+    st.info("初期表示では外部の待ち時間取得を行いません。保存済み履歴と予測を使って表示しています。最新化する場合は「今すぐ更新」を押してください。")
 
 if run_heavy_data_refresh and len(all_df) > 0:
     try:
