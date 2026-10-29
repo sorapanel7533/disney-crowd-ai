@@ -1,0 +1,43 @@
+{
+  "environment": "Windows / Python 3.12 / single AppTest process; UI uses captured real API response and isolated DB; external weather/price stubbed; server-side render only",
+  "parks": {
+    "DisneySea": {
+      "actual_API_seconds": 0.3753,
+      "received_rides": 36,
+      "DB_read_seconds": 0.0148,
+      "one_day_forecast_seconds": 0.3079,
+      "forecast_rows": 1728,
+      "first_server_render_seconds": 5.1046,
+      "view_switch_seconds": {
+        "ダッシュボード": 3.6385,
+        "全アトラクション": 0.2739,
+        "アトラクション別予測": 0.9026,
+        "DPA/PP予測": 0.2534,
+        "日付指定予測": 0.6667,
+        "回り方プランナー": 0.2427,
+        "データ管理": 2.7408
+      }
+    },
+    "Disneyland": {
+      "actual_API_seconds": 0.3335,
+      "received_rides": 37,
+      "DB_read_seconds": 0.0043,
+      "one_day_forecast_seconds": 0.2901,
+      "forecast_rows": 1776,
+      "first_server_render_seconds": 3.6829,
+      "view_switch_seconds": {
+        "ダッシュボード": 3.6218,
+        "全アトラクション": 0.2681,
+        "アトラクション別予測": 0.8904,
+        "DPA/PP予測": 0.2542,
+        "日付指定予測": 0.5926,
+        "回り方プランナー": 0.2245,
+        "データ管理": 2.5988
+      }
+    }
+  },
+  "memory": {
+    "working_set_MiB": 237.8,
+    "peak_MiB": 264.4
+  }
+}
