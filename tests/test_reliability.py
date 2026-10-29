@@ -240,3 +240,18 @@ def test_unobserved_forecast_expires_without_fabricated_actual(db):
     r.save_predictions(db,prediction(),'a',generated_at='2026-10-30T12:00:00Z')
     r.evaluate_predictions(db,[],now='2026-11-10T00:00:00Z')
     assert db.execute('SELECT predicted_wait,actual_wait,error,evaluation_status FROM predictions').fetchone()==(80,None,None,'insufficient_actual')
+
+
+def test_status_diagnostics_use_saved_observations(db):
+    frame=r.parse_queue(fixture(),'Disneyland')
+    r.save_observations(db,frame,20,0,'Disneyland')
+    loaded=utils.load_attraction_status_snapshots(db)
+    assert len(loaded)==37
+    assert loaded.attraction.nunique()==37
+    assert loaded.is_open.eq(0).all()
+
+
+def test_route_discloses_model_imputation():
+    frame=pd.DataFrame([{'Attraction':'a','Hour':9,'Minute':0,'Predicted Wait':10,'理由':'履歴不足：パーク傾向で補完'}])
+    route,meta=optimize(frame,['a'],'09:00','12:00')
+    assert meta['completed_count']==1 and meta['filled_attractions']==['a']

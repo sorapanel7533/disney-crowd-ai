@@ -81,6 +81,8 @@ def optimize(frame, selected, start, end, area_for=lambda a:'', closed=()):
         if score < best_score:
             best,best_score=value,score
     rows,total,finish,warnings,skipped,filled=best
+    if '理由' in frame and 'Attraction' in frame:
+        filled=sorted(set(frame.loc[frame.Attraction.isin(selected)&frame['理由'].astype(str).str.contains('補完',na=False),'Attraction']))
     return pd.DataFrame(rows), {'total_wait':round(total,1),'end_time':label(finish),
         'message':'体験完了数を優先し、予測待ち時間を比較。移動5/12分・体験8〜20分は推定です。',
         'warnings':warnings,'skipped':skipped,'filled_attractions':filled,'completed_count':len(rows),

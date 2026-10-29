@@ -1756,6 +1756,7 @@ elif display_mode == "回り方プランナー":
     selected_route_attractions = st.multiselect(
         "行きたいアトラクション",
         attraction_choices,
+        format_func=reliable.japanese_name,
         default=attraction_choices[:3] if len(attraction_choices) >= 3 else attraction_choices,
         key="route_attractions"
     )
@@ -1796,7 +1797,7 @@ elif display_mode == "回り方プランナー":
         if route_meta.get("skipped"):
             st.warning("時間内に回れない候補: " + " / ".join(route_meta["skipped"]))
         if route_meta.get("filled_attractions"):
-            st.info("予測データ不足のため平均値で補完: " + " / ".join(route_meta["filled_attractions"]))
+            st.warning("施設固有の履歴が不足し、エリア・パーク傾向から参考補完: " + " / ".join(reliable.japanese_name(a) for a in route_meta["filled_attractions"]))
         if route_meta.get("warnings"):
             with st.expander("注意点", expanded=False):
                 for warning in route_meta["warnings"]:

@@ -1767,6 +1767,11 @@ def save_attraction_status_snapshots(cursor, conn, park, all_df, major_rides):
 def load_attraction_status_snapshots(conn):
     try:
         df = pd.read_sql_query("SELECT * FROM attraction_status_snapshots", conn)
+        observations = pd.read_sql_query("""SELECT datetime AS observed_at,
+            substr(datetime,1,10) AS target_date,park,attraction,wait_time,is_open,source
+            FROM wait_times WHERE observed_at_utc IS NOT NULL AND quality='valid'""",conn)
+        if len(observations):
+            df = pd.concat([df,observations],ignore_index=True) if len(df) else observations
     except Exception:
         return pd.DataFrame()
 
@@ -1795,22 +1800,21 @@ def get_attraction_status_summary(status_df, settings):
             "説明": "今日の営業状態がまだ保存されていません。"
         }])
 
-    latest_time = today_df["observed_at"].max()
-    latest_df = today_df[today_df["observed_at"] == latest_time]
+    latest_df = today_df.sort_values('observed_at').drop_duplicates('attraction',keep='last')
     major_df = latest_df[latest_df["attraction"].isin(settings["rides"])]
     major_closed = int((major_df["is_open"] == 0).sum()) if len(major_df) > 0 else 0
     all_closed = int((latest_df["is_open"] == 0).sum())
 
     return pd.DataFrame([
         {
-            "項目": "人気主要アトラクション休止数",
+            "項目": "主要5施設の休止・閉園状態数",
             "状態": f"{major_closed}件",
-            "説明": "人気主要5施設内の休止が多いと、他施設へ待ち時間が集中しやすくなります。"
+            "説明": "各施設の最新報告。閉園時間帯を含み、恒常的な運休とは限りません。"
         },
         {
-            "項目": "全体休止数",
+            "項目": "全施設の休止・閉園状態数",
             "状態": f"{all_closed}件",
-            "説明": "全体の休止が多い日は、通常の曜日パターンより待ち時間が上振れしやすくなります。"
+            "説明": "提供元が営業中ではないと報告した施設数。閉園と個別運休の区別は全体の営業案内も確認してください。"
         },
     ])
 
@@ -3681,7 +3685,7 @@ def format_route_plan_cards(route_df):
     for _, row in route_df.iterrows():
         html.append(
             "<div class='ios-list-row'>"
-            f"<div><div class='ios-list-title'>{int(row['順番'])}. {row['開始時刻']} {row['Attraction']}</div>"
+            f"<div><div class='ios-list-title'>{int(row['順番'])}. {row['開始時刻']} {reliable.japanese_name(row['Attraction'])}</div>"
             f"<div class='ios-list-detail'>移動・体験込み 約{row['移動・体験込み所要']:.0f}分</div></div>"
             f"<div class='ios-list-value'>{row['予測待ち時間']:.0f}分</div>"
             "</div>"
