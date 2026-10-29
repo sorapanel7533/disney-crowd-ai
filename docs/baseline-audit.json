@@ -1,0 +1,2837 @@
+{
+  "source": {
+    "app.py": {
+      "lines": 2551,
+      "functions": [
+        {
+          "name": "cached_fetch_ticket_prices",
+          "line": 117,
+          "end": 118,
+          "calls": [
+            "fetch_ticket_prices",
+            "st.cache_data"
+          ]
+        },
+        {
+          "name": "cached_fetch_urtrip_dpa_sellouts",
+          "line": 122,
+          "end": 123,
+          "calls": [
+            "fetch_urtrip_dpa_sellouts",
+            "st.cache_data"
+          ]
+        },
+        {
+          "name": "clean_text",
+          "line": 410,
+          "end": 413,
+          "calls": [
+            "isinstance",
+            "safe_display_text"
+          ]
+        },
+        {
+          "name": "clean_records",
+          "line": 416,
+          "end": 423,
+          "calls": [
+            "clean_records",
+            "clean_text",
+            "isinstance",
+            "records.items",
+            "str"
+          ]
+        },
+        {
+          "name": "clean_dataframe",
+          "line": 426,
+          "end": 433,
+          "calls": [
+            "df.copy",
+            "isinstance",
+            "len",
+            "out.select_dtypes",
+            "out[col].apply",
+            "safe_display_text",
+            "str"
+          ]
+        },
+        {
+          "name": "graph_ylim",
+          "line": 438,
+          "end": 450,
+          "calls": [
+            "int",
+            "len",
+            "max",
+            "pd.isna"
+          ]
+        },
+        {
+          "name": "compact_card_grid",
+          "line": 454,
+          "end": 464,
+          "calls": [
+            "''.join",
+            "escape",
+            "html.append",
+            "st.markdown",
+            "str"
+          ]
+        },
+        {
+          "name": "ios_list_card",
+          "line": 467,
+          "end": 484,
+          "calls": [
+            "''.join",
+            "escape",
+            "html.append",
+            "row.get",
+            "st.markdown",
+            "str"
+          ]
+        },
+        {
+          "name": "render_crowd_hero",
+          "line": 487,
+          "end": 507,
+          "calls": [
+            "escape",
+            "format_crowd_index",
+            "st.markdown",
+            "str"
+          ]
+        },
+        {
+          "name": "crowd_level_label",
+          "line": 510,
+          "end": 520,
+          "calls": [
+            "float"
+          ]
+        },
+        {
+          "name": "safe_sort_head",
+          "line": 523,
+          "end": 531,
+          "calls": [
+            "df.copy",
+            "display_df.head",
+            "display_df.sort_values",
+            "len",
+            "pd.DataFrame"
+          ]
+        },
+        {
+          "name": "render_segmented_choice",
+          "line": 534,
+          "end": 558,
+          "calls": [
+            "clean_options.index",
+            "hasattr",
+            "st.radio",
+            "st.rerun",
+            "st.segmented_control",
+            "str",
+            "str(x).strip"
+          ]
+        },
+        {
+          "name": "filter_crowd_hours",
+          "line": 561,
+          "end": 569,
+          "calls": [
+            "df[(df['hour'] >= OPEN_HOUR) & (df['hour'] < CROWD_END_HOUR)].copy",
+            "len"
+          ]
+        }
+      ],
+      "duplicate_functions": []
+    },
+    "utils.py": {
+      "lines": 5232,
+      "functions": [
+        {
+          "name": "is_crowd_hour",
+          "line": 143,
+          "end": 144,
+          "calls": []
+        },
+        {
+          "name": "is_japanese_holiday",
+          "line": 147,
+          "end": 151,
+          "calls": [
+            "jpholiday.is_holiday"
+          ]
+        },
+        {
+          "name": "filter_crowd_history",
+          "line": 154,
+          "end": 170,
+          "calls": [
+            "df.copy",
+            "filtered_df[(filtered_df['hour'] >= OPEN_HOUR) & (filtered_df['hour'] < CROWD_END_HOUR)].copy",
+            "len",
+            "pd.to_datetime"
+          ]
+        },
+        {
+          "name": "connect_db",
+          "line": 173,
+          "end": 387,
+          "calls": [
+            "conn.commit",
+            "conn.cursor",
+            "cursor.execute",
+            "cursor.fetchall",
+            "sqlite3.connect"
+          ]
+        },
+        {
+          "name": "get_weather",
+          "line": 390,
+          "end": 431,
+          "calls": [
+            "current.get",
+            "data.get",
+            "len",
+            "pd.DataFrame",
+            "pd.to_datetime",
+            "requests.get",
+            "res.json"
+          ]
+        },
+        {
+          "name": "fetch_wait_times",
+          "line": 434,
+          "end": 458,
+          "calls": [
+            "all_df['Attraction'].isin",
+            "all_df[all_df['Attraction'].isin(settings['rides'])].copy",
+            "all_results.append",
+            "pd.DataFrame",
+            "requests.get",
+            "response.json"
+          ]
+        },
+        {
+          "name": "get_valid_open_df",
+          "line": 461,
+          "end": 469,
+          "calls": [
+            "df[(df['Open'] == True) & (df['Wait'] > 0)].copy"
+          ]
+        },
+        {
+          "name": "fetch_castel_ticket_prices",
+          "line": 472,
+          "end": 534,
+          "calls": [
+            "datetime",
+            "datetime(current_year, current_month, pending_day).date",
+            "day_match.group",
+            "int",
+            "month_match.group",
+            "plain.split",
+            "price_match.group",
+            "re.match",
+            "re.search",
+            "re.sub",
+            "requests.get",
+            "unescape",
+            "x.strip"
+          ]
+        },
+        {
+          "name": "fetch_official_ticket_prices",
+          "line": 537,
+          "end": 616,
+          "calls": [
+            "date",
+            "int",
+            "month_queue.pop",
+            "plain.splitlines",
+            "price_match.group",
+            "price_match.group(1).replace",
+            "re.findall",
+            "re.fullmatch",
+            "re.search",
+            "re.sub",
+            "requests.get",
+            "res.raise_for_status",
+            "unescape",
+            "x.strip",
+            "year_match.group"
+          ]
+        },
+        {
+          "name": "fetch_ticket_prices",
+          "line": 619,
+          "end": 626,
+          "calls": [
+            "fetch_castel_ticket_prices",
+            "fetch_official_ticket_prices"
+          ]
+        },
+        {
+          "name": "get_ticket_price_from_castel",
+          "line": 629,
+          "end": 635,
+          "calls": [
+            "estimate_ticket_price",
+            "isinstance",
+            "target_date.date"
+          ]
+        },
+        {
+          "name": "estimate_ticket_price",
+          "line": 638,
+          "end": 668,
+          "calls": [
+            "d.weekday",
+            "is_japanese_holiday",
+            "isinstance",
+            "max",
+            "target_date.date"
+          ]
+        },
+        {
+          "name": "get_ticket_bonus",
+          "line": 671,
+          "end": 694,
+          "calls": [
+            "reasons.append"
+          ]
+        },
+        {
+          "name": "get_calendar_bonus",
+          "line": 697,
+          "end": 782,
+          "calls": [
+            "d.weekday",
+            "get_ticket_bonus",
+            "is_japanese_holiday",
+            "isinstance",
+            "reasons.append",
+            "reasons.extend",
+            "target_date.date",
+            "timedelta"
+          ]
+        },
+        {
+          "name": "load_history",
+          "line": 785,
+          "end": 807,
+          "calls": [
+            "history_df['wait_time'].notna",
+            "history_df[history_df['wait_time'].notna() & (history_df['wait_time'] > 0) & (history_df['wait_time'] <= 300)].copy",
+            "len",
+            "pd.read_sql_query",
+            "pd.to_datetime",
+            "pd.to_numeric",
+            "pd.to_numeric(history_df['is_open'], errors='coerce').fillna",
+            "pd.to_numeric(history_df['is_open'], errors='coerce').fillna(1).astype"
+          ]
+        },
+        {
+          "name": "load_prediction_history",
+          "line": 810,
+          "end": 826,
+          "calls": [
+            "len",
+            "pd.read_sql_query",
+            "pd.to_datetime",
+            "prediction_df['attraction'].fillna"
+          ]
+        },
+        {
+          "name": "save_wait_times",
+          "line": 829,
+          "end": 853,
+          "calls": [
+            "bool",
+            "conn.commit",
+            "cursor.execute",
+            "datetime.now",
+            "datetime.now(JST).strftime",
+            "int",
+            "len",
+            "pd.isna",
+            "pd.to_numeric",
+            "row.get",
+            "str",
+            "wait_df.iterrows"
+          ]
+        },
+        {
+          "name": "is_mojibake_text",
+          "line": 871,
+          "end": 883,
+          "calls": [
+            "any",
+            "re.search",
+            "str",
+            "str(text).strip"
+          ]
+        },
+        {
+          "name": "safe_display_text",
+          "line": 886,
+          "end": 887,
+          "calls": [
+            "is_mojibake_text",
+            "str"
+          ]
+        },
+        {
+          "name": "_normalize_disneyreal_attraction_name",
+          "line": 936,
+          "end": 942,
+          "calls": [
+            "DISNEYREAL_ATTRACTION_NAME_MAP.items",
+            "key.replace",
+            "re.sub",
+            "str",
+            "str(name or '').strip",
+            "text.replace",
+            "text.replace('・', '').replace",
+            "text.replace('・', '').replace('！', '!').replace"
+          ]
+        },
+        {
+          "name": "_disneyreal_history_url",
+          "line": 945,
+          "end": 950,
+          "calls": [
+            "DISNEYREAL_PARK_SLUGS.get",
+            "datetime.now",
+            "datetime.now(JST).date",
+            "isinstance",
+            "target_date.date"
+          ]
+        },
+        {
+          "name": "_fetch_text",
+          "line": 953,
+          "end": 958,
+          "calls": [
+            "requests.get",
+            "res.encoding.lower",
+            "res.raise_for_status"
+          ]
+        },
+        {
+          "name": "fetch_disneyreal_history_calendar",
+          "line": 961,
+          "end": 973,
+          "calls": [
+            "_disneyreal_history_url",
+            "end_date.date",
+            "isinstance",
+            "pd.DataFrame",
+            "rows.append",
+            "start_date.date",
+            "timedelta"
+          ]
+        },
+        {
+          "name": "_extract_disneyreal_image_attractions",
+          "line": 976,
+          "end": 987,
+          "calls": [
+            "_normalize_disneyreal_attraction_name",
+            "len",
+            "names.append",
+            "part.strip",
+            "re.findall",
+            "re.split",
+            "re.sub",
+            "set",
+            "sorted",
+            "unescape"
+          ]
+        },
+        {
+          "name": "normalize_disneyreal_wait_rows",
+          "line": 990,
+          "end": 1030,
+          "calls": [
+            "_normalize_disneyreal_attraction_name",
+            "datetime.combine",
+            "datetime.combine(target_date, datetime.min.time()).replace",
+            "datetime.min.time",
+            "dt.strftime",
+            "int",
+            "is_crowd_hour",
+            "isinstance",
+            "match.group",
+            "pd.isna",
+            "pd.to_numeric",
+            "re.search",
+            "row.get",
+            "rows.append",
+            "seen.add",
+            "set",
+            "str",
+            "str(row.get('time', row.get('Time', ''))).strip",
+            "target_date.date"
+          ]
+        },
+        {
+          "name": "extract_wait_rows_from_html_tables",
+          "line": 1033,
+          "end": 1096,
+          "calls": [
+            "all",
+            "any",
+            "df.iloc[0].tolist",
+            "df.iloc[1:].copy",
+            "df.iterrows",
+            "df[first_col].astype",
+            "df[first_col].astype(str).str.contains",
+            "df[first_col].astype(str).str.contains('\\\\d{1,2}:\\\\d{2}', regex=True).any",
+            "int",
+            "len",
+            "max",
+            "normalize_disneyreal_wait_rows",
+            "parsed_rows.append",
+            "pd.DataFrame",
+            "pd.read_html",
+            "range",
+            "raw_rows.append",
+            "re.findall",
+            "re.fullmatch",
+            "re.search",
+            "re.sub",
+            "re.sub('\\\\s+', ' ', unescape(re.sub('<[^>]+>', ' ', cell))).strip",
+            "row.get",
+            "str",
+            "str(c).isdigit",
+            "str(c).strip",
+            "str(col).lower",
+            "str(row.get(col, '')).strip",
+            "str(row.get(time_col, '')).strip",
+            "str(v).strip",
+            "table.copy",
+            "tables.append",
+            "unescape"
+          ]
+        },
+        {
+          "name": "extract_wait_rows_from_text",
+          "line": 1099,
+          "end": 1147,
+          "calls": [
+            "_normalize_disneyreal_attraction_name",
+            "any",
+            "headers.append",
+            "int",
+            "len",
+            "line.startswith",
+            "normalize_disneyreal_wait_rows",
+            "plain.splitlines",
+            "raw_rows.append",
+            "re.compile",
+            "re.fullmatch",
+            "re.sub",
+            "re.sub('\\\\s+', ' ', x).strip",
+            "str",
+            "str(value).strip",
+            "time_re.match",
+            "unescape",
+            "unescape(plain).replace",
+            "values.append",
+            "zip"
+          ]
+        },
+        {
+          "name": "ocr_wait_table_image",
+          "line": 1150,
+          "end": 1160,
+          "calls": [
+            "Image.open",
+            "extract_wait_rows_from_text",
+            "io.BytesIO",
+            "len",
+            "pytesseract.image_to_string"
+          ]
+        },
+        {
+          "name": "extract_wait_rows_from_images",
+          "line": 1163,
+          "end": 1188,
+          "calls": [
+            "' / '.join",
+            "all_rows.extend",
+            "base_url.rstrip",
+            "image_urls.append",
+            "messages.append",
+            "normalize_disneyreal_wait_rows",
+            "ocr_wait_table_image",
+            "re.findall",
+            "requests.get",
+            "res.raise_for_status",
+            "src.lstrip",
+            "src.startswith",
+            "time.sleep"
+          ]
+        },
+        {
+          "name": "fetch_disneyreal_daily_waits",
+          "line": 1191,
+          "end": 1212,
+          "calls": [
+            "_extract_disneyreal_image_attractions",
+            "_fetch_text",
+            "extract_wait_rows_from_html_tables",
+            "extract_wait_rows_from_images",
+            "extract_wait_rows_from_text",
+            "isinstance",
+            "len",
+            "target_date.date"
+          ]
+        },
+        {
+          "name": "should_try_alternative_source",
+          "line": 1216,
+          "end": 1233,
+          "calls": [
+            "isinstance",
+            "len",
+            "pd.read_sql_query",
+            "target_date.date",
+            "target_date.strftime"
+          ]
+        },
+        {
+          "name": "fetch_wait_history_from_source",
+          "line": 1236,
+          "end": 1261,
+          "calls": [
+            "_fetch_text",
+            "extract_wait_rows_from_html_tables",
+            "extract_wait_rows_from_images",
+            "extract_wait_rows_from_text",
+            "isinstance",
+            "len",
+            "target_date.date"
+          ]
+        },
+        {
+          "name": "fetch_alternative_wait_history",
+          "line": 1264,
+          "end": 1289,
+          "calls": [
+            "ALTERNATIVE_WAIT_HISTORY_SOURCES.get",
+            "fetch_wait_history_from_source",
+            "pattern.format",
+            "source.get",
+            "target_date.strftime",
+            "time.sleep"
+          ]
+        },
+        {
+          "name": "_log_historical_import",
+          "line": 1291,
+          "end": 1306,
+          "calls": [
+            "conn.commit",
+            "cursor.execute",
+            "datetime.now",
+            "datetime.now(JST).strftime",
+            "int",
+            "str"
+          ]
+        },
+        {
+          "name": "load_historical_import_logs",
+          "line": 1309,
+          "end": 1317,
+          "calls": [
+            "len",
+            "pd.DataFrame",
+            "pd.read_sql_query",
+            "pd.to_datetime"
+          ]
+        },
+        {
+          "name": "_historical_date_imported",
+          "line": 1320,
+          "end": 1329,
+          "calls": [
+            "len",
+            "load_historical_import_logs",
+            "logs.get",
+            "logs.get('status', '').isin"
+          ]
+        },
+        {
+          "name": "save_historical_wait_rows",
+          "line": 1332,
+          "end": 1359,
+          "calls": [
+            "conn.commit",
+            "cursor.execute",
+            "cursor.fetchone",
+            "int",
+            "row.get"
+          ]
+        },
+        {
+          "name": "import_disneyreal_history",
+          "line": 1362,
+          "end": 1422,
+          "calls": [
+            "_historical_date_imported",
+            "_log_historical_import",
+            "calendar_df.iterrows",
+            "calendar_df.tail",
+            "fetch_alternative_wait_history",
+            "fetch_disneyreal_daily_waits",
+            "fetch_disneyreal_history_calendar",
+            "int",
+            "results.append",
+            "safe_display_text",
+            "save_historical_wait_rows",
+            "should_try_alternative_source",
+            "time.sleep"
+          ]
+        },
+        {
+          "name": "save_prediction_rows",
+          "line": 1424,
+          "end": 1453,
+          "calls": [
+            "conn.commit",
+            "cursor.execute",
+            "datetime.now",
+            "datetime.now(JST).strftime",
+            "float",
+            "int",
+            "pd.isna",
+            "pred_df.iterrows",
+            "row.get",
+            "str"
+          ]
+        },
+        {
+          "name": "update_prediction_feedback",
+          "line": 1456,
+          "end": 1511,
+          "calls": [
+            "conn.commit",
+            "cursor.execute",
+            "datetime.now",
+            "float",
+            "is_crowd_hour",
+            "len",
+            "now.strftime",
+            "valid_open_df.iterrows"
+          ]
+        },
+        {
+          "name": "get_feedback_error",
+          "line": 1514,
+          "end": 1533,
+          "calls": [
+            "error_df['error'].tail",
+            "error_df['error'].tail(30).mean",
+            "len",
+            "prediction_history['error'].notna"
+          ]
+        },
+        {
+          "name": "load_daily_crowd_predictions",
+          "line": 1536,
+          "end": 1549,
+          "calls": [
+            "len",
+            "pd.DataFrame",
+            "pd.read_sql_query",
+            "pd.to_datetime"
+          ]
+        },
+        {
+          "name": "get_daily_crowd_feedback_error",
+          "line": 1552,
+          "end": 1563,
+          "calls": [
+            "daily_prediction_history['error'].notna",
+            "error_df['error'].tail",
+            "error_df['error'].tail(14).mean",
+            "float",
+            "len"
+          ]
+        },
+        {
+          "name": "save_daily_crowd_prediction",
+          "line": 1566,
+          "end": 1592,
+          "calls": [
+            "conn.commit",
+            "cursor.execute",
+            "datetime.now",
+            "datetime.now(JST).strftime",
+            "float",
+            "target_date.strftime"
+          ]
+        },
+        {
+          "name": "get_locked_daily_prediction",
+          "line": 1595,
+          "end": 1622,
+          "calls": [
+            "float",
+            "len",
+            "pd.isna",
+            "pd.read_sql_query",
+            "row.iloc[0].get",
+            "target_date.strftime"
+          ]
+        },
+        {
+          "name": "save_locked_daily_prediction",
+          "line": 1625,
+          "end": 1653,
+          "calls": [
+            "conn.commit",
+            "cursor.execute",
+            "datetime.now",
+            "datetime.now(JST).strftime",
+            "float",
+            "get_locked_daily_prediction",
+            "target_date.strftime"
+          ]
+        },
+        {
+          "name": "update_daily_crowd_feedback",
+          "line": 1656,
+          "end": 1715,
+          "calls": [
+            "conn.commit",
+            "cursor.execute",
+            "cursor.fetchall",
+            "datetime.now",
+            "datetime.now(JST).date",
+            "datetime.strptime",
+            "datetime.strptime(target_date_text, '%Y-%m-%d').date",
+            "day_df['attraction'].isin",
+            "day_df['attraction'].nunique",
+            "day_df[day_df['attraction'].isin(settings.get('rides', []))].copy",
+            "filter_crowd_history",
+            "float",
+            "get_all_attraction_crowd_stats",
+            "get_crowd_index_from_major_attractions",
+            "get_dpa_score",
+            "history_df.copy",
+            "len",
+            "settings.get",
+            "target_history[(target_history['date'] == target_day) & (target_history['wait_time'] > 0)].copy"
+          ]
+        },
+        {
+          "name": "load_dpa_sellouts",
+          "line": 1717,
+          "end": 1730,
+          "calls": [
+            "len",
+            "pd.DataFrame",
+            "pd.read_sql_query",
+            "pd.to_datetime"
+          ]
+        },
+        {
+          "name": "load_dpa_fetch_logs",
+          "line": 1733,
+          "end": 1746,
+          "calls": [
+            "len",
+            "pd.DataFrame",
+            "pd.read_sql_query",
+            "pd.to_datetime"
+          ]
+        },
+        {
+          "name": "log_dpa_fetch",
+          "line": 1749,
+          "end": 1775,
+          "calls": [
+            "conn.commit",
+            "cursor.execute",
+            "datetime.now",
+            "hasattr",
+            "int",
+            "now.date",
+            "now.strftime",
+            "str",
+            "target_date.strftime"
+          ]
+        },
+        {
+          "name": "load_data_fetch_logs",
+          "line": 1778,
+          "end": 1791,
+          "calls": [
+            "len",
+            "pd.DataFrame",
+            "pd.read_sql_query",
+            "pd.to_datetime"
+          ]
+        },
+        {
+          "name": "log_data_fetch",
+          "line": 1794,
+          "end": 1820,
+          "calls": [
+            "conn.commit",
+            "cursor.execute",
+            "datetime.now",
+            "hasattr",
+            "int",
+            "now.date",
+            "now.strftime",
+            "str",
+            "target_date.strftime"
+          ]
+        },
+        {
+          "name": "should_fetch_data_today",
+          "line": 1823,
+          "end": 1835,
+          "calls": [
+            "datetime.now",
+            "datetime.now(JST).date",
+            "fetch_logs.get",
+            "len"
+          ]
+        },
+        {
+          "name": "save_weather_snapshot",
+          "line": 1838,
+          "end": 1863,
+          "calls": [
+            "conn.commit",
+            "cursor.execute",
+            "datetime.now",
+            "float",
+            "now.date",
+            "now.date().strftime",
+            "now.strftime",
+            "str"
+          ]
+        },
+        {
+          "name": "save_ticket_price_snapshots",
+          "line": 1866,
+          "end": 1907,
+          "calls": [
+            "conn.commit",
+            "cursor.execute",
+            "datetime.now",
+            "hasattr",
+            "int",
+            "now.strftime",
+            "str",
+            "target_date.strftime",
+            "ticket_price_map.items"
+          ]
+        },
+        {
+          "name": "_date_text",
+          "line": 1910,
+          "end": 1911,
+          "calls": [
+            "hasattr",
+            "str",
+            "target_date.strftime"
+          ]
+        },
+        {
+          "name": "_parse_hour_text",
+          "line": 1914,
+          "end": 1929,
+          "calls": [
+            "int",
+            "match.group",
+            "match.group(3).lower",
+            "re.search",
+            "str",
+            "suffix.startswith"
+          ]
+        },
+        {
+          "name": "save_attraction_status_snapshots",
+          "line": 1932,
+          "end": 1966,
+          "calls": [
+            "all_df.iterrows",
+            "bool",
+            "conn.commit",
+            "cursor.execute",
+            "datetime.now",
+            "int",
+            "len",
+            "now.date",
+            "now.date().strftime",
+            "now.strftime"
+          ]
+        },
+        {
+          "name": "load_attraction_status_snapshots",
+          "line": 1969,
+          "end": 1979,
+          "calls": [
+            "len",
+            "pd.DataFrame",
+            "pd.read_sql_query",
+            "pd.to_datetime"
+          ]
+        },
+        {
+          "name": "get_attraction_status_summary",
+          "line": 1982,
+          "end": 2017,
+          "calls": [
+            "(latest_df['is_open'] == 0).sum",
+            "(major_df['is_open'] == 0).sum",
+            "datetime.now",
+            "datetime.now(JST).date",
+            "int",
+            "latest_df['attraction'].isin",
+            "len",
+            "pd.DataFrame",
+            "status_df[status_df['target_date'] == today].copy",
+            "today_df['observed_at'].max"
+          ]
+        },
+        {
+          "name": "build_estimated_park_hours",
+          "line": 2020,
+          "end": 2035,
+          "calls": [
+            "datetime.now",
+            "datetime.now(JST).date",
+            "estimate_ticket_price",
+            "pd.DataFrame",
+            "range",
+            "rows.append",
+            "timedelta"
+          ]
+        },
+        {
+          "name": "fetch_official_park_hours",
+          "line": 2038,
+          "end": 2110,
+          "calls": [
+            "_parse_hour_text",
+            "build_estimated_park_hours",
+            "date",
+            "datetime.now",
+            "datetime.now(JST).date",
+            "int",
+            "len",
+            "match.group",
+            "match.group(4).replace",
+            "month_match.group",
+            "pattern.finditer",
+            "pd.DataFrame",
+            "pd.DataFrame(rows).drop_duplicates",
+            "re.compile",
+            "re.search",
+            "re.sub",
+            "requests.get",
+            "res.raise_for_status",
+            "rows.append",
+            "timedelta",
+            "unescape"
+          ]
+        },
+        {
+          "name": "save_park_hours_rows",
+          "line": 2113,
+          "end": 2158,
+          "calls": [
+            "_date_text",
+            "conn.commit",
+            "cursor.execute",
+            "datetime.now",
+            "float",
+            "hours_df.iterrows",
+            "int",
+            "len",
+            "now.strftime",
+            "row.get"
+          ]
+        },
+        {
+          "name": "load_park_hours",
+          "line": 2161,
+          "end": 2171,
+          "calls": [
+            "len",
+            "pd.DataFrame",
+            "pd.read_sql_query",
+            "pd.to_datetime"
+          ]
+        },
+        {
+          "name": "get_today_park_hours",
+          "line": 2174,
+          "end": 2198,
+          "calls": [
+            "float",
+            "isinstance",
+            "len",
+            "park_hours_df.copy",
+            "pd.to_datetime",
+            "row.get",
+            "rows.sort_values",
+            "target_date.date"
+          ]
+        },
+        {
+          "name": "is_park_open_now",
+          "line": 2201,
+          "end": 2204,
+          "calls": [
+            "get_today_park_hours",
+            "now.date"
+          ]
+        },
+        {
+          "name": "get_park_hours_bonus",
+          "line": 2207,
+          "end": 2225,
+          "calls": [
+            "day_rows.sort_values",
+            "float",
+            "isinstance",
+            "len",
+            "row.get",
+            "target_date.date"
+          ]
+        },
+        {
+          "name": "build_event_signal_rows",
+          "line": 2228,
+          "end": 2267,
+          "calls": [
+            "d.weekday",
+            "datetime.now",
+            "datetime.now(JST).date",
+            "pd.DataFrame",
+            "range",
+            "rows.append",
+            "signals.append",
+            "timedelta"
+          ]
+        },
+        {
+          "name": "save_event_signal_rows",
+          "line": 2270,
+          "end": 2308,
+          "calls": [
+            "_date_text",
+            "conn.commit",
+            "cursor.execute",
+            "datetime.now",
+            "event_df.iterrows",
+            "float",
+            "len",
+            "now.strftime"
+          ]
+        },
+        {
+          "name": "load_event_signals",
+          "line": 2311,
+          "end": 2321,
+          "calls": [
+            "len",
+            "pd.DataFrame",
+            "pd.read_sql_query",
+            "pd.to_datetime"
+          ]
+        },
+        {
+          "name": "get_event_bonus",
+          "line": 2324,
+          "end": 2339,
+          "calls": [
+            "event_signals[event_signals['target_date'] == d].copy",
+            "float",
+            "isinstance",
+            "len",
+            "rows['bonus'].sum",
+            "rows['event_name'].dropna",
+            "rows['event_name'].dropna().astype",
+            "rows['event_name'].dropna().astype(str).unique",
+            "rows['event_name'].dropna().astype(str).unique().tolist",
+            "target_date.date"
+          ]
+        },
+        {
+          "name": "get_forecast_weather_for_date",
+          "line": 2342,
+          "end": 2365,
+          "calls": [
+            "daily_weather.copy",
+            "float",
+            "isinstance",
+            "len",
+            "pd.isna",
+            "pd.to_datetime",
+            "row.get",
+            "target_date.date"
+          ]
+        },
+        {
+          "name": "_parse_show_time_to_hour",
+          "line": 2369,
+          "end": 2384,
+          "calls": [
+            "int",
+            "match.group",
+            "re.search",
+            "str",
+            "str(show_time).strip",
+            "str(show_time).strip().lower",
+            "str(show_time).strip().lower().replace"
+          ]
+        },
+        {
+          "name": "_clean_show_name",
+          "line": 2387,
+          "end": 2399,
+          "calls": [
+            "_is_broken_show_text",
+            "any",
+            "len",
+            "re.sub",
+            "re.sub('\\\\s+', ' ', unescape(str(value))).strip",
+            "str",
+            "text.lower",
+            "unescape"
+          ]
+        },
+        {
+          "name": "_is_broken_show_text",
+          "line": 2402,
+          "end": 2403,
+          "calls": [
+            "is_mojibake_text"
+          ]
+        },
+        {
+          "name": "_safe_show_text",
+          "line": 2406,
+          "end": 2407,
+          "calls": [
+            "safe_display_text"
+          ]
+        },
+        {
+          "name": "_sanitize_show_rows",
+          "line": 2409,
+          "end": 2419,
+          "calls": [
+            "_safe_show_text",
+            "df['category'].apply",
+            "df['note'].apply",
+            "df['show_name'].apply",
+            "len",
+            "pd.DataFrame",
+            "show_df.copy"
+          ]
+        },
+        {
+          "name": "_known_show_schedule_fallback",
+          "line": 2438,
+          "end": 2439,
+          "calls": [
+            "pd.DataFrame"
+          ]
+        },
+        {
+          "name": "_show_name_from_url",
+          "line": 2442,
+          "end": 2446,
+          "calls": [
+            "SHOW_NAME_BY_ID.items",
+            "str"
+          ]
+        },
+        {
+          "name": "_parse_monthly_show_page",
+          "line": 2449,
+          "end": 2470,
+          "calls": [
+            "_show_name_from_url",
+            "day_pattern.search",
+            "line.strip",
+            "match.group",
+            "re.compile",
+            "re.findall",
+            "re.sub",
+            "re.sub('\\\\s+', ' ', line).strip",
+            "rows.append",
+            "show_time.replace",
+            "show_time.replace('a.m.', 'am').replace",
+            "text.splitlines",
+            "unescape",
+            "unescape(text).replace"
+          ]
+        },
+        {
+          "name": "_parse_daily_show_page",
+          "line": 2473,
+          "end": 2507,
+          "calls": [
+            "_clean_show_name",
+            "any",
+            "line.strip",
+            "re.compile",
+            "re.sub",
+            "re.sub('\\\\s*/\\\\s*', ' / ', name).strip",
+            "re.sub('\\\\s+', ' ', line).strip",
+            "rows.append",
+            "seen.add",
+            "set",
+            "text.splitlines",
+            "time_pattern.findall",
+            "time_pattern.sub",
+            "unescape",
+            "unescape(text).replace"
+          ]
+        },
+        {
+          "name": "fetch_official_show_schedule",
+          "line": 2510,
+          "end": 2543,
+          "calls": [
+            "_parse_daily_show_page",
+            "_parse_monthly_show_page",
+            "_sanitize_show_rows",
+            "datetime.now",
+            "datetime.now(JST).date",
+            "df.reset_index",
+            "df['_hour'].notna",
+            "df['show_time'].apply",
+            "df[df['_hour'].notna()].sort_values",
+            "df[df['_hour'].notna()].sort_values('_hour').drop",
+            "len",
+            "messages.append",
+            "pd.DataFrame",
+            "pd.DataFrame(rows).drop_duplicates",
+            "requests.get",
+            "res.encoding.lower",
+            "res.raise_for_status",
+            "rows.extend",
+            "settings.get"
+          ]
+        },
+        {
+          "name": "save_show_schedule_rows",
+          "line": 2545,
+          "end": 2576,
+          "calls": [
+            "_sanitize_show_rows",
+            "conn.commit",
+            "cursor.execute",
+            "datetime.now",
+            "datetime.now(JST).date",
+            "datetime.now(JST).isoformat",
+            "len",
+            "row.get",
+            "show_df.iterrows",
+            "str"
+          ]
+        },
+        {
+          "name": "load_show_schedules",
+          "line": 2579,
+          "end": 2583,
+          "calls": [
+            "_sanitize_show_rows",
+            "pd.DataFrame",
+            "pd.read_sql_query"
+          ]
+        },
+        {
+          "name": "save_show_wait_context",
+          "line": 2586,
+          "end": 2627,
+          "calls": [
+            "(show_dt - now).total_seconds",
+            "_parse_show_time_to_hour",
+            "conn.commit",
+            "current_target_df[(current_target_df['Open'] == True) & (current_target_df['Wait'] > 0)].copy",
+            "cursor.execute",
+            "datetime.combine",
+            "datetime.min.time",
+            "datetime.now",
+            "float",
+            "int",
+            "len",
+            "now.date",
+            "now.isoformat",
+            "round",
+            "row.get",
+            "show_df.iterrows",
+            "str",
+            "timedelta",
+            "valid_df['Wait'].max",
+            "valid_df['Wait'].mean"
+          ]
+        },
+        {
+          "name": "load_show_wait_context",
+          "line": 2630,
+          "end": 2634,
+          "calls": [
+            "pd.DataFrame",
+            "pd.read_sql_query"
+          ]
+        },
+        {
+          "name": "get_show_wait_insights",
+          "line": 2637,
+          "end": 2673,
+          "calls": [
+            "after['avg_major_wait'].mean",
+            "before['avg_major_wait'].mean",
+            "df.dropna",
+            "len",
+            "pd.DataFrame",
+            "pd.to_numeric",
+            "rows.append",
+            "show_wait_context.copy"
+          ]
+        },
+        {
+          "name": "auto_collect_prediction_context",
+          "line": 2675,
+          "end": 2743,
+          "calls": [
+            "PARK_SETTINGS.get",
+            "build_event_signal_rows",
+            "datetime.now",
+            "datetime.now(JST).date",
+            "dict",
+            "fetch_official_park_hours",
+            "fetch_official_show_schedule",
+            "len",
+            "load_data_fetch_logs",
+            "load_show_schedules",
+            "log_data_fetch",
+            "results.append",
+            "save_event_signal_rows",
+            "save_park_hours_rows",
+            "save_show_schedule_rows",
+            "should_fetch_data_today",
+            "str"
+          ]
+        },
+        {
+          "name": "auto_save_context_data",
+          "line": 2745,
+          "end": 2797,
+          "calls": [
+            "datetime.now",
+            "datetime.now(JST).date",
+            "load_data_fetch_logs",
+            "log_data_fetch",
+            "results.append",
+            "save_ticket_price_snapshots",
+            "save_weather_snapshot",
+            "should_fetch_data_today"
+          ]
+        },
+        {
+          "name": "load_weather_snapshots",
+          "line": 2800,
+          "end": 2810,
+          "calls": [
+            "len",
+            "pd.DataFrame",
+            "pd.read_sql_query",
+            "pd.to_datetime"
+          ]
+        },
+        {
+          "name": "load_ticket_price_snapshots",
+          "line": 2813,
+          "end": 2823,
+          "calls": [
+            "len",
+            "pd.DataFrame",
+            "pd.read_sql_query",
+            "pd.to_datetime"
+          ]
+        },
+        {
+          "name": "get_next_feature_plan",
+          "line": 2826,
+          "end": 2871,
+          "calls": [
+            "pd.DataFrame"
+          ]
+        },
+        {
+          "name": "should_auto_fetch_dpa",
+          "line": 2874,
+          "end": 2889,
+          "calls": [
+            "datetime.now",
+            "datetime.now(JST).date",
+            "fetch_logs.get",
+            "len"
+          ]
+        },
+        {
+          "name": "auto_fetch_dpa_if_needed",
+          "line": 2892,
+          "end": 2949,
+          "calls": [
+            "datetime.now",
+            "datetime.now(JST).date",
+            "fetch_urtrip_dpa_sellouts",
+            "int",
+            "latest.get",
+            "len",
+            "load_dpa_fetch_logs",
+            "log_dpa_fetch",
+            "logs.get",
+            "logs[(logs['target_date'] == today) & (logs.get('park', '') == park) & (logs.get('source', '') == 'urtrip')].sort_values",
+            "save_dpa_sellout_rows",
+            "should_auto_fetch_dpa"
+          ]
+        },
+        {
+          "name": "save_dpa_sellout",
+          "line": 2952,
+          "end": 2985,
+          "calls": [
+            "conn.commit",
+            "cursor.execute",
+            "datetime.now",
+            "float",
+            "hasattr",
+            "now.date",
+            "now.strftime",
+            "str",
+            "target_date.strftime"
+          ]
+        },
+        {
+          "name": "clear_dpa_sellouts",
+          "line": 2988,
+          "end": 2997,
+          "calls": [
+            "conn.commit",
+            "cursor.execute"
+          ]
+        },
+        {
+          "name": "_time_text_to_hour",
+          "line": 3000,
+          "end": 3012,
+          "calls": [
+            "int",
+            "match.group",
+            "re.search",
+            "str",
+            "str(time_text).strip"
+          ]
+        },
+        {
+          "name": "_parse_urtrip_date",
+          "line": 3015,
+          "end": 3031,
+          "calls": [
+            "date",
+            "int",
+            "match.group",
+            "re.match"
+          ]
+        },
+        {
+          "name": "fetch_urtrip_dpa_sellouts",
+          "line": 3034,
+          "end": 3175,
+          "calls": [
+            "_parse_urtrip_date",
+            "_time_text_to_hour",
+            "current_values.append",
+            "date",
+            "datetime.now",
+            "datetime.now(JST).date",
+            "df.drop_duplicates",
+            "df.drop_duplicates(['target_date', 'attraction', 'sellout_hour'], keep='first').reset_index",
+            "enumerate",
+            "int",
+            "len",
+            "line.strip",
+            "match.group",
+            "pd.DataFrame",
+            "plain.splitlines",
+            "range",
+            "re.match",
+            "re.search",
+            "re.sub",
+            "requests.get",
+            "res.raise_for_status",
+            "rows.append",
+            "settings.get",
+            "status_rows.append",
+            "unescape",
+            "values.append",
+            "zip"
+          ]
+        },
+        {
+          "name": "save_dpa_sellout_rows",
+          "line": 3178,
+          "end": 3203,
+          "calls": [
+            "isinstance",
+            "len",
+            "pd.isna",
+            "row.get",
+            "save_dpa_sellout",
+            "sellout_df.iterrows",
+            "target_date_value.date"
+          ]
+        },
+        {
+          "name": "_weighted_average",
+          "line": 3206,
+          "end": 3213,
+          "calls": [
+            "float",
+            "pd.isna",
+            "sum"
+          ]
+        },
+        {
+          "name": "build_time_slots",
+          "line": 3216,
+          "end": 3228,
+          "calls": [
+            "current.strftime",
+            "date.today",
+            "datetime.combine",
+            "datetime.combine(date.today(), datetime.min.time()).replace",
+            "datetime.min.time",
+            "rows.append",
+            "timedelta"
+          ]
+        },
+        {
+          "name": "_prediction_attractions",
+          "line": 3231,
+          "end": 3242,
+          "calls": [
+            "current_target_df['Attraction'].dropna",
+            "current_target_df['Attraction'].dropna().astype",
+            "current_target_df['Attraction'].dropna().astype(str).unique",
+            "current_target_df['Attraction'].dropna().astype(str).unique().tolist",
+            "history_df['attraction'].dropna",
+            "history_df['attraction'].dropna().astype",
+            "history_df['attraction'].dropna().astype(str).unique",
+            "history_df['attraction'].dropna().astype(str).unique().tolist",
+            "len",
+            "names.extend",
+            "settings.get",
+            "unique_names.append"
+          ]
+        },
+        {
+          "name": "_prepare_model_history",
+          "line": 3245,
+          "end": 3263,
+          "calls": [
+            "filter_crowd_history",
+            "history_df[history_df['wait_time'] > 0].copy",
+            "len",
+            "model_df['attraction'].isin",
+            "model_df[model_df['attraction'].isin(rides)].copy",
+            "model_df[pd.to_numeric(model_df['is_open'], errors='coerce').fillna(1).astype(int) == 1].copy",
+            "pd.to_numeric",
+            "pd.to_numeric(model_df['is_open'], errors='coerce').fillna",
+            "pd.to_numeric(model_df['is_open'], errors='coerce').fillna(1).astype"
+          ]
+        },
+        {
+          "name": "prepare_prediction_history",
+          "line": 3267,
+          "end": 3292,
+          "calls": [
+            "df.get",
+            "df['attraction'].astype",
+            "df['attraction'].astype(str).isin",
+            "df['park'].isna",
+            "df[df['attraction'].astype(str).isin(allowed)].copy",
+            "df[df['park'].isna() | (df['park'] == park)].copy",
+            "df[pd.to_numeric(df.get('wait_time', 0), errors='coerce').fillna(0).between(1, 300)].copy",
+            "df[pd.to_numeric(df['is_open'], errors='coerce').fillna(1).astype(int) == 1].copy",
+            "filter_crowd_history",
+            "history_df.copy",
+            "len",
+            "pd.DataFrame",
+            "pd.to_datetime",
+            "pd.to_numeric",
+            "pd.to_numeric(df.get('wait_time', 0), errors='coerce').fillna",
+            "pd.to_numeric(df.get('wait_time', 0), errors='coerce').fillna(0).between",
+            "pd.to_numeric(df['is_open'], errors='coerce').fillna",
+            "pd.to_numeric(df['is_open'], errors='coerce').fillna(1).astype",
+            "str",
+            "str(a).strip"
+          ]
+        },
+        {
+          "name": "get_attraction_feedback_error",
+          "line": 3295,
+          "end": 3296,
+          "calls": [
+            "float",
+            "get_feedback_error",
+            "np.clip"
+          ]
+        },
+        {
+          "name": "get_area_prediction_baseline",
+          "line": 3299,
+          "end": 3313,
+          "calls": [
+            "classify_attraction_area",
+            "df['attraction'].apply",
+            "float",
+            "int",
+            "len",
+            "prepare_prediction_history",
+            "rows['wait_time'].median"
+          ]
+        },
+        {
+          "name": "get_park_time_baseline",
+          "line": 3316,
+          "end": 3328,
+          "calls": [
+            "float",
+            "int",
+            "len",
+            "prepare_prediction_history",
+            "rows['wait_time'].median"
+          ]
+        },
+        {
+          "name": "get_attraction_prediction_confidence",
+          "line": 3331,
+          "end": 3374,
+          "calls": [
+            "err['error'].abs",
+            "err['error'].abs().tail",
+            "err['error'].abs().tail(30).mean",
+            "float",
+            "hist['date'].nunique",
+            "history_df[history_df['attraction'] == attraction].copy",
+            "int",
+            "len",
+            "max",
+            "min",
+            "notes.append",
+            "pd.DataFrame",
+            "prediction_history['error'].notna",
+            "prediction_history[(prediction_history['attraction'] == attraction) & prediction_history['error'].notna()].copy",
+            "round"
+          ]
+        },
+        {
+          "name": "predict_wait_times_for_date",
+          "line": 3376,
+          "end": 3529,
+          "calls": [
+            "' / '.join",
+            "' / '.join(['15分枠履歴', '時間帯中央値', '曜日・月補正', '予測誤差補正', '同エリア傾向で補完' if used_fallback else '', current_reason] + target_reasons).strip",
+            "HOUR_PROFILE.get",
+            "_prediction_attractions",
+            "_weighted_average",
+            "abs",
+            "attraction_all.get",
+            "attraction_hour.get",
+            "attraction_time.get",
+            "build_time_slots",
+            "datetime.now",
+            "datetime.now(JST).date",
+            "dict",
+            "float",
+            "get_area_prediction_baseline",
+            "get_attraction_feedback_error",
+            "get_calendar_bonus",
+            "get_park_time_baseline",
+            "hour_all.get",
+            "int",
+            "isinstance",
+            "len",
+            "max",
+            "min",
+            "model_df.groupby",
+            "model_df.groupby('attraction')['wait_time'].median",
+            "model_df.groupby('hour')['wait_time'].median",
+            "model_df.groupby('time_slot')['wait_time'].median",
+            "model_df.groupby(['attraction', 'hour'])['wait_time'].median",
+            "model_df.groupby(['attraction', 'time_slot'])['wait_time'].median",
+            "model_df['wait_time'].median",
+            "pd.DataFrame",
+            "pd.Series",
+            "pd.Series(raw_predictions).rolling",
+            "pd.Series(raw_predictions).rolling(window=3, center=True, min_periods=1).mean",
+            "pd.Series(raw_predictions).rolling(window=3, center=True, min_periods=1).mean().tolist",
+            "pd.isna",
+            "prepare_prediction_history",
+            "raw_predictions.append",
+            "round",
+            "rows.append",
+            "rows_month['wait_time'].median",
+            "rows_weekday['wait_time'].median",
+            "settings.get",
+            "str",
+            "str(a).strip",
+            "str(settings.get('db', '')).lower",
+            "target_date.date",
+            "target_date.weekday",
+            "time_all.get",
+            "zip"
+          ]
+        },
+        {
+          "name": "make_major_average_prediction",
+          "line": 3531,
+          "end": 3546,
+          "calls": [
+            "avg_df.sort_values",
+            "avg_df.sort_values(group_cols).rename",
+            "df.groupby",
+            "df.groupby(group_cols)['Predicted Wait'].mean",
+            "df.groupby(group_cols)['Predicted Wait'].mean().reset_index",
+            "df['Attraction'].isin",
+            "df[df['Attraction'].isin(major_rides)].copy",
+            "len",
+            "pd.DataFrame",
+            "wait_prediction_df.copy"
+          ]
+        },
+        {
+          "name": "get_actual_wait_series_for_today",
+          "line": 3549,
+          "end": 3575,
+          "calls": [
+            "actual_df.rename",
+            "actual_df.sort_values",
+            "datetime.now",
+            "datetime.now(JST).date",
+            "df.groupby",
+            "df.groupby(['Time', 'TimeLabel', 'Hour', 'Minute'])['wait_time'].mean",
+            "df.groupby(['Time', 'TimeLabel', 'Hour', 'Minute'])['wait_time'].mean().reset_index",
+            "df['Hour'].astype",
+            "df['Hour'].astype(str).str.zfill",
+            "df['Minute'].astype",
+            "df['Minute'].astype(str).str.zfill",
+            "df['attraction'].isin",
+            "df[(df['date'] == today) & (pd.to_numeric(df['wait_time'], errors='coerce') > 0)].copy",
+            "df[df['attraction'] == attraction].copy",
+            "df[df['attraction'].isin(major_rides)].copy",
+            "df[pd.to_numeric(df['is_open'], errors='coerce').fillna(1).astype(int) == 1].copy",
+            "filter_crowd_history",
+            "history_df.copy",
+            "len",
+            "pd.DataFrame",
+            "pd.to_datetime",
+            "pd.to_numeric",
+            "pd.to_numeric(df['is_open'], errors='coerce').fillna",
+            "pd.to_numeric(df['is_open'], errors='coerce').fillna(1).astype"
+          ]
+        },
+        {
+          "name": "merge_prediction_and_actual_series",
+          "line": 3578,
+          "end": 3588,
+          "calls": [
+            "actual_df.copy",
+            "left.merge",
+            "len",
+            "pd.DataFrame",
+            "pred_df.copy"
+          ]
+        },
+        {
+          "name": "plot_prediction_vs_actual",
+          "line": 3591,
+          "end": 3592,
+          "calls": [
+            "merge_prediction_and_actual_series"
+          ]
+        },
+        {
+          "name": "get_all_attraction_crowd_stats",
+          "line": 3595,
+          "end": 3658,
+          "calls": [
+            "datetime.now",
+            "datetime.now(JST).date",
+            "day_df['attraction'].dropna",
+            "day_df['attraction'].dropna().astype",
+            "day_df['attraction'].dropna().astype(str).unique",
+            "day_df['attraction'].dropna().astype(str).unique().tolist",
+            "df.get",
+            "df[open_mask & (pd.to_numeric(df['Wait'], errors='coerce') > 0)].copy",
+            "filter_crowd_history",
+            "float",
+            "hist.get",
+            "hist[(hist.get('date') == target_date) & (hist['wait_time'] > 0)].copy",
+            "history_df.copy",
+            "int",
+            "isinstance",
+            "len",
+            "max",
+            "np.ceil",
+            "open_df['Attraction'].dropna",
+            "open_df['Attraction'].dropna().astype",
+            "open_df['Attraction'].dropna().astype(str).unique",
+            "open_df['Attraction'].dropna().astype(str).unique().tolist",
+            "pd.DataFrame",
+            "pd.Series",
+            "pd.isna",
+            "pd.to_datetime",
+            "pd.to_numeric",
+            "pd.to_numeric(day_df['wait_time'], errors='coerce').dropna",
+            "pd.to_numeric(day_df['wait_time'], errors='coerce').dropna().astype",
+            "pd.to_numeric(open_df['Wait'], errors='coerce').dropna",
+            "pd.to_numeric(open_df['Wait'], errors='coerce').dropna().astype",
+            "target_date.date",
+            "valid_all_df.copy",
+            "waits.max",
+            "waits.mean",
+            "waits.sort_values",
+            "waits.sort_values(ascending=False).head",
+            "waits.sort_values(ascending=False).head(top_count).mean",
+            "waits.std"
+          ]
+        },
+        {
+          "name": "get_major_attraction_crowd_stats",
+          "line": 3661,
+          "end": 3671,
+          "calls": [
+            "get_all_attraction_crowd_stats",
+            "stats.get"
+          ]
+        },
+        {
+          "name": "get_crowd_index_from_major_attractions",
+          "line": 3674,
+          "end": 3743,
+          "calls": [
+            "MAJOR_CROWD_BASELINES.get",
+            "baseline.get",
+            "float",
+            "int",
+            "max",
+            "min",
+            "np.clip",
+            "round"
+          ]
+        },
+        {
+          "name": "get_prediction_crowd_stats",
+          "line": 3745,
+          "end": 3796,
+          "calls": [
+            "by_attraction.index.astype",
+            "by_attraction.index.astype(str).tolist",
+            "by_attraction.sort_values",
+            "by_attraction.sort_values(ascending=False).head",
+            "by_attraction.sort_values(ascending=False).head(top_count).mean",
+            "df.assign",
+            "df.assign(**{'Predicted Wait': pd.to_numeric(df['Predicted Wait'], errors='coerce')}).groupby",
+            "df.assign(**{'Predicted Wait': pd.to_numeric(df['Predicted Wait'], errors='coerce')}).groupby('Attraction')['Predicted Wait'].mean",
+            "df.assign(**{'Predicted Wait': pd.to_numeric(df['Predicted Wait'], errors='coerce')}).groupby('Attraction')['Predicted Wait'].mean().dropna",
+            "float",
+            "int",
+            "len",
+            "max",
+            "np.ceil",
+            "pd.isna",
+            "pd.to_numeric",
+            "pd.to_numeric(df['Predicted Wait'], errors='coerce').dropna",
+            "pd.to_numeric(df['Predicted Wait'], errors='coerce').dropna().astype",
+            "wait_prediction_df.copy",
+            "waits.max",
+            "waits.mean",
+            "waits.std"
+          ]
+        },
+        {
+          "name": "predict_crowd_index_for_date",
+          "line": 3798,
+          "end": 3860,
+          "calls": [
+            "float",
+            "get_calendar_bonus",
+            "get_crowd_index_from_major_attractions",
+            "get_daily_crowd_feedback_error",
+            "get_dpa_score",
+            "get_event_bonus",
+            "get_feedback_error",
+            "get_park_hours_bonus",
+            "get_prediction_crowd_stats",
+            "get_weather_score",
+            "len",
+            "major_df['Predicted Wait'].mean",
+            "pd.DataFrame",
+            "predict_wait_times_for_date",
+            "reasons.extend",
+            "settings.get",
+            "wait_df['Attraction'].isin",
+            "wait_df[wait_df['Attraction'].isin(settings.get('rides', []))].copy"
+          ]
+        },
+        {
+          "name": "make_week_forecast",
+          "line": 3862,
+          "end": 3945,
+          "calls": [
+            "' / '.join",
+            "d.strftime",
+            "datetime.now",
+            "datetime.now(JST).date",
+            "float",
+            "get_forecast_weather_for_date",
+            "get_locked_daily_prediction",
+            "get_prediction_crowd_stats",
+            "get_ticket_price_from_castel",
+            "len",
+            "pd.DataFrame",
+            "predict_crowd_index_for_date",
+            "predict_wait_times_for_date",
+            "range",
+            "round",
+            "rows.append",
+            "save_locked_daily_prediction",
+            "settings.get",
+            "timedelta",
+            "wait_df['Attraction'].isin",
+            "wait_df[wait_df['Attraction'].isin(settings.get('rides', []))]['Predicted Wait'].mean"
+          ]
+        },
+        {
+          "name": "make_locked_week_forecast",
+          "line": 3948,
+          "end": 3950,
+          "calls": [
+            "make_week_forecast"
+          ]
+        },
+        {
+          "name": "_time_to_minutes",
+          "line": 3954,
+          "end": 3964,
+          "calls": [
+            "float",
+            "int",
+            "isinstance",
+            "value.split"
+          ]
+        },
+        {
+          "name": "_minutes_to_label",
+          "line": 3967,
+          "end": 3969,
+          "calls": [
+            "int"
+          ]
+        },
+        {
+          "name": "time_label_to_minutes",
+          "line": 3972,
+          "end": 3973,
+          "calls": [
+            "_time_to_minutes"
+          ]
+        },
+        {
+          "name": "minutes_to_time_label",
+          "line": 3976,
+          "end": 3977,
+          "calls": [
+            "_minutes_to_label"
+          ]
+        },
+        {
+          "name": "round_to_nearest_slot",
+          "line": 3980,
+          "end": 3981,
+          "calls": [
+            "int",
+            "round"
+          ]
+        },
+        {
+          "name": "_prediction_minutes",
+          "line": 3984,
+          "end": 3989,
+          "calls": [
+            "(pd.to_numeric(df['Time'], errors='coerce') * 60).round",
+            "(pd.to_numeric(df['Time'], errors='coerce') * 60).round().astype",
+            "df.get",
+            "pd.to_numeric",
+            "pd.to_numeric(df.get('Hour', 0), errors='coerce').fillna",
+            "pd.to_numeric(df.get('Hour', 0), errors='coerce').fillna(0).astype",
+            "pd.to_numeric(df.get('Minute', 0), errors='coerce').fillna",
+            "pd.to_numeric(df.get('Minute', 0), errors='coerce').fillna(0).astype"
+          ]
+        },
+        {
+          "name": "get_predicted_wait_at_time",
+          "line": 3992,
+          "end": 4017,
+          "calls": [
+            "(df['_minutes'].astype(int) - target_minutes).abs",
+            "(df_all['_minutes'].astype(int) - target_minutes).abs",
+            "_prediction_minutes",
+            "_time_to_minutes",
+            "df.sort_values",
+            "df['_minutes'].astype",
+            "df_all.assign",
+            "df_all.assign(_distance=(df_all['_minutes'].astype(int) - target_minutes).abs()).sort_values",
+            "df_all.dropna",
+            "df_all['Predicted Wait'].mean",
+            "df_all['_minutes'].astype",
+            "df_all[df_all['Attraction'] == attraction].copy",
+            "float",
+            "len",
+            "near_all.head",
+            "near_all.head(8)['Predicted Wait'].mean",
+            "pd.DataFrame",
+            "pd.to_numeric",
+            "round_to_nearest_slot",
+            "wait_pred_df.copy"
+          ]
+        },
+        {
+          "name": "simulate_route_order",
+          "line": 4020,
+          "end": 4055,
+          "calls": [
+            "_minutes_to_label",
+            "enumerate",
+            "filled.append",
+            "get_predicted_wait_at_time",
+            "int",
+            "len",
+            "round",
+            "rows.append",
+            "set",
+            "skipped.append",
+            "wait_pred_df['Attraction'].astype",
+            "warnings.append"
+          ]
+        },
+        {
+          "name": "_simulate_route_order",
+          "line": 4058,
+          "end": 4065,
+          "calls": [
+            "simulate_route_order"
+          ]
+        },
+        {
+          "name": "build_optimal_route_plan",
+          "line": 4068,
+          "end": 4128,
+          "calls": [
+            "_minutes_to_label",
+            "_time_to_minutes",
+            "get_predicted_wait_at_time",
+            "int",
+            "len",
+            "list",
+            "max",
+            "order.append",
+            "pd.DataFrame",
+            "permutations",
+            "remaining.remove",
+            "round",
+            "round_to_nearest_slot",
+            "set",
+            "simulate_route_order",
+            "sorted"
+          ]
+        },
+        {
+          "name": "format_route_plan_cards",
+          "line": 4131,
+          "end": 4144,
+          "calls": [
+            "''.join",
+            "html.append",
+            "int",
+            "len",
+            "route_df.iterrows"
+          ]
+        },
+        {
+          "name": "predict_dpa_sellout_time",
+          "line": 4146,
+          "end": 4187,
+          "calls": [
+            "(recent_history['sellout_hour'] < 18).mean",
+            "float",
+            "int",
+            "len",
+            "max",
+            "min",
+            "one_history.sort_values",
+            "one_history.sort_values('target_date').tail",
+            "predict_dpa_risk",
+            "recent_history['sellout_hour'].median",
+            "round"
+          ]
+        },
+        {
+          "name": "get_data_quality_report",
+          "line": 4190,
+          "end": 4239,
+          "calls": [
+            "' / '.join",
+            "dpa_sellout_history['source'].dropna",
+            "dpa_sellout_history['source'].dropna().unique",
+            "filter_crowd_history",
+            "history_df['attraction'].isin",
+            "history_df[history_df['attraction'].isin(settings['rides'])].copy",
+            "len",
+            "pd.DataFrame",
+            "prediction_history['error'].notna",
+            "rows.append",
+            "sorted",
+            "target_history['attraction'].nunique",
+            "target_history['date'].nunique"
+          ]
+        },
+        {
+          "name": "get_prediction_confidence",
+          "line": 4242,
+          "end": 4324,
+          "calls": [
+            "datetime.now",
+            "datetime.now(JST).date",
+            "error_df['error'].abs",
+            "error_df['error'].abs().tail",
+            "error_df['error'].abs().tail(50).mean",
+            "filter_crowd_history",
+            "float",
+            "history_df['attraction'].isin",
+            "history_df[history_df['attraction'].isin(settings['rides'])].copy",
+            "int",
+            "len",
+            "max",
+            "min",
+            "notes.append",
+            "pd.DataFrame",
+            "prediction_history['error'].notna",
+            "prediction_history[prediction_history['error'].notna()].copy",
+            "round",
+            "str",
+            "target_history['attraction'].nunique",
+            "target_history['date'].nunique"
+          ]
+        },
+        {
+          "name": "get_prediction_accuracy_report",
+          "line": 4327,
+          "end": 4372,
+          "calls": [
+            "error_df.groupby",
+            "float",
+            "group['error'].abs",
+            "group['error'].abs().mean",
+            "group['error'].mean",
+            "int",
+            "len",
+            "pd.DataFrame",
+            "pd.DataFrame(rows).sort_values",
+            "prediction_history['error'].notna",
+            "prediction_history[prediction_history['error'].notna()].copy",
+            "round",
+            "rows.append"
+          ]
+        },
+        {
+          "name": "get_prediction_alerts",
+          "line": 4375,
+          "end": 4406,
+          "calls": [
+            "alerts.append",
+            "float",
+            "len",
+            "pd.DataFrame",
+            "wait_prediction_df['Predicted Wait'].max",
+            "wait_prediction_df['Predicted Wait'].mean"
+          ]
+        },
+        {
+          "name": "get_wait_trend",
+          "line": 4409,
+          "end": 4435,
+          "calls": [
+            "filter_crowd_history",
+            "filter_crowd_history(one_df).sort_values",
+            "filter_crowd_history(one_df).sort_values('datetime').tail",
+            "float",
+            "history_df[(history_df['attraction'] == attraction) & (history_df['wait_time'] > 0)].copy",
+            "len",
+            "np.diff",
+            "np.mean",
+            "one_df['wait_time'].astype",
+            "one_df['wait_time'].astype(float).tolist",
+            "round"
+          ]
+        },
+        {
+          "name": "get_emptying_candidates",
+          "line": 4438,
+          "end": 4475,
+          "calls": [
+            "current_df.iterrows",
+            "datetime.now",
+            "filter_crowd_history",
+            "float",
+            "history_df.copy",
+            "hourly.loc[future_hours].idxmin",
+            "hourly.loc[future_hours].min",
+            "int",
+            "len",
+            "model_df[model_df['wait_time'] > 0].copy",
+            "one_df.groupby",
+            "one_df.groupby('hour')['wait_time'].mean",
+            "pd.DataFrame",
+            "pd.DataFrame(rows).sort_values",
+            "pd.DataFrame(rows).sort_values('予想平均との差', ascending=False).head",
+            "round",
+            "rows.append"
+          ]
+        },
+        {
+          "name": "classify_attraction_area",
+          "line": 4502,
+          "end": 4508,
+          "calls": [
+            "keyword.lower",
+            "rules.items",
+            "str",
+            "str(attraction).lower"
+          ]
+        },
+        {
+          "name": "get_theme_port_map",
+          "line": 4511,
+          "end": 4515,
+          "calls": [
+            "area_map.setdefault",
+            "rules.items"
+          ]
+        },
+        {
+          "name": "get_attractions_by_theme_port",
+          "line": 4518,
+          "end": 4525,
+          "calls": [
+            "area_map.setdefault",
+            "area_map.setdefault(area, []).append",
+            "classify_attraction_area",
+            "get_theme_port_map",
+            "get_theme_port_map(park).keys",
+            "sorted",
+            "str",
+            "str(x).strip"
+          ]
+        },
+        {
+          "name": "get_area_crowd_map",
+          "line": 4527,
+          "end": 4553,
+          "calls": [
+            "all_df.copy",
+            "classify_attraction_area",
+            "df.groupby",
+            "df['Attraction'].apply",
+            "df[(df['Open'] == True) & (df['Wait'] > 0)].copy",
+            "float",
+            "group['Wait'].mean",
+            "int",
+            "len",
+            "pd.DataFrame",
+            "pd.DataFrame(rows).sort_values",
+            "round",
+            "rows.append"
+          ]
+        },
+        {
+          "name": "get_historical_crowd_rank",
+          "line": 4556,
+          "end": 4587,
+          "calls": [
+            "(daily_avg <= today_avg).mean",
+            "daily_avg.get",
+            "datetime.now",
+            "datetime.now(JST).date",
+            "filter_crowd_history",
+            "float",
+            "history_df['attraction'].isin",
+            "history_df[history_df['attraction'].isin(settings['rides']) & (history_df['wait_time'] > 0)].copy",
+            "int",
+            "len",
+            "round",
+            "target_df.groupby",
+            "target_df.groupby('date')['wait_time'].mean",
+            "timedelta"
+          ]
+        },
+        {
+          "name": "get_prediction_risk_diagnosis",
+          "line": 4591,
+          "end": 4683,
+          "calls": [
+            "abs",
+            "add",
+            "current_df['Attraction'].isin",
+            "datetime.now",
+            "err['error'].abs",
+            "err['error'].abs().tail",
+            "err['error'].abs().tail(80).mean",
+            "filter_crowd_history",
+            "float",
+            "history_df.copy",
+            "history_df['attraction'].isin",
+            "history_df[history_df['attraction'].isin(settings['rides'])].copy",
+            "int",
+            "len",
+            "max",
+            "model_df['attraction'].isin",
+            "model_df['attraction'].nunique",
+            "model_df['date'].nunique",
+            "model_df[model_df['attraction'].isin(settings['rides'])].copy",
+            "open_major['Wait'].mean",
+            "pd.DataFrame",
+            "pd.isna",
+            "prediction_history['error'].notna",
+            "prediction_history[prediction_history['error'].notna()].copy",
+            "rows.append",
+            "same_hour['wait_time'].median",
+            "str"
+          ]
+        },
+        {
+          "name": "get_guest_action_plan",
+          "line": 4686,
+          "end": 4748,
+          "calls": [
+            "df.groupby",
+            "df.groupby('Attraction')['Predicted Wait'].max",
+            "df.groupby('Attraction')['Predicted Wait'].max().sort_values",
+            "df.groupby('Hour')['Predicted Wait'].mean",
+            "df.groupby('Hour')['Predicted Wait'].mean().sort_values",
+            "df['Predicted Wait'].notna",
+            "df[df['Predicted Wait'].notna()].copy",
+            "float",
+            "int",
+            "len",
+            "pd.DataFrame",
+            "pd.isna",
+            "rows.append",
+            "str",
+            "wait_prediction_df.copy"
+          ]
+        },
+        {
+          "name": "get_current_stats",
+          "line": 4749,
+          "end": 4762,
+          "calls": [
+            "len",
+            "pd.isna",
+            "valid_open_df['Wait'].max",
+            "valid_open_df['Wait'].mean",
+            "valid_open_df['Wait'].var"
+          ]
+        },
+        {
+          "name": "get_today_stats",
+          "line": 4765,
+          "end": 4796,
+          "calls": [
+            "datetime.now",
+            "datetime.now(JST).date",
+            "filter_crowd_history",
+            "history_df[(history_df['date'] == today) & (history_df['wait_time'] > 0)].copy",
+            "len",
+            "pd.DataFrame",
+            "pd.isna",
+            "today_df['wait_time'].max",
+            "today_df['wait_time'].mean",
+            "today_df['wait_time'].var",
+            "valid_open_df['Wait'].max",
+            "valid_open_df['Wait'].mean",
+            "valid_open_df['Wait'].var"
+          ]
+        },
+        {
+          "name": "get_prediction_gap_summary",
+          "line": 4798,
+          "end": 4849,
+          "calls": [
+            "datetime.now",
+            "int",
+            "len",
+            "now.date",
+            "pd.DataFrame",
+            "pending_df.apply",
+            "pending_df.groupby",
+            "pending_df.groupby(['created_date', '理由']).size",
+            "pending_df.groupby(['created_date', '理由']).size().reset_index",
+            "prediction_history['error'].isna",
+            "prediction_history[prediction_history['error'].isna()].copy",
+            "row['created_at'].date",
+            "summary.rename",
+            "summary['理由'].map"
+          ]
+        },
+        {
+          "name": "get_weather_score",
+          "line": 4852,
+          "end": 4864,
+          "calls": []
+        },
+        {
+          "name": "get_dpa_score",
+          "line": 4867,
+          "end": 4876,
+          "calls": []
+        },
+        {
+          "name": "format_crowd_index",
+          "line": 4880,
+          "end": 4884,
+          "calls": [
+            "float"
+          ]
+        },
+        {
+          "name": "_attraction_prediction_profiles",
+          "line": 4892,
+          "end": 4937,
+          "calls": [
+            "best_row.get",
+            "df.groupby",
+            "df['Predicted Wait'].notna",
+            "df[df['Predicted Wait'].notna()].copy",
+            "float",
+            "group.sort_values",
+            "group.sort_values('Hour').copy",
+            "group.sort_values('Predicted Wait').head",
+            "group.sort_values('Predicted Wait', ascending=False).head",
+            "group.sort_values('diff', ascending=False).head",
+            "group['Predicted Wait'].diff",
+            "int",
+            "len",
+            "pd.isna",
+            "required.issubset",
+            "rows.append",
+            "sorted",
+            "str",
+            "surge.iloc[0].get",
+            "wait_prediction_df.copy",
+            "worst_row.get"
+          ]
+        },
+        {
+          "name": "_low_wait_slots",
+          "line": 4940,
+          "end": 4941,
+          "calls": [
+            "_attraction_prediction_profiles"
+          ]
+        },
+        {
+          "name": "_short_attraction_name",
+          "line": 4944,
+          "end": 4958,
+          "calls": [
+            "is_mojibake_text",
+            "replacements.get",
+            "str",
+            "str(name).replace",
+            "str(name).replace('TM', '').strip"
+          ]
+        },
+        {
+          "name": "_x_level_text",
+          "line": 4961,
+          "end": 4967,
+          "calls": [
+            "float"
+          ]
+        },
+        {
+          "name": "_truncate_text",
+          "line": 4970,
+          "end": 4978,
+          "calls": [
+            "is_mojibake_text",
+            "len",
+            "max",
+            "text.rfind",
+            "text[:max(0, limit - 1)].rstrip"
+          ]
+        },
+        {
+          "name": "_attraction_prediction_profiles",
+          "line": 4981,
+          "end": 4990,
+          "calls": [
+            "df.groupby",
+            "df.groupby('Attraction')['Predicted Wait'].idxmin",
+            "df.loc[idx].sort_values",
+            "df.loc[idx].sort_values('Predicted Wait').head",
+            "float",
+            "int",
+            "len",
+            "picks.iterrows",
+            "profiles.append",
+            "row.get",
+            "wait_prediction_df.copy",
+            "{'Attraction', 'Predicted Wait'}.issubset"
+          ]
+        },
+        {
+          "name": "_format_time_jp",
+          "line": 4993,
+          "end": 5001,
+          "calls": [
+            "int",
+            "str",
+            "text.split"
+          ]
+        },
+        {
+          "name": "make_x_post_summary",
+          "line": 5004,
+          "end": 5036,
+          "calls": [
+            "'、'.join",
+            "PARK_SETTINGS.get",
+            "PARK_SETTINGS.get(park, {}).get",
+            "_attraction_prediction_profiles",
+            "_format_time_jp",
+            "_short_attraction_name",
+            "_truncate_text",
+            "_x_level_text",
+            "aim_parts.append",
+            "df.copy",
+            "df.groupby",
+            "df.groupby('Hour')['Predicted Wait'].mean",
+            "df['Attraction'].isin",
+            "df['Predicted Wait'].mean",
+            "df[df['Attraction'].isin(major_rides)].copy",
+            "df[pd.to_numeric(df['Predicted Wait'], errors='coerce').notna()].copy",
+            "float",
+            "format_crowd_index",
+            "hasattr",
+            "hourly.idxmax",
+            "int",
+            "is_mojibake_text",
+            "len",
+            "major_df['Predicted Wait'].mean",
+            "pd.DataFrame",
+            "pd.to_numeric",
+            "pd.to_numeric(df['Predicted Wait'], errors='coerce').notna",
+            "profile.get",
+            "str",
+            "target_date.strftime",
+            "wait_prediction_df.copy",
+            "{'Attraction', 'Hour', 'Predicted Wait'}.issubset"
+          ]
+        },
+        {
+          "name": "get_crowd_index_for_park",
+          "line": 5039,
+          "end": 5123,
+          "calls": [
+            "PARK_CROWD_BASELINES.get",
+            "baseline.get",
+            "float",
+            "int",
+            "max",
+            "min",
+            "np.clip",
+            "round",
+            "warnings.append"
+          ]
+        },
+        {
+          "name": "get_crowd_index",
+          "line": 5126,
+          "end": 5140,
+          "calls": [
+            "get_crowd_index_for_park",
+            "max",
+            "np.sqrt",
+            "pd.isna"
+          ]
+        },
+        {
+          "name": "get_level",
+          "line": 5143,
+          "end": 5152,
+          "calls": []
+        },
+        {
+          "name": "make_action_advice",
+          "line": 5154,
+          "end": 5201,
+          "calls": [
+            "advice.append",
+            "len",
+            "valid_all_df.sort_values",
+            "valid_target_df.sort_values"
+          ]
+        },
+        {
+          "name": "predict_dpa_risk",
+          "line": 5204,
+          "end": 5232,
+          "calls": []
+        },
+        {
+          "name": "add",
+          "line": 4602,
+          "end": 4608,
+          "calls": [
+            "rows.append"
+          ]
+        },
+        {
+          "name": "classify",
+          "line": 4824,
+          "end": 4836,
+          "calls": [
+            "int",
+            "now.date",
+            "row['created_at'].date"
+          ]
+        }
+      ],
+      "duplicate_functions": [
+        "_attraction_prediction_profiles"
+      ]
+    }
+  },
+  "databases": {
+    "disneyland.db": {
+      "sha256": "20ee8bf97d7f0f308c8cac76aca9776ab755f36993d59c11944bb93c53b2efad",
+      "integrity": "ok",
+      "days": [
+        [
+          "2026-05-08",
+          224,
+          5,
+          "2026-05-08 10:38:01",
+          "2026-05-08 20:55:24"
+        ]
+      ],
+      "rides": [
+        [
+          "Enchanted Tale of Beauty and the Beast",
+          45,
+          1
+        ],
+        [
+          "Monsters, Inc. Ride & Go Seek!",
+          45,
+          1
+        ],
+        [
+          "Pooh's Hunny Hunt",
+          45,
+          1
+        ],
+        [
+          "Splash Mountain",
+          44,
+          1
+        ],
+        [
+          "The Happy Ride with Baymax",
+          45,
+          1
+        ]
+      ],
+      "duplicate_observations": null,
+      "legacy_predictions": [
+        468,
+        133,
+        "2026-05-08 13:20:18",
+        "2026-05-08 21:10:28"
+      ]
+    },
+    "disneysea.db": {
+      "sha256": "6e740c840bf441e897b767939cfba2f96103fbd2da70827d7e331549a146444c",
+      "integrity": "ok",
+      "days": [
+        [
+          "2026-05-08",
+          994,
+          5,
+          "2026-05-08 10:38:20",
+          "2026-05-08 20:37:38"
+        ]
+      ],
+      "rides": [
+        [
+          "Anna and Elsa's Frozen Journey",
+          195,
+          1
+        ],
+        [
+          "Journey to the Center of the Earth",
+          195,
+          1
+        ],
+        [
+          "Soaring: Fantastic Flight",
+          189,
+          1
+        ],
+        [
+          "Tower of Terror",
+          213,
+          1
+        ],
+        [
+          "Toy Story Mania!",
+          202,
+          1
+        ]
+      ],
+      "duplicate_observations": null,
+      "legacy_predictions": [
+        2574,
+        811,
+        "2026-05-08 11:29:26",
+        "2026-05-08 21:33:11"
+      ]
+    }
+  }
+}

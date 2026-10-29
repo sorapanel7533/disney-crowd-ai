@@ -1,0 +1,1466 @@
+{
+  "protocol": "Expanding origin; target observations strictly after origin; daily/hourly aggregation; no future weather, tickets or errors",
+  "adopted": "legacy-corrected-v1 (correctness repairs; accuracy improvement not established)",
+  "parks": {
+    "DisneySea": {
+      "data": {
+        "available_days": 1,
+        "first_day": "2026-05-08",
+        "last_day": "2026-05-08",
+        "observations": 994,
+        "hourly_samples": 52
+      },
+      "formal_daily_validation": {
+        "metrics": {},
+        "breakdowns": {}
+      },
+      "intraday_diagnostic_only": {
+        "metrics": {
+          "legacy": {
+            "n": 40,
+            "MAE": 19.95515297906602,
+            "RMSE": 23.720137505544763,
+            "Bias_predicted_minus_actual": 17.883486312399356,
+            "days": 1,
+            "improvement_vs_legacy_percent": 0.0
+          },
+          "legacy_corrected": {
+            "n": 40,
+            "MAE": 19.887652979066026,
+            "RMSE": 23.589561940426336,
+            "Bias_predicted_minus_actual": 17.715986312399355,
+            "days": 1,
+            "improvement_vs_legacy_percent": 0.33825849428870036
+          },
+          "weekday_hour_median": {
+            "n": 40,
+            "MAE": 22.325820968484017,
+            "RMSE": 25.99601423322149,
+            "Bias_predicted_minus_actual": 17.908658270071317,
+            "days": 1,
+            "improvement_vs_legacy_percent": -11.87997903050379
+          },
+          "weighted_history_candidate": {
+            "n": 40,
+            "MAE": 17.358393719806763,
+            "RMSE": 21.425670423332296,
+            "Bias_predicted_minus_actual": 11.03762652403957,
+            "days": 1,
+            "improvement_vs_legacy_percent": 13.012975956553136
+          }
+        },
+        "breakdowns": {
+          "attraction": [
+            {
+              "model": "legacy",
+              "attraction": "Anna and Elsa's Frozen Journey",
+              "n": 8,
+              "MAE": 19.85981280193237,
+              "RMSE": 24.427964637255233,
+              "Bias_predicted_minus_actual": 19.85981280193237,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "attraction": "Journey to the Center of the Earth",
+              "n": 8,
+              "MAE": 24.702063204508853,
+              "RMSE": 28.453374435094933,
+              "Bias_predicted_minus_actual": 22.052063204508855,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "attraction": "Soaring: Fantastic Flight",
+              "n": 8,
+              "MAE": 15.313425925925923,
+              "RMSE": 17.45235288023484,
+              "Bias_predicted_minus_actual": 13.196759259259256,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "attraction": "Tower of Terror",
+              "n": 8,
+              "MAE": 25.95949074074074,
+              "RMSE": 27.94266069921229,
+              "Bias_predicted_minus_actual": 25.40949074074074,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "attraction": "Toy Story Mania!",
+              "n": 8,
+              "MAE": 13.940972222222223,
+              "RMSE": 17.931194476094063,
+              "Bias_predicted_minus_actual": 8.899305555555555,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "attraction": "Anna and Elsa's Frozen Journey",
+              "n": 8,
+              "MAE": 20.097312801932368,
+              "RMSE": 24.535955151733567,
+              "Bias_predicted_minus_actual": 20.097312801932368,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "attraction": "Journey to the Center of the Earth",
+              "n": 8,
+              "MAE": 24.714563204508856,
+              "RMSE": 28.460113871144802,
+              "Bias_predicted_minus_actual": 22.064563204508858,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "attraction": "Soaring: Fantastic Flight",
+              "n": 8,
+              "MAE": 15.42592592592592,
+              "RMSE": 17.480228003554224,
+              "Bias_predicted_minus_actual": 13.309259259259253,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "attraction": "Tower of Terror",
+              "n": 8,
+              "MAE": 25.659490740740743,
+              "RMSE": 27.48888950486291,
+              "Bias_predicted_minus_actual": 24.809490740740742,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "attraction": "Toy Story Mania!",
+              "n": 8,
+              "MAE": 13.540972222222225,
+              "RMSE": 17.582621211663508,
+              "Bias_predicted_minus_actual": 8.299305555555554,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "attraction": "Anna and Elsa's Frozen Journey",
+              "n": 8,
+              "MAE": 23.2712215320911,
+              "RMSE": 30.003014448948473,
+              "Bias_predicted_minus_actual": 22.6462215320911,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "attraction": "Journey to the Center of the Earth",
+              "n": 8,
+              "MAE": 27.570846273291934,
+              "RMSE": 30.83065157131698,
+              "Bias_predicted_minus_actual": 24.53513198757765,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "attraction": "Soaring: Fantastic Flight",
+              "n": 8,
+              "MAE": 17.458664021164026,
+              "RMSE": 21.148685384948166,
+              "Bias_predicted_minus_actual": 13.99140211640212,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "attraction": "Tower of Terror",
+              "n": 8,
+              "MAE": 24.397321428571423,
+              "RMSE": 25.25918256375812,
+              "Bias_predicted_minus_actual": 21.622023809523803,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "attraction": "Toy Story Mania!",
+              "n": 8,
+              "MAE": 18.93105158730159,
+              "RMSE": 21.046629906774356,
+              "Bias_predicted_minus_actual": 6.748511904761909,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "attraction": "Anna and Elsa's Frozen Journey",
+              "n": 8,
+              "MAE": 20.074296928916496,
+              "RMSE": 26.05253339131531,
+              "Bias_predicted_minus_actual": 18.511796928916496,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "attraction": "Journey to the Center of the Earth",
+              "n": 8,
+              "MAE": 24.657486484932143,
+              "RMSE": 27.565673882675465,
+              "Bias_predicted_minus_actual": 12.984206061651717,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "attraction": "Soaring: Fantastic Flight",
+              "n": 8,
+              "MAE": 14.720568783068785,
+              "RMSE": 18.83179774856848,
+              "Bias_predicted_minus_actual": 11.595568783068785,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "attraction": "Tower of Terror",
+              "n": 8,
+              "MAE": 14.385747354497354,
+              "RMSE": 15.220113704202419,
+              "Bias_predicted_minus_actual": 10.323247354497354,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "attraction": "Toy Story Mania!",
+              "n": 8,
+              "MAE": 12.953869047619047,
+              "RMSE": 16.444069603441445,
+              "Bias_predicted_minus_actual": 1.7733134920634939,
+              "days": 1
+            }
+          ],
+          "target_hour": [
+            {
+              "model": "legacy",
+              "target_hour": "12",
+              "n": 5,
+              "MAE": 23.149629629629626,
+              "RMSE": 24.818087456945108,
+              "Bias_predicted_minus_actual": 23.149629629629626,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "target_hour": "13",
+              "n": 5,
+              "MAE": 26.3,
+              "RMSE": 28.349514987032848,
+              "Bias_predicted_minus_actual": 26.3,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "target_hour": "14",
+              "n": 5,
+              "MAE": 15.320000000000007,
+              "RMSE": 23.068311598381023,
+              "Bias_predicted_minus_actual": 14.440000000000007,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "target_hour": "15",
+              "n": 5,
+              "MAE": 24.979999999999997,
+              "RMSE": 29.26209151786659,
+              "Bias_predicted_minus_actual": 23.819999999999993,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "target_hour": "16",
+              "n": 5,
+              "MAE": 15.62333333333333,
+              "RMSE": 20.1825130579255,
+              "Bias_predicted_minus_actual": 9.143333333333334,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "target_hour": "17",
+              "n": 5,
+              "MAE": 11.753333333333336,
+              "RMSE": 14.431516436835969,
+              "Bias_predicted_minus_actual": 3.7,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "target_hour": "18",
+              "n": 5,
+              "MAE": 16.616666666666667,
+              "RMSE": 17.63033528388562,
+              "Bias_predicted_minus_actual": 16.616666666666667,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "target_hour": "19",
+              "n": 5,
+              "MAE": 25.898260869565217,
+              "RMSE": 27.688963487512716,
+              "Bias_predicted_minus_actual": 25.898260869565217,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "target_hour": "12",
+              "n": 5,
+              "MAE": 22.68962962962963,
+              "RMSE": 24.143464383306373,
+              "Bias_predicted_minus_actual": 22.68962962962963,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "target_hour": "13",
+              "n": 5,
+              "MAE": 26.3,
+              "RMSE": 28.349514987032848,
+              "Bias_predicted_minus_actual": 26.3,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "target_hour": "14",
+              "n": 5,
+              "MAE": 15.480000000000004,
+              "RMSE": 23.080792880661622,
+              "Bias_predicted_minus_actual": 14.120000000000001,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "target_hour": "15",
+              "n": 5,
+              "MAE": 24.979999999999997,
+              "RMSE": 29.26209151786659,
+              "Bias_predicted_minus_actual": 23.819999999999993,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "target_hour": "16",
+              "n": 5,
+              "MAE": 15.803333333333327,
+              "RMSE": 20.055784701676465,
+              "Bias_predicted_minus_actual": 9.003333333333327,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "target_hour": "17",
+              "n": 5,
+              "MAE": 11.753333333333336,
+              "RMSE": 14.431516436835969,
+              "Bias_predicted_minus_actual": 3.7,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "target_hour": "18",
+              "n": 5,
+              "MAE": 16.196666666666665,
+              "RMSE": 17.290538517415307,
+              "Bias_predicted_minus_actual": 16.196666666666665,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "target_hour": "19",
+              "n": 5,
+              "MAE": 25.898260869565217,
+              "RMSE": 27.688963487512716,
+              "Bias_predicted_minus_actual": 25.898260869565217,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "target_hour": "12",
+              "n": 5,
+              "MAE": 23.962962962962965,
+              "RMSE": 25.047154655333816,
+              "Bias_predicted_minus_actual": 23.962962962962965,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "target_hour": "13",
+              "n": 5,
+              "MAE": 23.833333333333336,
+              "RMSE": 26.04409852590815,
+              "Bias_predicted_minus_actual": 23.833333333333336,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "target_hour": "14",
+              "n": 5,
+              "MAE": 16.00066137566138,
+              "RMSE": 21.60542593504445,
+              "Bias_predicted_minus_actual": 8.576058201058206,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "target_hour": "15",
+              "n": 5,
+              "MAE": 18.607804232804234,
+              "RMSE": 20.93504027500718,
+              "Bias_predicted_minus_actual": 12.076058201058206,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "target_hour": "16",
+              "n": 5,
+              "MAE": 17.964285714285715,
+              "RMSE": 20.42602693943715,
+              "Bias_predicted_minus_actual": 5.345238095238093,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "target_hour": "17",
+              "n": 5,
+              "MAE": 12.023809523809524,
+              "RMSE": 13.92084899882448,
+              "Bias_predicted_minus_actual": 3.261904761904765,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "target_hour": "18",
+              "n": 5,
+              "MAE": 24.326058201058206,
+              "RMSE": 25.665973216643135,
+              "Bias_predicted_minus_actual": 24.326058201058206,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "target_hour": "19",
+              "n": 5,
+              "MAE": 41.88765240395676,
+              "RMSE": 43.884642963893675,
+              "Bias_predicted_minus_actual": 41.88765240395676,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "target_hour": "12",
+              "n": 5,
+              "MAE": 10.973544973544978,
+              "RMSE": 13.941954558733132,
+              "Bias_predicted_minus_actual": 10.2962962962963,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "target_hour": "13",
+              "n": 5,
+              "MAE": 10.166666666666671,
+              "RMSE": 10.877917155073996,
+              "Bias_predicted_minus_actual": 10.166666666666671,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "target_hour": "14",
+              "n": 5,
+              "MAE": 16.4484126984127,
+              "RMSE": 21.20486365804699,
+              "Bias_predicted_minus_actual": 5.3373015873015905,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "target_hour": "15",
+              "n": 5,
+              "MAE": 17.9484126984127,
+              "RMSE": 19.019450484296748,
+              "Bias_predicted_minus_actual": 8.83730158730159,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "target_hour": "16",
+              "n": 5,
+              "MAE": 15.675925925925927,
+              "RMSE": 18.521492816701414,
+              "Bias_predicted_minus_actual": -1.6574074074074105,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "target_hour": "17",
+              "n": 5,
+              "MAE": 8.592592592592592,
+              "RMSE": 9.54611218703809,
+              "Bias_predicted_minus_actual": -3.740740740740739,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "target_hour": "18",
+              "n": 5,
+              "MAE": 20.75,
+              "RMSE": 21.92236934680596,
+              "Bias_predicted_minus_actual": 20.75,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "target_hour": "19",
+              "n": 5,
+              "MAE": 38.31159420289855,
+              "RMSE": 40.41803650424181,
+              "Bias_predicted_minus_actual": 38.31159420289855,
+              "days": 1
+            }
+          ],
+          "target_day": [
+            {
+              "model": "legacy",
+              "target_day": "2026-05-08",
+              "n": 40,
+              "MAE": 19.95515297906602,
+              "RMSE": 23.720137505544763,
+              "Bias_predicted_minus_actual": 17.883486312399356,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "target_day": "2026-05-08",
+              "n": 40,
+              "MAE": 19.887652979066026,
+              "RMSE": 23.589561940426336,
+              "Bias_predicted_minus_actual": 17.715986312399355,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "target_day": "2026-05-08",
+              "n": 40,
+              "MAE": 22.325820968484017,
+              "RMSE": 25.99601423322149,
+              "Bias_predicted_minus_actual": 17.908658270071317,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "target_day": "2026-05-08",
+              "n": 40,
+              "MAE": 17.358393719806763,
+              "RMSE": 21.425670423332296,
+              "Bias_predicted_minus_actual": 11.03762652403957,
+              "days": 1
+            }
+          ],
+          "horizon_days": [
+            {
+              "model": "legacy",
+              "horizon_days": "0",
+              "n": 40,
+              "MAE": 19.95515297906602,
+              "RMSE": 23.720137505544763,
+              "Bias_predicted_minus_actual": 17.883486312399356,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "horizon_days": "0",
+              "n": 40,
+              "MAE": 19.887652979066026,
+              "RMSE": 23.589561940426336,
+              "Bias_predicted_minus_actual": 17.715986312399355,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "horizon_days": "0",
+              "n": 40,
+              "MAE": 22.325820968484017,
+              "RMSE": 25.99601423322149,
+              "Bias_predicted_minus_actual": 17.908658270071317,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "horizon_days": "0",
+              "n": 40,
+              "MAE": 17.358393719806763,
+              "RMSE": 21.425670423332296,
+              "Bias_predicted_minus_actual": 11.03762652403957,
+              "days": 1
+            }
+          ],
+          "origin": [
+            {
+              "model": "legacy",
+              "origin": "2026-05-08 12:00:00",
+              "n": 10,
+              "MAE": 24.724814814814813,
+              "RMSE": 26.642376630291228,
+              "Bias_predicted_minus_actual": 24.724814814814813,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "origin": "2026-05-08 14:00:00",
+              "n": 10,
+              "MAE": 20.150000000000002,
+              "RMSE": 26.3478367233441,
+              "Bias_predicted_minus_actual": 19.13,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "origin": "2026-05-08 16:00:00",
+              "n": 10,
+              "MAE": 13.688333333333333,
+              "RMSE": 17.544265444868305,
+              "Bias_predicted_minus_actual": 6.421666666666667,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "origin": "2026-05-08 18:00:00",
+              "n": 10,
+              "MAE": 21.257463768115947,
+              "RMSE": 23.211068709077516,
+              "Bias_predicted_minus_actual": 21.257463768115947,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "origin": "2026-05-08 12:00:00",
+              "n": 10,
+              "MAE": 24.494814814814816,
+              "RMSE": 26.330608352523715,
+              "Bias_predicted_minus_actual": 24.494814814814816,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "origin": "2026-05-08 14:00:00",
+              "n": 10,
+              "MAE": 20.229999999999997,
+              "RMSE": 26.3533015009505,
+              "Bias_predicted_minus_actual": 18.969999999999995,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "origin": "2026-05-08 16:00:00",
+              "n": 10,
+              "MAE": 13.77833333333333,
+              "RMSE": 17.471450521732113,
+              "Bias_predicted_minus_actual": 6.351666666666664,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "origin": "2026-05-08 18:00:00",
+              "n": 10,
+              "MAE": 21.047463768115943,
+              "RMSE": 23.08290949203582,
+              "Bias_predicted_minus_actual": 21.047463768115943,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "origin": "2026-05-08 12:00:00",
+              "n": 10,
+              "MAE": 23.898148148148152,
+              "RMSE": 25.550489470413492,
+              "Bias_predicted_minus_actual": 23.898148148148152,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "origin": "2026-05-08 14:00:00",
+              "n": 10,
+              "MAE": 17.30423280423281,
+              "RMSE": 21.272874055365254,
+              "Bias_predicted_minus_actual": 10.326058201058206,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "origin": "2026-05-08 16:00:00",
+              "n": 10,
+              "MAE": 14.99404761904762,
+              "RMSE": 17.478738704189794,
+              "Bias_predicted_minus_actual": 4.303571428571429,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "origin": "2026-05-08 18:00:00",
+              "n": 10,
+              "MAE": 33.106855302507476,
+              "RMSE": 35.94860267956089,
+              "Bias_predicted_minus_actual": 33.106855302507476,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "origin": "2026-05-08 12:00:00",
+              "n": 10,
+              "MAE": 10.570105820105825,
+              "RMSE": 12.504142884468985,
+              "Bias_predicted_minus_actual": 10.231481481481485,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "origin": "2026-05-08 14:00:00",
+              "n": 10,
+              "MAE": 17.1984126984127,
+              "RMSE": 20.141818928301607,
+              "Bias_predicted_minus_actual": 7.0873015873015905,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "origin": "2026-05-08 16:00:00",
+              "n": 10,
+              "MAE": 12.13425925925926,
+              "RMSE": 14.733871759429686,
+              "Bias_predicted_minus_actual": -2.699074074074075,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "origin": "2026-05-08 18:00:00",
+              "n": 10,
+              "MAE": 29.530797101449274,
+              "RMSE": 32.51313544274068,
+              "Bias_predicted_minus_actual": 29.530797101449274,
+              "days": 1
+            }
+          ]
+        }
+      },
+      "adoption_allowed": false,
+      "limitation": "Only one observed day. Intraday diagnostics do not establish next-day, weekday, seasonal or 7/30-day accuracy.",
+      "machine_learning": "Deferred until >=56 distinct observed days and independent holdout dates."
+    },
+    "Disneyland": {
+      "data": {
+        "available_days": 1,
+        "first_day": "2026-05-08",
+        "last_day": "2026-05-08",
+        "observations": 224,
+        "hourly_samples": 50
+      },
+      "formal_daily_validation": {
+        "metrics": {},
+        "breakdowns": {}
+      },
+      "intraday_diagnostic_only": {
+        "metrics": {
+          "legacy": {
+            "n": 35,
+            "MAE": 9.755238095238097,
+            "RMSE": 12.232700126339743,
+            "Bias_predicted_minus_actual": 7.8504761904761935,
+            "days": 1,
+            "improvement_vs_legacy_percent": 0.0
+          },
+          "legacy_corrected": {
+            "n": 35,
+            "MAE": 9.803809523809523,
+            "RMSE": 12.33435774381386,
+            "Bias_predicted_minus_actual": 7.910476190476192,
+            "days": 1,
+            "improvement_vs_legacy_percent": -0.4979010055647522
+          },
+          "weekday_hour_median": {
+            "n": 35,
+            "MAE": 10.252380952380953,
+            "RMSE": 13.603716812368269,
+            "Bias_predicted_minus_actual": 8.433333333333332,
+            "days": 1,
+            "improvement_vs_legacy_percent": -5.096163233427699
+          },
+          "weighted_history_candidate": {
+            "n": 35,
+            "MAE": 7.371428571428571,
+            "RMSE": 9.829983287298683,
+            "Bias_predicted_minus_actual": 5.266666666666666,
+            "days": 1,
+            "improvement_vs_legacy_percent": 24.43620033193402
+          }
+        },
+        "breakdowns": {
+          "attraction": [
+            {
+              "model": "legacy",
+              "attraction": "Enchanted Tale of Beauty and the Beast",
+              "n": 7,
+              "MAE": 20.795238095238094,
+              "RMSE": 21.768154255300097,
+              "Bias_predicted_minus_actual": 20.795238095238094,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "attraction": "Monsters, Inc. Ride & Go Seek!",
+              "n": 7,
+              "MAE": 7.076190476190477,
+              "RMSE": 7.70130889720434,
+              "Bias_predicted_minus_actual": 0.7904761904761912,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "attraction": "Pooh's Hunny Hunt",
+              "n": 7,
+              "MAE": 7.2285714285714295,
+              "RMSE": 8.702873088813831,
+              "Bias_predicted_minus_actual": 7.2285714285714295,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "attraction": "Splash Mountain",
+              "n": 7,
+              "MAE": 8.614285714285716,
+              "RMSE": 9.589354216302278,
+              "Bias_predicted_minus_actual": 8.614285714285716,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "attraction": "The Happy Ride with Baymax",
+              "n": 7,
+              "MAE": 5.061904761904763,
+              "RMSE": 6.880141655979854,
+              "Bias_predicted_minus_actual": 1.8238095238095238,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "attraction": "Enchanted Tale of Beauty and the Beast",
+              "n": 7,
+              "MAE": 21.066666666666663,
+              "RMSE": 22.051426185745825,
+              "Bias_predicted_minus_actual": 21.066666666666663,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "attraction": "Monsters, Inc. Ride & Go Seek!",
+              "n": 7,
+              "MAE": 7.104761904761905,
+              "RMSE": 7.720946565869749,
+              "Bias_predicted_minus_actual": 0.8190476190476191,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "attraction": "Pooh's Hunny Hunt",
+              "n": 7,
+              "MAE": 7.2285714285714295,
+              "RMSE": 8.702873088813831,
+              "Bias_predicted_minus_actual": 7.2285714285714295,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "attraction": "Splash Mountain",
+              "n": 7,
+              "MAE": 8.585714285714285,
+              "RMSE": 9.584585839476096,
+              "Bias_predicted_minus_actual": 8.585714285714285,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "attraction": "The Happy Ride with Baymax",
+              "n": 7,
+              "MAE": 5.033333333333333,
+              "RMSE": 6.870167854514643,
+              "Bias_predicted_minus_actual": 1.8523809523809527,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "attraction": "Enchanted Tale of Beauty and the Beast",
+              "n": 7,
+              "MAE": 24.4047619047619,
+              "RMSE": 24.958298553119896,
+              "Bias_predicted_minus_actual": 24.4047619047619,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "attraction": "Monsters, Inc. Ride & Go Seek!",
+              "n": 7,
+              "MAE": 7.285714285714285,
+              "RMSE": 8.869870527499437,
+              "Bias_predicted_minus_actual": 0.14285714285714185,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "attraction": "Pooh's Hunny Hunt",
+              "n": 7,
+              "MAE": 7.428571428571429,
+              "RMSE": 10.99675276745692,
+              "Bias_predicted_minus_actual": 7.428571428571429,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "attraction": "Splash Mountain",
+              "n": 7,
+              "MAE": 8.785714285714286,
+              "RMSE": 8.962222300937897,
+              "Bias_predicted_minus_actual": 8.785714285714286,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "attraction": "The Happy Ride with Baymax",
+              "n": 7,
+              "MAE": 3.357142857142858,
+              "RMSE": 4.739650378908315,
+              "Bias_predicted_minus_actual": 1.404761904761905,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "attraction": "Enchanted Tale of Beauty and the Beast",
+              "n": 7,
+              "MAE": 12.619047619047619,
+              "RMSE": 13.972762620115436,
+              "Bias_predicted_minus_actual": 12.619047619047619,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "attraction": "Monsters, Inc. Ride & Go Seek!",
+              "n": 7,
+              "MAE": 10.023809523809522,
+              "RMSE": 12.084523750885438,
+              "Bias_predicted_minus_actual": 2.8809523809523805,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "attraction": "Pooh's Hunny Hunt",
+              "n": 7,
+              "MAE": 6.0,
+              "RMSE": 9.535647404794885,
+              "Bias_predicted_minus_actual": 6.0,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "attraction": "Splash Mountain",
+              "n": 7,
+              "MAE": 4.142857142857143,
+              "RMSE": 4.488079449258573,
+              "Bias_predicted_minus_actual": 4.142857142857143,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "attraction": "The Happy Ride with Baymax",
+              "n": 7,
+              "MAE": 4.071428571428572,
+              "RMSE": 5.549560257139214,
+              "Bias_predicted_minus_actual": 0.6904761904761908,
+              "days": 1
+            }
+          ],
+          "target_hour": [
+            {
+              "model": "legacy",
+              "target_hour": "13",
+              "n": 5,
+              "MAE": 6.746666666666667,
+              "RMSE": 8.394680855557683,
+              "Bias_predicted_minus_actual": 5.813333333333333,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "target_hour": "14",
+              "n": 5,
+              "MAE": 10.760000000000002,
+              "RMSE": 12.53491124818999,
+              "Bias_predicted_minus_actual": 10.760000000000002,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "target_hour": "15",
+              "n": 5,
+              "MAE": 12.919999999999998,
+              "RMSE": 14.438420966296832,
+              "Bias_predicted_minus_actual": 12.919999999999998,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "target_hour": "16",
+              "n": 5,
+              "MAE": 10.48,
+              "RMSE": 14.23755597003924,
+              "Bias_predicted_minus_actual": 5.4,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "target_hour": "17",
+              "n": 5,
+              "MAE": 11.1,
+              "RMSE": 15.06539080143625,
+              "Bias_predicted_minus_actual": 7.340000000000001,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "target_hour": "18",
+              "n": 5,
+              "MAE": 6.7600000000000025,
+              "RMSE": 8.195852609704497,
+              "Bias_predicted_minus_actual": 5.7600000000000025,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "target_hour": "19",
+              "n": 5,
+              "MAE": 9.52,
+              "RMSE": 10.70345738534984,
+              "Bias_predicted_minus_actual": 6.960000000000001,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "target_hour": "13",
+              "n": 5,
+              "MAE": 6.746666666666667,
+              "RMSE": 8.394680855557683,
+              "Bias_predicted_minus_actual": 5.813333333333333,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "target_hour": "14",
+              "n": 5,
+              "MAE": 10.98,
+              "RMSE": 12.924627654211163,
+              "Bias_predicted_minus_actual": 10.98,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "target_hour": "15",
+              "n": 5,
+              "MAE": 12.919999999999998,
+              "RMSE": 14.438420966296832,
+              "Bias_predicted_minus_actual": 12.919999999999998,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "target_hour": "16",
+              "n": 5,
+              "MAE": 10.6,
+              "RMSE": 14.465821787924805,
+              "Bias_predicted_minus_actual": 5.519999999999999,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "target_hour": "17",
+              "n": 5,
+              "MAE": 11.1,
+              "RMSE": 15.06539080143625,
+              "Bias_predicted_minus_actual": 7.340000000000001,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "target_hour": "18",
+              "n": 5,
+              "MAE": 6.76,
+              "RMSE": 8.257118141337205,
+              "Bias_predicted_minus_actual": 5.840000000000001,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "target_hour": "19",
+              "n": 5,
+              "MAE": 9.52,
+              "RMSE": 10.70345738534984,
+              "Bias_predicted_minus_actual": 6.960000000000001,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "target_hour": "13",
+              "n": 5,
+              "MAE": 7.166666666666669,
+              "RMSE": 9.596006113656523,
+              "Bias_predicted_minus_actual": 5.833333333333334,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "target_hour": "14",
+              "n": 5,
+              "MAE": 9.0,
+              "RMSE": 11.773322008299575,
+              "Bias_predicted_minus_actual": 9.0,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "target_hour": "15",
+              "n": 5,
+              "MAE": 8.5,
+              "RMSE": 10.756135200175036,
+              "Bias_predicted_minus_actual": 8.5,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "target_hour": "16",
+              "n": 5,
+              "MAE": 11.666666666666666,
+              "RMSE": 16.012148165967265,
+              "Bias_predicted_minus_actual": 4.666666666666666,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "target_hour": "17",
+              "n": 5,
+              "MAE": 11.666666666666666,
+              "RMSE": 16.3469331136523,
+              "Bias_predicted_minus_actual": 7.666666666666666,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "target_hour": "18",
+              "n": 5,
+              "MAE": 9.833333333333332,
+              "RMSE": 12.455476261022252,
+              "Bias_predicted_minus_actual": 9.833333333333332,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "target_hour": "19",
+              "n": 5,
+              "MAE": 13.933333333333332,
+              "RMSE": 16.44046498396225,
+              "Bias_predicted_minus_actual": 13.533333333333331,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "target_hour": "13",
+              "n": 5,
+              "MAE": 3.6666666666666687,
+              "RMSE": 4.654746681256315,
+              "Bias_predicted_minus_actual": 0.33333333333333426,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "target_hour": "14",
+              "n": 5,
+              "MAE": 7.666666666666666,
+              "RMSE": 10.448285345771652,
+              "Bias_predicted_minus_actual": 7.666666666666666,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "target_hour": "15",
+              "n": 5,
+              "MAE": 7.166666666666666,
+              "RMSE": 9.376388786023467,
+              "Bias_predicted_minus_actual": 7.166666666666666,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "target_hour": "16",
+              "n": 5,
+              "MAE": 7.0,
+              "RMSE": 9.082951062292475,
+              "Bias_predicted_minus_actual": 0.0,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "target_hour": "17",
+              "n": 5,
+              "MAE": 7.0,
+              "RMSE": 8.660254037844387,
+              "Bias_predicted_minus_actual": 3.0,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "target_hour": "18",
+              "n": 5,
+              "MAE": 7.5,
+              "RMSE": 10.062305898749054,
+              "Bias_predicted_minus_actual": 7.5,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "target_hour": "19",
+              "n": 5,
+              "MAE": 11.6,
+              "RMSE": 14.10319112825179,
+              "Bias_predicted_minus_actual": 11.2,
+              "days": 1
+            }
+          ],
+          "target_day": [
+            {
+              "model": "legacy",
+              "target_day": "2026-05-08",
+              "n": 35,
+              "MAE": 9.755238095238097,
+              "RMSE": 12.232700126339743,
+              "Bias_predicted_minus_actual": 7.8504761904761935,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "target_day": "2026-05-08",
+              "n": 35,
+              "MAE": 9.803809523809523,
+              "RMSE": 12.33435774381386,
+              "Bias_predicted_minus_actual": 7.910476190476192,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "target_day": "2026-05-08",
+              "n": 35,
+              "MAE": 10.252380952380953,
+              "RMSE": 13.603716812368269,
+              "Bias_predicted_minus_actual": 8.433333333333332,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "target_day": "2026-05-08",
+              "n": 35,
+              "MAE": 7.371428571428571,
+              "RMSE": 9.829983287298683,
+              "Bias_predicted_minus_actual": 5.266666666666666,
+              "days": 1
+            }
+          ],
+          "horizon_days": [
+            {
+              "model": "legacy",
+              "horizon_days": "0",
+              "n": 35,
+              "MAE": 9.755238095238097,
+              "RMSE": 12.232700126339743,
+              "Bias_predicted_minus_actual": 7.8504761904761935,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "horizon_days": "0",
+              "n": 35,
+              "MAE": 9.803809523809523,
+              "RMSE": 12.33435774381386,
+              "Bias_predicted_minus_actual": 7.910476190476192,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "horizon_days": "0",
+              "n": 35,
+              "MAE": 10.252380952380953,
+              "RMSE": 13.603716812368269,
+              "Bias_predicted_minus_actual": 8.433333333333332,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "horizon_days": "0",
+              "n": 35,
+              "MAE": 7.371428571428571,
+              "RMSE": 9.829983287298683,
+              "Bias_predicted_minus_actual": 5.266666666666666,
+              "days": 1
+            }
+          ],
+          "origin": [
+            {
+              "model": "legacy",
+              "origin": "2026-05-08 12:00:00",
+              "n": 5,
+              "MAE": 6.746666666666667,
+              "RMSE": 8.394680855557683,
+              "Bias_predicted_minus_actual": 5.813333333333333,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "origin": "2026-05-08 14:00:00",
+              "n": 10,
+              "MAE": 11.84,
+              "RMSE": 13.520207099005548,
+              "Bias_predicted_minus_actual": 11.84,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "origin": "2026-05-08 16:00:00",
+              "n": 10,
+              "MAE": 10.790000000000001,
+              "RMSE": 14.657318990865962,
+              "Bias_predicted_minus_actual": 6.37,
+              "days": 1
+            },
+            {
+              "model": "legacy",
+              "origin": "2026-05-08 18:00:00",
+              "n": 10,
+              "MAE": 8.14,
+              "RMSE": 9.532470823453908,
+              "Bias_predicted_minus_actual": 6.360000000000001,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "origin": "2026-05-08 12:00:00",
+              "n": 5,
+              "MAE": 6.746666666666667,
+              "RMSE": 8.394680855557683,
+              "Bias_predicted_minus_actual": 5.813333333333333,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "origin": "2026-05-08 14:00:00",
+              "n": 10,
+              "MAE": 11.95,
+              "RMSE": 13.702445037291701,
+              "Bias_predicted_minus_actual": 11.95,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "origin": "2026-05-08 16:00:00",
+              "n": 10,
+              "MAE": 10.85,
+              "RMSE": 14.768649227332876,
+              "Bias_predicted_minus_actual": 6.43,
+              "days": 1
+            },
+            {
+              "model": "legacy_corrected",
+              "origin": "2026-05-08 18:00:00",
+              "n": 10,
+              "MAE": 8.14,
+              "RMSE": 9.558870226130283,
+              "Bias_predicted_minus_actual": 6.4,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "origin": "2026-05-08 12:00:00",
+              "n": 5,
+              "MAE": 7.166666666666669,
+              "RMSE": 9.596006113656523,
+              "Bias_predicted_minus_actual": 5.833333333333334,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "origin": "2026-05-08 14:00:00",
+              "n": 10,
+              "MAE": 8.75,
+              "RMSE": 11.276204050024006,
+              "Bias_predicted_minus_actual": 8.75,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "origin": "2026-05-08 16:00:00",
+              "n": 10,
+              "MAE": 11.666666666666666,
+              "RMSE": 16.18040653245633,
+              "Bias_predicted_minus_actual": 6.166666666666666,
+              "days": 1
+            },
+            {
+              "model": "weekday_hour_median",
+              "origin": "2026-05-08 18:00:00",
+              "n": 10,
+              "MAE": 11.883333333333333,
+              "RMSE": 14.584714220336608,
+              "Bias_predicted_minus_actual": 11.683333333333334,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "origin": "2026-05-08 12:00:00",
+              "n": 5,
+              "MAE": 3.6666666666666687,
+              "RMSE": 4.654746681256315,
+              "Bias_predicted_minus_actual": 0.33333333333333426,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "origin": "2026-05-08 14:00:00",
+              "n": 10,
+              "MAE": 7.416666666666666,
+              "RMSE": 9.926815535037742,
+              "Bias_predicted_minus_actual": 7.416666666666666,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "origin": "2026-05-08 16:00:00",
+              "n": 10,
+              "MAE": 7.0,
+              "RMSE": 8.874119674649425,
+              "Bias_predicted_minus_actual": 1.5,
+              "days": 1
+            },
+            {
+              "model": "weighted_history_candidate",
+              "origin": "2026-05-08 18:00:00",
+              "n": 10,
+              "MAE": 9.55,
+              "RMSE": 12.25051019345725,
+              "Bias_predicted_minus_actual": 9.35,
+              "days": 1
+            }
+          ]
+        }
+      },
+      "adoption_allowed": false,
+      "limitation": "Only one observed day. Intraday diagnostics do not establish next-day, weekday, seasonal or 7/30-day accuracy.",
+      "machine_learning": "Deferred until >=56 distinct observed days and independent holdout dates."
+    }
+  }
+}
