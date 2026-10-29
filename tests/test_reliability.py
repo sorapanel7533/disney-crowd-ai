@@ -215,3 +215,28 @@ def test_unavailable_values_are_not_zero_or_official():
     assert utils.get_ticket_price_from_castel(date(2099,1,1),{})[0] is None
     hours=pd.DataFrame([{'target_date':date(2026,10,30),'park':'Disneyland','open_hour':9,'close_hour':21,'source':'rule_estimate'}])
     assert '推定' in utils.get_today_park_hours(hours,'Disneyland',date(2026,10,30))[2]
+
+
+def test_scheduled_week_forecasts_survive_rerun_and_evening_issue(db,monkeypatch):
+    from collector import persist_forecasts
+    with sqlite3.connect(Path(__file__).parents[1]/'disneyland.db') as source:
+        history=pd.read_sql_query('SELECT * FROM wait_times',source)
+    history['datetime']=pd.to_datetime(history.datetime)
+    history['date']=history.datetime.dt.date;history['hour']=history.datetime.dt.hour
+    weather=(20.,0.,'',pd.DataFrame(),pd.DataFrame())
+    now=pd.Timestamp.now(tz=r.JST).normalize()+pd.Timedelta(hours=8)
+    persist_forecasts(db,history,utils.PARK_SETTINGS['Disneyland'],'Disneyland',weather,now)
+    before=db.execute('SELECT * FROM daily_crowd_predictions').fetchall()
+    assert len(before)==7
+    assert db.execute('SELECT count(*) FROM predictions WHERE target_at_utc IS NOT NULL').fetchone()[0]>0
+    persist_forecasts(db,history,utils.PARK_SETTINGS['Disneyland'],'Disneyland',weather,now+pd.Timedelta(minutes=15))
+    assert db.execute('SELECT * FROM daily_crowd_predictions').fetchall()==before
+    persist_forecasts(db,history,utils.PARK_SETTINGS['Disneyland'],'Disneyland',weather,now+pd.Timedelta(hours=13))
+    assert db.execute("SELECT count(*) FROM daily_crowd_predictions WHERE forecast_kind='21:00'").fetchone()[0]==1
+    assert db.execute("SELECT * FROM daily_crowd_predictions WHERE forecast_kind='fixed'").fetchall()==before
+
+
+def test_unobserved_forecast_expires_without_fabricated_actual(db):
+    r.save_predictions(db,prediction(),'a',generated_at='2026-10-30T12:00:00Z')
+    r.evaluate_predictions(db,[],now='2026-11-10T00:00:00Z')
+    assert db.execute('SELECT predicted_wait,actual_wait,error,evaluation_status FROM predictions').fetchone()==(80,None,None,'insufficient_actual')

@@ -11,6 +11,33 @@ import utils
 from persistence import snapshot
 
 
+def persist_forecasts(conn, history, settings, park, weather, now):
+    """Durable first-issued weekly forecasts, plus a separate previous-evening issue."""
+    prediction_history=utils.load_prediction_history(conn)
+    daily_history=utils.load_daily_crowd_predictions(conn)
+    hours=utils.load_park_hours(conn)
+    events=utils.load_event_signals(conn)
+    targets=[(now.date()+timedelta(days=i),'fixed') for i in range(7)
+             if r.locked_daily(conn,now.date()+timedelta(days=i)) is None]
+    tomorrow=now.date()+timedelta(days=1)
+    if now.hour==21 and not conn.execute(
+        "SELECT 1 FROM daily_crowd_predictions WHERE target_date=? AND forecast_kind='21:00' AND model_version=?",
+        (str(tomorrow),r.MODEL_VERSION)).fetchone():
+        targets.append((tomorrow,'21:00'))
+    for target,kind in targets:
+        temp,rain,source=utils.get_forecast_weather_for_date(weather[4],target,weather[0],weather[1])
+        index,pred,reasons=utils.predict_crowd_index_for_date(
+            history,settings,target,temp,rain,prediction_history,daily_history,
+            event_signals=events,park_hours_df=hours,park=park)
+        features={**pred.attrs.get('features',{}),'weather_source':source,'reasons':reasons,
+                  'feature_cutoff_utc':pred.attrs.get('feature_cutoff_utc'),'issuer':'scheduled-collector'}
+        issued=max(r.utc(now),r.utc())
+        if r.save_daily(conn,target,index,features,kind=kind,generated_at=issued):
+            major=pred[pred.Attraction.isin(settings['rides'])].copy()
+            major.attrs=pred.attrs.copy()
+            r.save_predictions(conn,major,'__ALL__',target_date=target,park=park,generated_at=issued)
+
+
 def collect(destination, force=False, context=False):
     os.environ['DISNEY_DB_DIR']=str(destination)
     now=datetime.now(r.JST)
@@ -38,15 +65,7 @@ def collect(destination, force=False, context=False):
             if context:
                 utils.auto_collect_prediction_context(cursor,conn,park)
                 utils.auto_fetch_dpa_if_needed(cursor,conn,settings,park)
-            # First successful job after 21:00 takes an immutable next-day snapshot.
-            if now.hour==21:
-                target=now.date()+timedelta(days=1)
-                temp,rain,weather_source=utils.get_forecast_weather_for_date(weather[4],target,weather[0],weather[1])
-                pred_history=utils.load_prediction_history(conn)
-                index,pred,reasons=utils.predict_crowd_index_for_date(history,settings,target,temp,rain,pred_history,utils.load_daily_crowd_predictions(conn),park=park)
-                r.save_predictions(conn,pred,'__ALL__',target_date=target,park=park)
-                r.save_daily(conn,target,index,{'weather_source':weather_source,'reasons':reasons},kind='21:00')
-                r.save_daily(conn,target,index,{'weather_source':weather_source,'reasons':reasons})
+            persist_forecasts(conn,history,settings,park,weather,now)
             conn.execute('PRAGMA wal_checkpoint(TRUNCATE)')
         finally:
             conn.close()

@@ -252,6 +252,8 @@ def save_predictions(conn, frame, attraction, target_date=None, park=None, gener
 
 def evaluate_predictions(conn, major_rides, now=None):
     now = utc(now)
+    with conn:
+        conn.execute("UPDATE predictions SET evaluation_status='insufficient_actual' WHERE evaluation_status='pending' AND target_at_utc < ?",((now-pd.Timedelta(days=7)).isoformat(),))
     pending = pd.read_sql_query("SELECT rowid,* FROM predictions WHERE evaluation_status='pending'",conn)
     if pending.empty:
         return 0

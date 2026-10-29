@@ -67,7 +67,8 @@ def sync_public_snapshot(conn, db_name, directory, ttl=900):
             state=json.loads(marker.read_text(encoding='utf-8'))
         except (OSError,ValueError):
             state={}
-        if time.time()-state.get('checked',0)<ttl:
+        retry_ttl=ttl if state.get('status')=='success' else min(ttl,60)
+        if time.time()-state.get('checked',0)<retry_ttl:
             return state['message']
     try:
         # Data branch contains public park observations only, never secrets/config.
@@ -79,10 +80,12 @@ def sync_public_snapshot(conn, db_name, directory, ttl=900):
             path=Path(tmp)/'incoming.db'; path.write_bytes(response.content)
             count=merge_snapshot(conn,path)
         message=f'永続スナップショット同期成功: {count}行を追加'
+        status='success'
     except (requests.RequestException,ValueError,sqlite3.Error,OSError) as exc:
         message=f'永続保存先の同期失敗。ローカル履歴を保持: {exc}'
+        status='failed'
     with tempfile.NamedTemporaryFile(mode='w',encoding='utf-8',dir=directory,delete=False) as status_file:
-        json.dump({'checked':time.time(),'message':message},status_file,ensure_ascii=False)
+        json.dump({'checked':time.time(),'message':message,'status':status},status_file,ensure_ascii=False)
         status_path=status_file.name
     os.replace(status_path,marker)
     return message
