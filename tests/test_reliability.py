@@ -255,3 +255,11 @@ def test_route_discloses_model_imputation():
     frame=pd.DataFrame([{'Attraction':'a','Hour':9,'Minute':0,'Predicted Wait':10,'理由':'履歴不足：パーク傾向で補完'}])
     route,meta=optimize(frame,['a'],'09:00','12:00')
     assert meta['completed_count']==1 and meta['filled_attractions']==['a']
+
+
+def test_dpa_uses_history_when_closed_and_never_invents_missing_times():
+    empty=utils.predict_dpa_sellout_time('a',np.nan,np.nan,None,0,pd.DataFrame())
+    assert empty['予測売切れ時刻']=='未推定' and np.isnan(empty['Risk Score'])
+    history=pd.DataFrame([{'attraction':'a','sellout_hour':19.,'observed_at':pd.Timestamp('2026-10-29'),'target_date':date(2026,10,29)}])
+    prior=utils.predict_dpa_sellout_time('a',np.nan,np.nan,None,0,history)
+    assert prior['予測売切れ時刻']=='19:00' and prior['履歴件数']==1

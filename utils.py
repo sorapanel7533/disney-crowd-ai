@@ -3709,6 +3709,13 @@ def predict_dpa_sellout_time(attraction, wait, crowd_10, ticket_price, bonus, dp
             historical_hour = float(recent_history["sellout_hour"].median())
 
     risk_text, risk_score = predict_dpa_risk(wait, crowd_10, ticket_price, bonus)
+    if not np.isfinite(wait):
+        risk_score=round(early_ratio*6,2) if sample_count else np.nan
+        risk_text='履歴上の早期終了傾向（現在の販売状況は未確認）' if sample_count else 'データ不足'
+        if historical_hour is None:
+            return {'Attraction':attraction,'Wait':np.nan,'Risk':risk_text,'Risk Score':np.nan,
+                    '予測売切れ時刻':'未推定','根拠':'有効な現在値・売切れ履歴がありません',
+                    '履歴件数':0,'18時前売切れ率':np.nan}
 
     if historical_hour is not None:
         predicted_hour = historical_hour

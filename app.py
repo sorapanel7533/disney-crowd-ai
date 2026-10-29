@@ -1381,7 +1381,8 @@ elif display_mode == "全アトラクション":
 
     selected_history_attraction = st.selectbox(
         "🎢 グラフで見るアトラクションを選択",
-        all_attraction_list
+        all_attraction_list,
+        format_func=reliable.japanese_name,
     )
 
     graph_mode = st.selectbox(
@@ -1894,11 +1895,14 @@ elif display_mode == "DPA/PP予測":
 
     dpa_rows = []
 
-    for _, row in valid_all_df[valid_all_df.Attraction.isin(settings["dpa_order"])].iterrows():
+    live_dpa_waits = valid_all_df.set_index('Attraction')['Wait'].to_dict()
+    if not live_dpa_waits:
+        st.caption('現在の有効な待ち時間はありません。取得済み履歴の中央値を参考表示し、履歴もない施設は推定しません。')
+    for attraction in settings["dpa_order"]:
 
         dpa_rows.append(predict_dpa_sellout_time(
-            row["Attraction"],
-            row["Wait"],
+            attraction,
+            live_dpa_waits.get(attraction,np.nan),
             crowd_10,
             ticket_price,
             today_bonus,
@@ -1906,6 +1910,8 @@ elif display_mode == "DPA/PP予測":
         ))
 
     dpa_df = pd.DataFrame(dpa_rows)
+    if len(dpa_df):
+        dpa_df.insert(0,'日本語名',dpa_df.Attraction.map(reliable.japanese_name))
 
     if len(dpa_df) > 0:
 
@@ -1929,7 +1935,8 @@ elif display_mode == "DPA/PP予測":
     with st.form("dpa_sellout_form"):
         sellout_attraction = st.selectbox(
             "売切れを確認したアトラクション",
-            settings["dpa_order"]
+            settings["dpa_order"],
+            format_func=reliable.japanese_name,
         )
         sellout_hour = st.slider(
             "売切れ時刻",
