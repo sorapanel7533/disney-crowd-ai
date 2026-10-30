@@ -35,6 +35,15 @@ def merge_snapshot(conn, path):
                 cols={row[1] for row in conn.execute(f'PRAGMA table_info("{table}")')}
                 for row in source.execute(f'SELECT * FROM "{table}"'):
                     record={key:row[key] for key in row.keys() if key in cols}
+                    if table.startswith('alcohol_'):
+                        from alcohol import TABLES
+                        if table not in TABLES: raise ValueError('Unknown alcohol table')
+                        # Mutable official catalog facts are versioned by checked time.
+                        # Administrator overlays use a separate table and survive crawls.
+                        names=','.join(f'"{c}"' for c in record)
+                        marks=','.join('?' for _ in record)
+                        saved+=conn.execute(f'INSERT INTO "{table}" ({names}) VALUES ({marks}) ON CONFLICT(record_key) DO UPDATE SET updated_at_utc=excluded.updated_at_utc,payload_json=excluded.payload_json WHERE excluded.updated_at_utc>"{table}".updated_at_utc',tuple(record.values())).rowcount
+                        continue
                     if table=='dpa_sellouts':
                         prior=conn.execute('SELECT rowid,observed_at,sellout_hour FROM dpa_sellouts WHERE target_date=? AND attraction=? AND source=?',
                             (record['target_date'],record['attraction'],record['source'])).fetchone()

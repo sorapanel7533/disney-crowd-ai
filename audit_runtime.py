@@ -9,7 +9,7 @@ import requests
 import reliability as r
 import utils
 from data_quality import coverage
-from operations import schedule_audit
+from operations import schedule_audit,observation_audit
 
 
 def audit(directory,runs=None,now=None):
@@ -20,6 +20,7 @@ def audit(directory,runs=None,now=None):
         frame=r.load_history(con)
         result['parks'][park]={'integrity':con.execute('PRAGMA integrity_check').fetchone()[0],
             'db_bytes':path.stat().st_size,'quality':coverage(frame,park,settings['rides'],now),
+            'actual_collection_slots':observation_audit(frame,park,now),
             'fixed_forecasts':[dict(zip(['target_date','generated_at_utc','forecast_kind','model_version','predicted_crowd_index','actual_crowd_index'],row)) for row in con.execute('SELECT target_date,generated_at_utc,forecast_kind,model_version,predicted_crowd_index,actual_crowd_index FROM daily_crowd_predictions WHERE generated_at_utc IS NOT NULL')],
             'collection_attempts':dict(con.execute('SELECT status,count(*) FROM collection_runs GROUP BY status').fetchall())}
         total+=path.stat().st_size; con.close()
@@ -27,9 +28,18 @@ def audit(directory,runs=None,now=None):
     result['storage']={'current_db_bytes':total,'journal_files':len(journals),'journal_bytes':sum(x.stat().st_size for x in journals),
         'planned_runs_per_day':56,'raw_full_snapshot_upper_bound_bytes_per_day':total*56,
         'raw_full_snapshot_upper_bound_bytes_per_30days':total*56*30,
-        'warning':'Git delta compression is not guaranteed. This is an uncompressed full-snapshot upper bound, not measured Git growth.',
+        'warning':'Constant-current-size scenario only: DBs grow over time. This is neither a strict future upper bound nor measured compressed Git growth. 56 observations/day; bounded sessions share the data writer.',
         'partition_required':total>=20*1024*1024,'partition_warning_threshold_bytes':20*1024*1024,
         'retention_policy':'No destructive prune. Immutable row journals plus original DB and retained Git snapshots. Plan monthly partitions before threshold.'}
+    alcohol_path=directory/'alcohol.db'
+    if alcohol_path.exists():
+        try:
+            import alcohol
+            ac=alcohol.connect(alcohol_path)
+            result['alcohol']={'integrity':ac.execute('PRAGMA integrity_check').fetchone()[0],'bytes':alcohol_path.stat().st_size,'freshness':alcohol.freshness(ac,now)}
+            ac.close()
+        except Exception as exc:
+            result['alcohol']={'status':'audit_failed','reason':type(exc).__name__}
     try:
         result['storage']['git_object_statistics']=subprocess.run(['git','count-objects','-v'],cwd=directory,capture_output=True,text=True,check=True).stdout.strip()
         commits=subprocess.run(['git','log','--format=%H %cI','--','*.db'],cwd=directory,capture_output=True,text=True,check=True).stdout.splitlines()

@@ -1,0 +1,58 @@
+name: Update official alcohol menu facts
+on:
+  schedule:
+    # Monday 06:00 JST. GitHub can delay or drop scheduled starts.
+    - cron: '0 21 * * 0'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Recheck an already successful week (manual review/recovery)'
+        type: boolean
+        default: false
+      admin_note:
+        description: 'Optional public annotation JSON exported by an authenticated administrator'
+        required: false
+        default: ''
+  push:
+    branches: [main]
+    paths: ['alcohol.py', 'alcohol_collector.py', 'data/alcohol-bootstrap.json', '.github/workflows/alcohol.yml']
+permissions:
+  contents: write
+concurrency:
+  group: crowd-data-collector
+  cancel-in-progress: false
+jobs:
+  survey:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Restore data branch
+        run: |
+          git fetch origin crowd-data
+          git worktree add .data origin/crowd-data
+      - name: Integrity check and recovery
+        run: python backup_recovery.py .data --only alcohol.db
+      - name: Weekly factual survey
+        id: survey
+        continue-on-error: true
+        env:
+          FORCE_SURVEY: ${{ inputs.force }}
+          ADMIN_ALCOHOL_NOTE: ${{ inputs.admin_note }}
+        run: |
+          if [ "$FORCE_SURVEY" = "true" ]; then
+            python alcohol_collector.py --data-dir .data --force
+          else
+            python alcohol_collector.py --data-dir .data
+          fi
+      - name: Persist catalog and failure evidence
+        if: always()
+        run: python -c "from collection_session import persist; persist('.data')"
+      - name: Report failed survey
+        if: steps.survey.outcome == 'failure'
+        run: exit 1

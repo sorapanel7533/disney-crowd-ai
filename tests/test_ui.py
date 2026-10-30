@@ -8,7 +8,7 @@ from streamlit.testing.v1 import AppTest
 import utils
 import reliability as r
 
-VIEWS=['ダッシュボード','全アトラクション','アトラクション別予測','DPA/PP予測','日付指定予測','回り方プランナー','データ管理']
+VIEWS=['ダッシュボード','全アトラクション','アトラクション別予測','DPA/PP予測','日付指定予測','回り方プランナー','データ管理','アルコール情報']
 ROOT=Path(__file__).resolve().parents[1]
 
 

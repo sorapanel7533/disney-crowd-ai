@@ -104,9 +104,14 @@ def backtest(raw,settings,legacy,diagnostic=False):
             legacy.datetime,utils.datetime=old_dt,old_new_dt
         mappings={name:frame[frame.Minute.eq(0)].set_index(['Attraction','Hour'])['Predicted Wait']
                   for name,frame in [('legacy',old),('legacy_corrected',corrected)]}
+        import model_registry
+        import reliability as r
+        target_keys=[(row.attraction,r.iso(pd.Timestamp(row.datetime).tz_localize(r.JST))) for row in test.itertuples()]
+        recent=model_registry.predict('recent-trend-candidate-v1',train,settings,target_keys,pd.Timestamp(origin).tz_localize(r.JST))
         for row in test.itertuples():
             values={'weekday_hour_median':baseline(train,row.attraction,row.datetime),
                     'weighted_history_candidate':baseline(train,row.attraction,row.datetime,True)}
+            values['recent_trend_candidate']=recent.get((row.attraction,r.iso(pd.Timestamp(row.datetime).tz_localize(r.JST))),np.nan)
             for name,mapping in mappings.items(): values[name]=mapping.get((row.attraction,row.hour),np.nan)
             for model,value in values.items():
                 if np.isfinite(value): results.append({'model':model,'origin':str(origin),'target_day':str(row.date),

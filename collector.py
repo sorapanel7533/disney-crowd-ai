@@ -56,12 +56,21 @@ def collect(destination, force=False, context=False):
         return [{'status':'skipped','reason':'営業時間外（08:00〜22:00 JSTの収集窓）'}]
     weather=utils.get_weather(); results=[]; reports={}
     run_id=(os.environ['GITHUB_RUN_ID']+'-'+os.environ.get('GITHUB_RUN_ATTEMPT','1')) if os.environ.get('GITHUB_RUN_ID') else r.utc().strftime('%Y%m%dT%H%M%S%f')
+    if os.environ.get('COLLECTOR_SAMPLE_ID'): run_id+='-s'+os.environ['COLLECTOR_SAMPLE_ID']
     event=os.environ.get('COLLECTOR_EVENT',os.environ.get('GITHUB_EVENT_NAME','local'))
     admin_payload=json.loads(os.environ['ADMIN_EVENT_JSON']) if os.environ.get('ADMIN_EVENT_JSON','').strip() else None
     if admin_payload: durable_admin.validate(admin_payload)
     for park,base in utils.PARK_SETTINGS.items():
         settings=dict(base,park=park); start=r.iso(); started=time.monotonic()
-        conn,cursor=utils.connect_db(base['db']); result={'park':park,'status':'failed'}
+        result={'park':park,'status':'failed'}
+        try: conn,cursor=utils.connect_db(base['db'])
+        except (sqlite3.Error,OSError) as exc:
+            results.append({**result,'failure_class':'db_open','message':type(exc).__name__})
+            continue
+        latest=conn.execute('SELECT max(fetched_at_utc) FROM wait_times WHERE quality=?',('valid',)).fetchone()[0]
+        if not force and latest and 0<=(r.utc()-r.utc(latest)).total_seconds()<300:
+            results.append({'park':park,'status':'skipped','reason':'A current collection was persisted less than five minutes ago; no duplicate API request'})
+            conn.close();continue
         with tempfile.TemporaryDirectory(dir=destination) as temp:
             before_path=Path(temp)/'before.db'; snapshot(conn,before_path)
             try:
@@ -75,6 +84,7 @@ def collect(destination, force=False, context=False):
                         closed=int(frame.Open.eq(False).sum()),source_stale=int((pd.to_datetime(frame.UpdatedUTC,utc=True)<r.utc()-pd.Timedelta(minutes=20)).sum()))
                 except Exception as exc:
                     r.record_collection(conn,park,'failed',str(exc)); result['message']=str(exc)
+                    result['failure_class']='db_save' if isinstance(exc,sqlite3.Error) else 'api_fetch'
                 if admin_payload and admin_payload['park']==park:
                     result['admin_acknowledged']=durable_admin.apply(conn,admin_payload)
                 operations.source_check(conn,park,'weather','success' if r.finite(weather[0]) is not None else 'failed',weather[2],now.date(),'https://api.open-meteo.com/v1/forecast',observed_at=weather[4].attrs.get('observed_at_utc'))
@@ -95,7 +105,7 @@ def collect(destination, force=False, context=False):
                 result['shadow_issued']=evaluation.issue(conn,history,settings,park)
                 reports[park]={'quality':coverage(history,park,settings['rides']),'evaluation':evaluation.report(conn),'sources':operations.freshness(conn)}
             except Exception as exc:
-                result.update(status='failed',processing_error=str(exc))
+                result.update(status='failed',processing_error=str(exc),failure_class='db_save' if isinstance(exc,sqlite3.Error) else 'forecast_or_context')
             finally:
                 result['duration_seconds']=round(time.monotonic()-started,3)
                 with conn:

@@ -134,7 +134,7 @@ def test_evening_shadow_targets_next_day_is_immutable(db,monkeypatch):
     f=observations();settings=dict(utils.PARK_SETTINGS['Disneyland'],rides=['a'])
     monkeypatch.setattr(models,'predict',lambda version,training,settings,targets,origin:{x:10. for x in targets})
     first=ce.issue(db,f,settings,'Disneyland','2026-10-01T12:07:00Z')
-    assert first==48 # 12 hours * 4 frozen versions; intraday outside opening hours
+    assert first==12*len(models.MODELS) # All frozen versions, intraday outside opening hours
     assert ce.issue(db,f,settings,'Disneyland','2026-10-01T12:22:00Z')==0
     assert db.execute('SELECT distinct target_date FROM model_issues').fetchone()[0]=='2026-10-02'
     assert db.execute('SELECT min(target_at_utc) FROM model_predictions').fetchone()[0].startswith('2026-10-02T00:00')

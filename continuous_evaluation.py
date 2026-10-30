@@ -19,6 +19,7 @@ def migrate(conn):
 
 
 def issue(conn,history,settings,park,now=None):
+    real_clock=now is None
     migrate(conn); now=r.utc(now); local=now.tz_convert(r.JST)
     kinds=[('intraday',local.date(),[now.ceil('h')+pd.Timedelta(hours=i) for i in (1,2)])]
     if local.hour==21:
@@ -26,7 +27,7 @@ def issue(conn,history,settings,park,now=None):
         kinds.append(('previous_evening',tomorrow,[pd.Timestamp(tomorrow,tz=r.JST)+pd.Timedelta(hours=h) for h in range(9,21)]))
     made=0
     for kind,day,stamps in kinds:
-        key=f'{park}|{local.date()}|{kind}'
+        key=f'{park}|{local.date()}|{kind}' + (f'|{local.hour:02d}|stage3' if kind=='intraday' else '|stage3')
         if conn.execute('SELECT 1 FROM model_issues WHERE issue_key=?',(key,)).fetchone(): continue
         training=models.prepare(history,now)
         if training.empty: continue
@@ -37,10 +38,11 @@ def issue(conn,history,settings,park,now=None):
             'training_max_local':str(training.datetime.max()),'policy':'verified; available before origin; no future weather/price/feedback',
             'versions':{v:models.source_fingerprint(v) for v in models.MODELS}}
         predictions={v:models.predict(v,training,settings,targets,now) for v in models.MODELS}
+        issued=max(now,r.utc()) if real_clock else now
         # Compute first, then issue. No partly written issue can prevent a retry.
         with conn:
             conn.execute('INSERT OR IGNORE INTO model_issues VALUES (?,?,?,?,?,?,?)',
-                (key,park,r.iso(now),str(day),kind,r.iso(now),json.dumps(features,sort_keys=True)))
+                (key,park,r.iso(issued),str(day),kind,r.iso(now),json.dumps(features,sort_keys=True)))
             for version,values in predictions.items():
                 for (name,target),value in values.items():
                     pk=hashlib.sha256(f'{key}|{version}|{name}|{target}'.encode()).hexdigest()
@@ -89,11 +91,11 @@ def report(conn):
                 'MAE':float(e.abs().mean()),'RMSE':float((e.pow(2).mean())**.5),'Bias':float(e.mean())})
         return out
     key=['issue_key','attraction','target_at_utc']
-    required={'legacy-corrected-v1','weekday-hour-median-v1','weighted-history-candidate-v1'}
+    required={'legacy-corrected-v1','weekday-hour-median-v1','weighted-history-candidate-v1','recent-trend-candidate-v1'}
     complete=raw.groupby(key).model_version.apply(lambda x:required<=set(x))
     matched=set(complete[complete].index)
     paired=raw[[tuple(x) in matched for x in raw[key].itertuples(index=False,name=None)]]
-    evidence={}
+    evidence={};candidate_evidence={'weighted-history-candidate-v1':evidence,'recent-trend-candidate-v1':{}}
     for (park,cohort),rows in paired.groupby(['park','cohort']):
         comparison=rows[rows.model_version.isin(['legacy-corrected-v1','weighted-history-candidate-v1'])].copy()
         comparison['absolute_error']=(comparison.predicted-comparison.actual).abs()
@@ -124,10 +126,29 @@ def report(conn):
             'paired_complete':len(rows[key].drop_duplicates())==len(all_points),
             'day_bootstrap_lower_bound_positive':lower is not None and lower>0,
             'day_bootstrap_lower_bound_minutes':lower,'coverage_qualified_dates':sorted(qualified)}
+        newer=rows[rows.model_version.isin(['legacy-corrected-v1','recent-trend-candidate-v1'])].copy()
+        newer['absolute_error']=(newer.predicted-newer.actual).abs()
+        paired_daily=newer.groupby(['target_day','model_version']).absolute_error.mean().unstack().dropna()
+        paired_daily=paired_daily[paired_daily.index.isin(qualified)]
+        newer_days=len(paired_daily);new_delta=paired_daily['legacy-corrected-v1']-paired_daily['recent-trend-candidate-v1']
+        new_lower=None
+        if newer_days>=14:
+            rng=np.random.default_rng(20261031)
+            new_lower=float(np.quantile(rng.choice(new_delta.to_numpy(),size=(2000,newer_days),replace=True).mean(axis=1),.05))
+        new_base=float(paired_daily['legacy-corrected-v1'].mean()) if newer_days else 0
+        candidate_evidence['recent-trend-candidate-v1'].setdefault(park,{})[cohort]={
+            'independent_days':newer_days,'periods_improved':sum(float(part.mean())>0 for part in np.array_split(new_delta.to_numpy(),3) if len(part)) if newer_days>=3 else 0,
+            'mae_improvement':float(new_delta.mean()/new_base) if new_base else 0,
+            'paired_complete':len(rows[key].drop_duplicates())==len(all_points),
+            'day_bootstrap_lower_bound_positive':new_lower is not None and new_lower>0,
+            'day_bootstrap_lower_bound_minutes':new_lower,'coverage_qualified_dates':sorted(qualified)}
     return {'counts':counts,'metrics':summarize(raw,['park','cohort','model_version']),
         'paired_metrics':summarize(paired,['park','cohort','model_version']),
         'by_day':summarize(paired,['park','cohort','model_version','target_day']),
         'by_hour':summarize(paired,['park','cohort','model_version','hour']),
         'by_lead':summarize(paired,['park','cohort','model_version','lead_bucket']),
         'paired_points':len(matched),'promotion_evidence':evidence,'adoption':models.adoption_gate(evidence),
+        'comparison_required_versions':sorted(required),
+        'candidate_uncertainty':{version:{'evidence':proof,'adoption':models.adoption_gate(proof)} for version,proof in candidate_evidence.items()},
+        'old_model_note':'Original model is a major-ride reference. Review per-version n; nonmajor forecasts may be unavailable.',
         'limitation':'Promotion remains manual and blocked until independent days, disjoint periods and day-level uncertainty have been reviewed. Unpaired metrics are descriptive only.'}

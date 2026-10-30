@@ -2,7 +2,7 @@ name: Collect park observations
 on:
   push:
     branches: [main]
-    paths: ['collector.py', 'reliability.py', 'continuous_evaluation.py', '.github/workflows/collect.yml']
+    paths: ['collector.py', 'reliability.py', 'continuous_evaluation.py', 'collection_session.py', '.github/workflows/collect.yml']
   schedule:
     # UTC: 08:07-21:52 JST, 15-minute cadence with off-hour-start offsets.
     - cron: '7,22,37,52 23,0-12 * * *'
@@ -21,7 +21,7 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -43,7 +43,7 @@ jobs:
             git -C .data config http.https://github.com/.extraheader "$(git config http.https://github.com/.extraheader)"
           fi
       - name: Verify or recover durable databases
-        run: python backup_recovery.py .data
+        run: python backup_recovery.py .data --only disneyland.db --only disneysea.db
       - name: Collect and evaluate
         id: collect
         continue-on-error: true
@@ -53,9 +53,9 @@ jobs:
           ADMIN_EVENT_JSON: ${{ inputs.admin_event }}
         run: |
           if [ "$EVENT_NAME" = "schedule" ]; then
-            python collector.py --data-dir .data --context
+            python collection_session.py --data-dir .data --context --minutes 330 --push
           else
-            python collector.py --data-dir .data --context --force
+            python collection_session.py --data-dir .data --context --force --push
           fi
       - name: Audit schedule coverage and storage
         if: always()
@@ -65,20 +65,17 @@ jobs:
       - name: Persist observations and failure log
         if: always()
         shell: bash
-        run: |
-          git -C .data config user.name 'github-actions[bot]'
-          git -C .data config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git -C .data add -- '*.db' last-run.json
-          for file in operational-report.json runtime-audit.json; do
-            if [ -f ".data/$file" ]; then git -C .data add -- "$file"; fi
-          done
-          for directory in journal recovery; do
-            if [ -d ".data/$directory" ]; then git -C .data add -- "$directory/"; fi
-          done
-          if ! git -C .data diff --cached --quiet; then
-            git -C .data commit -m 'Record park observations and forecast evaluations'
-            git -C .data push origin HEAD:crowd-data
-          fi
+        run: python -c "from collection_session import persist; persist('.data')"
+      - name: Retain failed persistence artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: collection-recovery-${{ github.run_id }}
+          path: |
+            .data/*.db
+            .data/collection-attempts.jsonl
+            .data/journal/
+          retention-days: 7
       - name: Report collection failure
         if: steps.collect.outcome == 'failure'
         run: exit 1

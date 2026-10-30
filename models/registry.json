@@ -21,6 +21,19 @@
         "same_hour",
         "ride_median"
       ]
+    },
+    "recent-trend-candidate-v1": {
+      "file": "recent_trend_candidate_v1.py",
+      "sha256": "faac8965d98797e92dda83bd7885a646b555999d3fc442b2596917abb1141712",
+      "half_life_scale_days": 28,
+      "hour_decay_scale": 2,
+      "same_weekday_weight": 2,
+      "recent_minutes": 60,
+      "level_weight": 0.35,
+      "trend_weight": 0.2,
+      "decay_hours": 3,
+      "max_adjustment": 15,
+      "role": "shadow_only; no tuning on evaluation dates"
     }
   },
   "source_hash_encoding": "UTF-8 with LF line endings"
