@@ -1,25 +1,25 @@
 {
-  "generated_at_utc": "2026-10-30T04:58:55.205341+00:00",
+  "generated_at_utc": "2026-10-30T08:56:30.476540+00:00",
   "results": [
     {
       "park": "DisneySea",
       "status": "success",
       "received": 36,
-      "inserted": 36,
-      "observed_at": "2026-10-30T04:55:59+00:00",
+      "inserted": 35,
+      "observed_at": "2026-10-30T08:51:01+00:00",
       "open_positive": 24,
       "open_zero": 2,
       "closed": 10,
       "source_stale": 1,
       "evaluated_predictions": 3,
       "shadow_evaluated": 0,
-      "shadow_issued": 216,
-      "duration_seconds": 16.607,
+      "shadow_issued": 0,
+      "duration_seconds": 1.081,
       "journal": {
-        "path": "journal/2026-10/41005759626-1-DisneySea.jsonl.gz",
-        "changes": 265,
-        "compressed_bytes": 13835,
-        "sha256": "1f9845a69803348739362e79ad53fd54428da986e0f57c53084692a55082299d"
+        "path": "journal/2026-10/41029677524-1-DisneySea.jsonl.gz",
+        "changes": 42,
+        "compressed_bytes": 2206,
+        "sha256": "ff0dce413b626ee51aaebbd2a2c1dfd86800e1b4c9fc3bd158a3289fb0a104ca"
       }
     },
     {
@@ -27,20 +27,20 @@
       "status": "success",
       "received": 37,
       "inserted": 37,
-      "observed_at": "2026-10-30T04:55:54+00:00",
-      "open_positive": 32,
+      "observed_at": "2026-10-30T08:51:01+00:00",
+      "open_positive": 29,
       "open_zero": 2,
-      "closed": 3,
+      "closed": 6,
       "source_stale": 0,
       "evaluated_predictions": 5,
       "shadow_evaluated": 0,
-      "shadow_issued": 272,
-      "duration_seconds": 17.912,
+      "shadow_issued": 0,
+      "duration_seconds": 1.142,
       "journal": {
-        "path": "journal/2026-10/41005759626-1-Disneyland.jsonl.gz",
-        "changes": 324,
-        "compressed_bytes": 16429,
-        "sha256": "f5f50d967c5f0771562c293092e29b56a53e7bda44ac7aeb337a22c6494f9b2c"
+        "path": "journal/2026-10/41029677524-1-Disneyland.jsonl.gz",
+        "changes": 46,
+        "compressed_bytes": 2289,
+        "sha256": "78f4400b1690fd60148a08956e35d8a3efc8902ed010cd0ec895240e41e97ca1"
       }
     }
   ]
