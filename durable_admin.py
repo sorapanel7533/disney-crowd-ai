@@ -47,7 +47,7 @@ def dispatch(payload,token,authorized=False):
     response=requests.post(f'https://api.github.com/repos/{REPO}/actions/workflows/collect.yml/dispatches',
         headers={'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},
         json={'ref':'main','inputs':{'admin_event':json.dumps(payload,ensure_ascii=False)}},timeout=(3,10))
-    if response.status_code!=204:
+    if response.status_code not in (200,204):
         # Never include response request headers/token or the response body.
         raise RuntimeError(f'GitHub dispatch HTTP {response.status_code}')
     return 'submitted' # Durable only after crowd-data acknowledgement is synced.

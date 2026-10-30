@@ -276,6 +276,19 @@ def test_failed_admin_auth_never_dispatches_token_or_payload(monkeypatch):
     assert not called
 
 
+@pytest.mark.parametrize('status',[200,204,403])
+def test_admin_dispatch_accepts_documented_success_variants(monkeypatch,status):
+    from types import SimpleNamespace
+    import uuid
+    payload={'event_id':str(uuid.uuid4()),'park':'Disneyland','attraction':utils.PARK_SETTINGS['Disneyland']['rides'][0],
+        'target_date':str(pd.Timestamp.now(tz=r.JST).date()),'sellout_hour':12.,'created_at_utc':r.iso()}
+    monkeypatch.setattr(durable_admin.requests,'post',lambda *a,**k:SimpleNamespace(status_code=status))
+    if status==403:
+        with pytest.raises(RuntimeError,match='HTTP 403'):durable_admin.dispatch(payload,'isolated-test-token',True)
+    else:
+        assert durable_admin.dispatch(payload,'isolated-test-token',True)=='submitted'
+
+
 def test_admin_ui_authorizes_save_and_restart_retains_outbox(tmp_path,monkeypatch):
     from streamlit.testing.v1 import AppTest
     import streamlit as st
