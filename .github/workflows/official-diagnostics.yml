@@ -1,18 +1,11 @@
 name: Diagnose official source connectivity
 on:
   workflow_dispatch:
-  push:
-    branches: [fix/weekly-alcohol-update]
-    paths: ['.github/workflows/official-diagnostics.yml']
 permissions:
   contents: read
 jobs:
   probe:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-15-intel]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
       - uses: actions/checkout@v4
@@ -22,4 +15,4 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - name: Verify current source policy and a small menu sample
-        run: python diagnose_official.py --transport-check
+        run: python diagnose_official.py
