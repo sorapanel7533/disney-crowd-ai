@@ -1,433 +1,431 @@
 {
-  "run_id": "weekly:2026-W44:20261030T164847936029",
-  "week": "2026-W44",
-  "status": "success",
-  "finished_at_utc": "2026-10-30T16:50:22.372097+00:00",
-  "target_stores": 44,
-  "successful_stores": 44,
-  "stores_with_products": 43,
-  "products": 164,
-  "priced_products": 164,
+  "collection_performed": false,
   "dated_products": 32,
-  "unconfirmed_stores": 1,
-  "quarantined_stores": [],
-  "failures": {},
   "diffs": 0,
+  "execution_environment": "local",
+  "failures": {},
+  "finished_at_utc": "2026-10-30T16:50:22.372097+00:00",
+  "priced_products": 164,
+  "products": 164,
+  "quarantined_stores": [],
+  "run_id": "weekly:2026-W44:20261030T164847936029",
   "source": {
-    "user_agent": "DisneyCrowdAI/3.1",
-    "requests": 48,
     "failed_requests": 0,
     "policy": {
       "robots": {
-        "url": "https://www.tokyodisneyresort.jp/robots.txt",
+        "checked_at_utc": "2026-10-30T16:48:48.117938+00:00",
         "sha256": "4aeb2fc617a4abdffa041b367253eb0e8b3fcf311c8b2fdd7a1cf838c6057f59",
-        "checked_at_utc": "2026-10-30T16:48:48.117938+00:00"
+        "url": "https://www.tokyodisneyresort.jp/robots.txt"
       },
       "terms": {
-        "url": "https://www.tokyodisneyresort.jp/legal.html",
-        "sha256": "a18c932d1279b72b7c23bd6a9b5fd2d32d86c63c58eaf57205a342b1fb6b0459",
         "checked_at_utc": "2026-10-30T16:48:49.968005+00:00",
-        "scope": "Minimum factual menu names, published prices/dates, store relationships and official links. No copied images, HTML, creative descriptions, authentication, purchase pages or bypass. A robots allow is not a content reuse license. Changed terms require renewed review."
+        "scope": "Minimum factual menu names, published prices/dates, store relationships and official links. No copied images, HTML, creative descriptions, authentication, purchase pages or bypass. A robots allow is not a content reuse license. Changed terms require renewed review.",
+        "sha256": "a18c932d1279b72b7c23bd6a9b5fd2d32d86c63c58eaf57205a342b1fb6b0459",
+        "url": "https://www.tokyodisneyresort.jp/legal.html"
       }
     },
     "request_log": [
       {
-        "path": "/robots.txt",
-        "started_at_utc": "2026-10-30T16:48:47.937027+00:00",
-        "http_status": 200,
         "bytes": 157,
         "finished_at_utc": "2026-10-30T16:48:48.117938+00:00",
-        "seconds": 0.187
+        "http_status": 200,
+        "path": "/robots.txt",
+        "seconds": 0.187,
+        "started_at_utc": "2026-10-30T16:48:47.937027+00:00"
       },
       {
-        "path": "/legal.html",
-        "started_at_utc": "2026-10-30T16:48:49.931563+00:00",
-        "http_status": 200,
         "bytes": 36485,
         "finished_at_utc": "2026-10-30T16:48:49.965588+00:00",
-        "seconds": 0.031
+        "http_status": 200,
+        "path": "/legal.html",
+        "seconds": 0.031,
+        "started_at_utc": "2026-10-30T16:48:49.931563+00:00"
       },
       {
-        "path": "/tdl/restaurant/list/",
-        "started_at_utc": "2026-10-30T16:48:51.937634+00:00",
-        "http_status": 200,
         "bytes": 701428,
         "finished_at_utc": "2026-10-30T16:48:52.019875+00:00",
-        "seconds": 0.094
+        "http_status": 200,
+        "path": "/tdl/restaurant/list/",
+        "seconds": 0.094,
+        "started_at_utc": "2026-10-30T16:48:51.937634+00:00"
       },
       {
-        "path": "/tds/restaurant/list/",
-        "started_at_utc": "2026-10-30T16:48:53.930540+00:00",
-        "http_status": 200,
         "bytes": 745225,
         "finished_at_utc": "2026-10-30T16:48:54.033046+00:00",
-        "seconds": 0.094
+        "http_status": 200,
+        "path": "/tds/restaurant/list/",
+        "seconds": 0.094,
+        "started_at_utc": "2026-10-30T16:48:53.930540+00:00"
       },
       {
-        "path": "/tdl/restaurant/food/300/",
-        "started_at_utc": "2026-10-30T16:48:55.938216+00:00",
-        "http_status": 200,
         "bytes": 50199,
         "finished_at_utc": "2026-10-30T16:48:56.041804+00:00",
-        "seconds": 0.109
+        "http_status": 200,
+        "path": "/tdl/restaurant/food/300/",
+        "seconds": 0.109,
+        "started_at_utc": "2026-10-30T16:48:55.938216+00:00"
       },
       {
-        "path": "/tdl/restaurant/food/306/",
-        "started_at_utc": "2026-10-30T16:48:57.939648+00:00",
-        "http_status": 200,
         "bytes": 56712,
         "finished_at_utc": "2026-10-30T16:48:58.007504+00:00",
-        "seconds": 0.078
+        "http_status": 200,
+        "path": "/tdl/restaurant/food/306/",
+        "seconds": 0.078,
+        "started_at_utc": "2026-10-30T16:48:57.939648+00:00"
       },
       {
-        "path": "/tdl/restaurant/food/313/",
-        "started_at_utc": "2026-10-30T16:48:59.935397+00:00",
-        "http_status": 200,
         "bytes": 45071,
         "finished_at_utc": "2026-10-30T16:49:00.028040+00:00",
-        "seconds": 0.094
+        "http_status": 200,
+        "path": "/tdl/restaurant/food/313/",
+        "seconds": 0.094,
+        "started_at_utc": "2026-10-30T16:48:59.935397+00:00"
       },
       {
-        "path": "/tdl/restaurant/food/323/",
-        "started_at_utc": "2026-10-30T16:49:01.939613+00:00",
-        "http_status": 200,
         "bytes": 38312,
         "finished_at_utc": "2026-10-30T16:49:02.014474+00:00",
-        "seconds": 0.078
+        "http_status": 200,
+        "path": "/tdl/restaurant/food/323/",
+        "seconds": 0.078,
+        "started_at_utc": "2026-10-30T16:49:01.939613+00:00"
       },
       {
-        "path": "/tdl/restaurant/food/327/",
-        "started_at_utc": "2026-10-30T16:49:03.940412+00:00",
-        "http_status": 200,
         "bytes": 40584,
         "finished_at_utc": "2026-10-30T16:49:04.038074+00:00",
-        "seconds": 0.094
+        "http_status": 200,
+        "path": "/tdl/restaurant/food/327/",
+        "seconds": 0.094,
+        "started_at_utc": "2026-10-30T16:49:03.940412+00:00"
       },
       {
-        "path": "/tdl/restaurant/food/332/",
-        "started_at_utc": "2026-10-30T16:49:05.950081+00:00",
-        "http_status": 200,
         "bytes": 45738,
         "finished_at_utc": "2026-10-30T16:49:06.053459+00:00",
-        "seconds": 0.11
+        "http_status": 200,
+        "path": "/tdl/restaurant/food/332/",
+        "seconds": 0.11,
+        "started_at_utc": "2026-10-30T16:49:05.950081+00:00"
       },
       {
-        "path": "/tdl/restaurant/food/318/",
-        "started_at_utc": "2026-10-30T16:49:07.951133+00:00",
-        "http_status": 200,
         "bytes": 49602,
         "finished_at_utc": "2026-10-30T16:49:08.005865+00:00",
-        "seconds": 0.063
+        "http_status": 200,
+        "path": "/tdl/restaurant/food/318/",
+        "seconds": 0.063,
+        "started_at_utc": "2026-10-30T16:49:07.951133+00:00"
       },
       {
-        "path": "/tdl/restaurant/food/333/",
-        "started_at_utc": "2026-10-30T16:49:09.948591+00:00",
-        "http_status": 200,
         "bytes": 37949,
         "finished_at_utc": "2026-10-30T16:49:10.040962+00:00",
-        "seconds": 0.094
+        "http_status": 200,
+        "path": "/tdl/restaurant/food/333/",
+        "seconds": 0.094,
+        "started_at_utc": "2026-10-30T16:49:09.948591+00:00"
       },
       {
-        "path": "/tdl/restaurant/food/326/",
-        "started_at_utc": "2026-10-30T16:49:11.951232+00:00",
-        "http_status": 200,
         "bytes": 40683,
         "finished_at_utc": "2026-10-30T16:49:12.056699+00:00",
-        "seconds": 0.11
+        "http_status": 200,
+        "path": "/tdl/restaurant/food/326/",
+        "seconds": 0.11,
+        "started_at_utc": "2026-10-30T16:49:11.951232+00:00"
       },
       {
-        "path": "/tdl/restaurant/food/322/",
-        "started_at_utc": "2026-10-30T16:49:13.950912+00:00",
-        "http_status": 200,
         "bytes": 36420,
         "finished_at_utc": "2026-10-30T16:49:14.003442+00:00",
-        "seconds": 0.063
+        "http_status": 200,
+        "path": "/tdl/restaurant/food/322/",
+        "seconds": 0.063,
+        "started_at_utc": "2026-10-30T16:49:13.950912+00:00"
       },
       {
-        "path": "/tdl/restaurant/food/499/",
-        "started_at_utc": "2026-10-30T16:49:15.945858+00:00",
-        "http_status": 200,
         "bytes": 33718,
         "finished_at_utc": "2026-10-30T16:49:16.000676+00:00",
-        "seconds": 0.047
+        "http_status": 200,
+        "path": "/tdl/restaurant/food/499/",
+        "seconds": 0.047,
+        "started_at_utc": "2026-10-30T16:49:15.945858+00:00"
       },
       {
-        "path": "/tdl/restaurant/food/339/",
-        "started_at_utc": "2026-10-30T16:49:17.940858+00:00",
-        "http_status": 200,
         "bytes": 51980,
         "finished_at_utc": "2026-10-30T16:49:17.981040+00:00",
-        "seconds": 0.032
+        "http_status": 200,
+        "path": "/tdl/restaurant/food/339/",
+        "seconds": 0.032,
+        "started_at_utc": "2026-10-30T16:49:17.940858+00:00"
       },
       {
-        "path": "/tdl/restaurant/food/336/",
-        "started_at_utc": "2026-10-30T16:49:19.955072+00:00",
-        "http_status": 200,
         "bytes": 43598,
         "finished_at_utc": "2026-10-30T16:49:20.022621+00:00",
-        "seconds": 0.079
+        "http_status": 200,
+        "path": "/tdl/restaurant/food/336/",
+        "seconds": 0.079,
+        "started_at_utc": "2026-10-30T16:49:19.955072+00:00"
       },
       {
-        "path": "/tdl/restaurant/food/338/",
-        "started_at_utc": "2026-10-30T16:49:21.947737+00:00",
-        "http_status": 200,
         "bytes": 54675,
         "finished_at_utc": "2026-10-30T16:49:21.984936+00:00",
-        "seconds": 0.032
+        "http_status": 200,
+        "path": "/tdl/restaurant/food/338/",
+        "seconds": 0.032,
+        "started_at_utc": "2026-10-30T16:49:21.947737+00:00"
       },
       {
-        "path": "/tdl/restaurant/food/335/",
-        "started_at_utc": "2026-10-30T16:49:23.943265+00:00",
-        "http_status": 200,
         "bytes": 50319,
         "finished_at_utc": "2026-10-30T16:49:23.984604+00:00",
-        "seconds": 0.032
+        "http_status": 200,
+        "path": "/tdl/restaurant/food/335/",
+        "seconds": 0.032,
+        "started_at_utc": "2026-10-30T16:49:23.943265+00:00"
       },
       {
-        "path": "/tdl/restaurant/food/344/",
-        "started_at_utc": "2026-10-30T16:49:25.945038+00:00",
-        "http_status": 200,
         "bytes": 49991,
         "finished_at_utc": "2026-10-30T16:49:25.978960+00:00",
-        "seconds": 0.032
+        "http_status": 200,
+        "path": "/tdl/restaurant/food/344/",
+        "seconds": 0.032,
+        "started_at_utc": "2026-10-30T16:49:25.945038+00:00"
       },
       {
-        "path": "/tdl/restaurant/food/347/",
-        "started_at_utc": "2026-10-30T16:49:27.952207+00:00",
-        "http_status": 200,
         "bytes": 38591,
         "finished_at_utc": "2026-10-30T16:49:27.994693+00:00",
-        "seconds": 0.047
+        "http_status": 200,
+        "path": "/tdl/restaurant/food/347/",
+        "seconds": 0.047,
+        "started_at_utc": "2026-10-30T16:49:27.952207+00:00"
       },
       {
-        "path": "/tdl/restaurant/food/290/",
-        "started_at_utc": "2026-10-30T16:49:29.953780+00:00",
-        "http_status": 200,
         "bytes": 49229,
         "finished_at_utc": "2026-10-30T16:49:29.994352+00:00",
-        "seconds": 0.047
+        "http_status": 200,
+        "path": "/tdl/restaurant/food/290/",
+        "seconds": 0.047,
+        "started_at_utc": "2026-10-30T16:49:29.953780+00:00"
       },
       {
-        "path": "/tdl/restaurant/food/352/",
-        "started_at_utc": "2026-10-30T16:49:31.954289+00:00",
-        "http_status": 200,
         "bytes": 65610,
         "finished_at_utc": "2026-10-30T16:49:32.023010+00:00",
-        "seconds": 0.079
+        "http_status": 200,
+        "path": "/tdl/restaurant/food/352/",
+        "seconds": 0.079,
+        "started_at_utc": "2026-10-30T16:49:31.954289+00:00"
       },
       {
-        "path": "/tds/restaurant/food/400/",
-        "started_at_utc": "2026-10-30T16:49:33.950966+00:00",
-        "http_status": 200,
         "bytes": 70985,
         "finished_at_utc": "2026-10-30T16:49:34.011183+00:00",
-        "seconds": 0.063
+        "http_status": 200,
+        "path": "/tds/restaurant/food/400/",
+        "seconds": 0.063,
+        "started_at_utc": "2026-10-30T16:49:33.950966+00:00"
       },
       {
-        "path": "/tds/restaurant/food/403/",
-        "started_at_utc": "2026-10-30T16:49:35.942992+00:00",
-        "http_status": 200,
         "bytes": 70105,
         "finished_at_utc": "2026-10-30T16:49:35.994175+00:00",
-        "seconds": 0.047
+        "http_status": 200,
+        "path": "/tds/restaurant/food/403/",
+        "seconds": 0.047,
+        "started_at_utc": "2026-10-30T16:49:35.942992+00:00"
       },
       {
-        "path": "/tds/restaurant/food/412/",
-        "started_at_utc": "2026-10-30T16:49:37.954661+00:00",
-        "http_status": 200,
         "bytes": 53658,
         "finished_at_utc": "2026-10-30T16:49:38.011407+00:00",
-        "seconds": 0.063
+        "http_status": 200,
+        "path": "/tds/restaurant/food/412/",
+        "seconds": 0.063,
+        "started_at_utc": "2026-10-30T16:49:37.954661+00:00"
       },
       {
-        "path": "/tds/restaurant/food/408/",
-        "started_at_utc": "2026-10-30T16:49:39.942503+00:00",
-        "http_status": 200,
         "bytes": 67047,
         "finished_at_utc": "2026-10-30T16:49:39.992410+00:00",
-        "seconds": 0.047
+        "http_status": 200,
+        "path": "/tds/restaurant/food/408/",
+        "seconds": 0.047,
+        "started_at_utc": "2026-10-30T16:49:39.942503+00:00"
       },
       {
-        "path": "/tds/restaurant/food/416/",
-        "started_at_utc": "2026-10-30T16:49:41.940770+00:00",
-        "http_status": 200,
         "bytes": 44540,
         "finished_at_utc": "2026-10-30T16:49:42.074023+00:00",
-        "seconds": 0.125
+        "http_status": 200,
+        "path": "/tds/restaurant/food/416/",
+        "seconds": 0.125,
+        "started_at_utc": "2026-10-30T16:49:41.940770+00:00"
       },
       {
-        "path": "/tds/restaurant/food/436/",
-        "started_at_utc": "2026-10-30T16:49:43.953786+00:00",
-        "http_status": 200,
         "bytes": 38340,
         "finished_at_utc": "2026-10-30T16:49:43.998686+00:00",
-        "seconds": 0.047
+        "http_status": 200,
+        "path": "/tds/restaurant/food/436/",
+        "seconds": 0.047,
+        "started_at_utc": "2026-10-30T16:49:43.953786+00:00"
       },
       {
-        "path": "/tds/restaurant/food/425/",
-        "started_at_utc": "2026-10-30T16:49:45.955640+00:00",
-        "http_status": 200,
         "bytes": 50484,
         "finished_at_utc": "2026-10-30T16:49:46.004876+00:00",
-        "seconds": 0.063
+        "http_status": 200,
+        "path": "/tds/restaurant/food/425/",
+        "seconds": 0.063,
+        "started_at_utc": "2026-10-30T16:49:45.955640+00:00"
       },
       {
-        "path": "/tds/restaurant/food/429/",
-        "started_at_utc": "2026-10-30T16:49:47.950636+00:00",
-        "http_status": 200,
         "bytes": 51341,
         "finished_at_utc": "2026-10-30T16:49:47.987537+00:00",
-        "seconds": 0.047
+        "http_status": 200,
+        "path": "/tds/restaurant/food/429/",
+        "seconds": 0.047,
+        "started_at_utc": "2026-10-30T16:49:47.950636+00:00"
       },
       {
-        "path": "/tds/restaurant/food/426/",
-        "started_at_utc": "2026-10-30T16:49:49.954316+00:00",
-        "http_status": 200,
         "bytes": 32599,
         "finished_at_utc": "2026-10-30T16:49:50.020512+00:00",
-        "seconds": 0.079
+        "http_status": 200,
+        "path": "/tds/restaurant/food/426/",
+        "seconds": 0.079,
+        "started_at_utc": "2026-10-30T16:49:49.954316+00:00"
       },
       {
-        "path": "/tds/restaurant/food/441/",
-        "started_at_utc": "2026-10-30T16:49:51.944408+00:00",
-        "http_status": 200,
         "bytes": 66530,
         "finished_at_utc": "2026-10-30T16:49:51.978679+00:00",
-        "seconds": 0.032
+        "http_status": 200,
+        "path": "/tds/restaurant/food/441/",
+        "seconds": 0.032,
+        "started_at_utc": "2026-10-30T16:49:51.944408+00:00"
       },
       {
-        "path": "/tds/restaurant/food/422/",
-        "started_at_utc": "2026-10-30T16:49:53.953297+00:00",
-        "http_status": 200,
         "bytes": 65839,
         "finished_at_utc": "2026-10-30T16:49:54.011718+00:00",
-        "seconds": 0.063
+        "http_status": 200,
+        "path": "/tds/restaurant/food/422/",
+        "seconds": 0.063,
+        "started_at_utc": "2026-10-30T16:49:53.953297+00:00"
       },
       {
-        "path": "/tds/restaurant/food/430/",
-        "started_at_utc": "2026-10-30T16:49:55.955064+00:00",
-        "http_status": 200,
         "bytes": 38645,
         "finished_at_utc": "2026-10-30T16:49:56.014092+00:00",
-        "seconds": 0.063
+        "http_status": 200,
+        "path": "/tds/restaurant/food/430/",
+        "seconds": 0.063,
+        "started_at_utc": "2026-10-30T16:49:55.955064+00:00"
       },
       {
-        "path": "/tds/restaurant/food/432/",
-        "started_at_utc": "2026-10-30T16:49:57.954774+00:00",
-        "http_status": 200,
         "bytes": 55991,
         "finished_at_utc": "2026-10-30T16:49:57.995220+00:00",
-        "seconds": 0.047
+        "http_status": 200,
+        "path": "/tds/restaurant/food/432/",
+        "seconds": 0.047,
+        "started_at_utc": "2026-10-30T16:49:57.954774+00:00"
       },
       {
-        "path": "/tds/restaurant/food/453/",
-        "started_at_utc": "2026-10-30T16:49:59.955749+00:00",
-        "http_status": 200,
         "bytes": 41083,
         "finished_at_utc": "2026-10-30T16:49:59.997868+00:00",
-        "seconds": 0.047
+        "http_status": 200,
+        "path": "/tds/restaurant/food/453/",
+        "seconds": 0.047,
+        "started_at_utc": "2026-10-30T16:49:59.955749+00:00"
       },
       {
-        "path": "/tds/restaurant/food/451/",
-        "started_at_utc": "2026-10-30T16:50:01.954380+00:00",
-        "http_status": 200,
         "bytes": 67286,
         "finished_at_utc": "2026-10-30T16:50:02.763407+00:00",
-        "seconds": 0.813
+        "http_status": 200,
+        "path": "/tds/restaurant/food/451/",
+        "seconds": 0.813,
+        "started_at_utc": "2026-10-30T16:50:01.954380+00:00"
       },
       {
-        "path": "/tds/restaurant/food/456/",
-        "started_at_utc": "2026-10-30T16:50:03.942842+00:00",
-        "http_status": 200,
         "bytes": 70643,
         "finished_at_utc": "2026-10-30T16:50:03.980524+00:00",
-        "seconds": 0.032
+        "http_status": 200,
+        "path": "/tds/restaurant/food/456/",
+        "seconds": 0.032,
+        "started_at_utc": "2026-10-30T16:50:03.942842+00:00"
       },
       {
-        "path": "/tds/restaurant/food/459/",
-        "started_at_utc": "2026-10-30T16:50:05.954581+00:00",
-        "http_status": 200,
         "bytes": 67808,
         "finished_at_utc": "2026-10-30T16:50:06.002087+00:00",
-        "seconds": 0.047
+        "http_status": 200,
+        "path": "/tds/restaurant/food/459/",
+        "seconds": 0.047,
+        "started_at_utc": "2026-10-30T16:50:05.954581+00:00"
       },
       {
-        "path": "/tds/restaurant/food/452/",
-        "started_at_utc": "2026-10-30T16:50:07.948232+00:00",
-        "http_status": 200,
         "bytes": 35453,
         "finished_at_utc": "2026-10-30T16:50:07.990415+00:00",
-        "seconds": 0.047
+        "http_status": 200,
+        "path": "/tds/restaurant/food/452/",
+        "seconds": 0.047,
+        "started_at_utc": "2026-10-30T16:50:07.948232+00:00"
       },
       {
-        "path": "/tds/restaurant/food/409/",
-        "started_at_utc": "2026-10-30T16:50:09.946634+00:00",
-        "http_status": 200,
         "bytes": 59646,
         "finished_at_utc": "2026-10-30T16:50:09.980131+00:00",
-        "seconds": 0.032
+        "http_status": 200,
+        "path": "/tds/restaurant/food/409/",
+        "seconds": 0.032,
+        "started_at_utc": "2026-10-30T16:50:09.946634+00:00"
       },
       {
-        "path": "/tds/restaurant/food/410/",
-        "started_at_utc": "2026-10-30T16:50:11.954780+00:00",
-        "http_status": 200,
         "bytes": 35222,
         "finished_at_utc": "2026-10-30T16:50:11.993624+00:00",
-        "seconds": 0.047
+        "http_status": 200,
+        "path": "/tds/restaurant/food/410/",
+        "seconds": 0.047,
+        "started_at_utc": "2026-10-30T16:50:11.954780+00:00"
       },
       {
-        "path": "/tds/restaurant/food/413/",
-        "started_at_utc": "2026-10-30T16:50:13.949957+00:00",
-        "http_status": 200,
         "bytes": 55122,
         "finished_at_utc": "2026-10-30T16:50:13.985857+00:00",
-        "seconds": 0.032
+        "http_status": 200,
+        "path": "/tds/restaurant/food/413/",
+        "seconds": 0.032,
+        "started_at_utc": "2026-10-30T16:50:13.949957+00:00"
       },
       {
-        "path": "/tds/restaurant/food/414/",
-        "started_at_utc": "2026-10-30T16:50:15.944539+00:00",
-        "http_status": 200,
         "bytes": 50985,
         "finished_at_utc": "2026-10-30T16:50:15.987674+00:00",
-        "seconds": 0.047
+        "http_status": 200,
+        "path": "/tds/restaurant/food/414/",
+        "seconds": 0.047,
+        "started_at_utc": "2026-10-30T16:50:15.944539+00:00"
       },
       {
-        "path": "/tds/restaurant/food/463/",
-        "started_at_utc": "2026-10-30T16:50:17.946657+00:00",
-        "http_status": 200,
         "bytes": 61069,
         "finished_at_utc": "2026-10-30T16:50:18.011345+00:00",
-        "seconds": 0.063
+        "http_status": 200,
+        "path": "/tds/restaurant/food/463/",
+        "seconds": 0.063,
+        "started_at_utc": "2026-10-30T16:50:17.946657+00:00"
       },
       {
-        "path": "/tds/restaurant/food/418/",
-        "started_at_utc": "2026-10-30T16:50:19.943694+00:00",
-        "http_status": 200,
         "bytes": 66048,
         "finished_at_utc": "2026-10-30T16:50:20.517367+00:00",
-        "seconds": 0.563
+        "http_status": 200,
+        "path": "/tds/restaurant/food/418/",
+        "seconds": 0.563,
+        "started_at_utc": "2026-10-30T16:50:19.943694+00:00"
       },
       {
-        "path": "/tds/restaurant/food/421/",
-        "started_at_utc": "2026-10-30T16:50:21.947120+00:00",
-        "http_status": 200,
         "bytes": 40834,
         "finished_at_utc": "2026-10-30T16:50:22.366853+00:00",
-        "seconds": 0.422
+        "http_status": 200,
+        "path": "/tds/restaurant/food/421/",
+        "seconds": 0.422,
+        "started_at_utc": "2026-10-30T16:50:21.947120+00:00"
       }
-    ]
+    ],
+    "requests": 48,
+    "user_agent": "DisneyCrowdAI/3.1"
   },
-  "collection_performed": true,
-  "source_requests_this_attempt": 48,
-  "execution_environment": "local",
+  "source_requests_this_attempt": 0,
+  "status": "success",
+  "stores_with_products": 43,
+  "successful_stores": 44,
+  "target_stores": 44,
+  "unconfirmed_stores": 1,
+  "week": "2026-W44",
+  "skipped_same_week": true,
+  "attempt_finished_at_utc": "2026-10-30T22:17:21.431894+00:00",
   "journal": {
-    "path": "journal/2026-10/alcohol-20261030T164847900564-1-Alcohol.jsonl.gz",
-    "changes": 418,
-    "compressed_bytes": 20873,
-    "sha256": "3fad21569111c28a3c124a35e257e369d0e92730fd77197a060a1e65f52f7873"
-  },
-  "publication": {
-    "execution_environment": "local",
-    "base_sha": "83ea02fef91da29a99c42d4201d4a81995c936df"
+    "path": "journal/2026-10/alcohol-41137033334-1-Alcohol.jsonl.gz",
+    "changes": 0,
+    "compressed_bytes": 139,
+    "sha256": "11d372602d84a5efd00f7ef91169e6893ed25c6e17cf42ce02fefb290e6beb43"
   }
 }
