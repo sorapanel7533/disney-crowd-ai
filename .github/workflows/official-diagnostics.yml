@@ -1,11 +1,18 @@
 name: Diagnose official source connectivity
 on:
   workflow_dispatch:
+  push:
+    branches: [fix/weekly-alcohol-update]
+    paths: ['.github/workflows/official-diagnostics.yml']
 permissions:
   contents: read
 jobs:
   probe:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 4
     steps:
       - uses: actions/checkout@v4
