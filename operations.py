@@ -69,12 +69,13 @@ def freshness(conn,now=None):
     limits={'weather':60,'ticket_price':1440,'park_hours':1440,'show_schedules':1440,'dpa':1440,'event_signals':1440}
     for (park,source),items in rows.groupby(['park','source']):
         latest=items.iloc[-1]; age=(now-r.utc(latest.checked_at_utc)).total_seconds()/60
+        data_age=(now-r.utc(latest.observed_at_utc)).total_seconds()/60 if pd.notna(latest.observed_at_utc) else None
         success=items.status.eq('success')
         last_good=items[success].iloc[-1] if success.any() else None
         output.append({'park':park,'source':source,'latest_attempt_utc':latest.checked_at_utc,
             'source_observed_utc':latest.observed_at_utc,'target_date':latest.target_date,
-            'source_age_minutes':round((now-r.utc(latest.observed_at_utc)).total_seconds()/60,1) if pd.notna(latest.observed_at_utc) else None,
-            'status':latest.status,'age_minutes':round(age,1),'stale':age>limits.get(source,1440),
+            'source_age_minutes':round(data_age,1) if data_age is not None else None,
+            'status':latest.status,'age_minutes':round(age,1),'stale':age>limits.get(source,1440) or (data_age is not None and (data_age>limits.get(source,1440) or data_age < -5)),
             'last_success_utc':last_good.checked_at_utc if last_good is not None else None,
             'attempts':len(items),'failed_attempts':int(items.status.isin(['failed','empty']).sum()),
             'failure_rate':float(items.status.isin(['failed','empty']).mean()),

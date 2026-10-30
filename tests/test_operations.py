@@ -169,6 +169,12 @@ def test_external_freshness_distinguishes_attempts_estimates_and_success(db):
     assert out['park_hours']['last_success_utc'] is None
 
 
+def test_fresh_http_fetch_does_not_make_old_weather_current(db):
+    operations.source_check(db,'Disneyland','weather','success',now='2026-10-01T02:00:00Z',observed_at='2026-10-01T00:00:00Z')
+    row=operations.freshness(db,'2026-10-01T02:05:00Z')[0]
+    assert row['age_minutes']==5 and row['source_age_minutes']==125 and row['stale']
+
+
 @pytest.mark.parametrize('bad',['8O','O','-','301','5.0'])
 def test_ocr_ambiguous_values_never_promoted(bad):
     with pytest.raises(ValueError): ocr_review.validate_cell({'datetime':'2026-10-01 10:00:00','attraction':'a','text':bad,'is_open':1},'2026-10-01',{'a'})
