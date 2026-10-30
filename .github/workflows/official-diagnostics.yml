@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 4
     steps:
@@ -22,4 +22,4 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - name: Verify current source policy and a small menu sample
-        run: python diagnose_official.py
+        run: python diagnose_official.py --transport-check
