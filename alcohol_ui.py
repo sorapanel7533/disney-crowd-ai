@@ -20,7 +20,12 @@ def render(st,is_admin=False):
         a.bootstrap(conn)
         sync=sync_public_snapshot(conn,'alcohol.db',directory,ttl=60)
         freshness=a.freshness(conn);rows=a.catalog(conn)
-        selected=st.segmented_control('アルコール情報のパーク',['ランド','シー','両方'],default='両方',key='alcohol_park') or '両方'
+        if 'alcohol_park' not in st.session_state: st.session_state['alcohol_park']='両方'
+        def sync_park(origin,target):
+            value=st.session_state[origin] or '両方'
+            st.session_state[origin]=value
+            st.session_state[target]=value
+        selected=st.segmented_control('アルコール情報のパーク',['ランド','シー','両方'],key='alcohol_park',on_change=sync_park,args=('alcohol_park','alcohol_filter_park')) or '両方'
         parks={'ランド':['Disneyland'],'シー':['DisneySea'],'両方':[]}[selected]
         chosen=[x for x in rows if not parks or x['park'] in parks]
         local=lambda value:r.utc(value).tz_convert(r.JST).strftime('%Y/%m/%d %H:%M JST') if value else '未確認'
@@ -53,6 +58,9 @@ def render(st,is_admin=False):
             return
         query=st.text_input('商品名検索',key='alcohol_query')
         with st.expander('絞り込み',expanded=mode=='店舗から探す'):
+            if 'alcohol_filter_park' not in st.session_state: st.session_state['alcohol_filter_park']=selected
+            st.segmented_control('パークで絞り込み',['ランド','シー','両方'],key='alcohol_filter_park',on_change=sync_park,args=('alcohol_filter_park','alcohol_park'))
+            exclude_beer=st.toggle('ビールを除く',key='alcohol_exclude_beer',help='ビールに分類された商品（ビール系カクテルを含む）を外します。オフにすると再表示します。')
             area_options=sorted({x['area'] for x in chosen})
             if 'alcohol_areas' in st.session_state: st.session_state['alcohol_areas']=[x for x in st.session_state['alcohol_areas'] if x in area_options]
             areas=st.multiselect('エリア',area_options,key='alcohol_areas')
@@ -68,7 +76,7 @@ def render(st,is_admin=False):
             limited=st.checkbox('期間限定商品のみ',key='alcohol_limited')
             within=st.checkbox('公式掲載上の販売期間内のみ',key='alcohol_within')
             new=st.checkbox('新しく追加された商品のみ（確認から7日以内）',key='alcohol_new')
-        filtered=a.filter_catalog(rows,query,parks,areas,stores,kinds,max_price,limited,within,new)
+        filtered=a.filter_catalog(rows,query,parks,areas,stores,kinds,max_price,limited,within,new,exclude_beer)
         grouped={}
         for row in filtered: grouped.setdefault(row['product_id'],[]).append(row)
         st.caption(f'検索結果: {len(grouped)}商品 / {len(filtered)}店舗別の掲載')

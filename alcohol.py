@@ -252,11 +252,12 @@ def catalog(conn,now=None):
     return output
 
 
-def filter_catalog(rows,query='',parks=(),areas=(),stores=(),kinds=(),max_price=None,limited=False,within=False,new=False):
+def filter_catalog(rows,query='',parks=(),areas=(),stores=(),kinds=(),max_price=None,limited=False,within=False,new=False,exclude_beer=False):
     return [x for x in rows if (not query or query.casefold() in x['name'].casefold()) and (not parks or x['park'] in parks)
             and (not areas or x['area'] in areas) and (not stores or x['store_id'] in stores) and (not kinds or x['kind'] in kinds)
             and (max_price is None or x['price'] is not None and x['price']<=max_price)
-            and (not limited or x['limited']) and (not within or x['state']=='公式掲載上の販売期間内') and (not new or x['new'])]
+            and (not limited or x['limited']) and (not within or x['state']=='公式掲載上の販売期間内') and (not new or x['new'])
+            and (not exclude_beer or x['kind']!='ビール')]
 
 
 def annotate(conn,sale_key,note,authorized=False,now=None):

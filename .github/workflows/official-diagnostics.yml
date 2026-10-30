@@ -1,0 +1,23 @@
+name: Diagnose official source connectivity
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/weekly-alcohol-update]
+    paths: ['diagnose_official.py', '.github/workflows/official-diagnostics.yml']
+permissions:
+  contents: read
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check a few public resources without bypassing access controls
+        run: python diagnose_official.py
