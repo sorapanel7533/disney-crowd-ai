@@ -150,6 +150,10 @@ def migrate(conn):
         conn.execute('CREATE INDEX IF NOT EXISTS prediction_target ON predictions(target_at_utc, attraction)')
         conn.execute('CREATE TABLE IF NOT EXISTS collection_runs (run_key TEXT PRIMARY KEY, fetched_at_utc TEXT, park TEXT, status TEXT, message TEXT, saved_count INTEGER)')
         conn.execute('CREATE TABLE IF NOT EXISTS dpa_revisions (revised_at_utc TEXT, original_row_json TEXT)')
+    # Additive only. New operational tables also participate in snapshot merging.
+    import operations, continuous_evaluation, durable_admin, ocr_review
+    for module in (operations,continuous_evaluation,durable_admin,ocr_review):
+        module.migrate(conn)
 
 
 def save_observations(conn, frame, temperature, rain, park):
@@ -258,7 +262,9 @@ def evaluate_predictions(conn, major_rides, now=None):
     if pending.empty:
         return 0
     hist = load_history(conn)
-    hist = hist[hist.is_open.eq(1) & hist.wait_time.between(0,300) & hist.quality.eq('valid')].copy()
+    from data_quality import classify
+    hist=classify(hist,now)
+    hist=hist[hist.eligible].copy()
     if hist.empty:
         return 0
     hist['stamp'] = pd.to_datetime(hist.observed_at_utc, utc=True, errors='coerce')

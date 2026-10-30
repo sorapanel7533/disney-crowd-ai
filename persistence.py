@@ -35,7 +35,16 @@ def merge_snapshot(conn, path):
                 cols={row[1] for row in conn.execute(f'PRAGMA table_info("{table}")')}
                 for row in source.execute(f'SELECT * FROM "{table}"'):
                     record={key:row[key] for key in row.keys() if key in cols}
-                    key=next((k for k in ('observation_key','prediction_key','forecast_key','run_key') if record.get(k)),None)
+                    if table=='dpa_sellouts':
+                        prior=conn.execute('SELECT rowid,observed_at,sellout_hour FROM dpa_sellouts WHERE target_date=? AND attraction=? AND source=?',
+                            (record['target_date'],record['attraction'],record['source'])).fetchone()
+                        if prior:
+                            import reliability as r
+                            if r.utc(record['observed_at'])>r.utc(prior[1]):
+                                conn.execute('INSERT INTO dpa_revisions VALUES (?,?)',(r.iso(),json.dumps(dict(source=record['source'],target_date=record['target_date'],attraction=record['attraction'],observed_at=prior[1],sellout_hour=prior[2]),ensure_ascii=False)))
+                                conn.execute('UPDATE dpa_sellouts SET observed_at=?,sellout_hour=? WHERE rowid=?',(record['observed_at'],record['sellout_hour'],prior[0]))
+                            continue
+                    key=next((k for k in ('observation_key','prediction_key','forecast_key','run_key','event_id','issue_key','candidate_key') if record.get(k)),None)
                     if key:
                         existing=conn.execute(f'SELECT rowid FROM "{table}" WHERE "{key}"=?',(record[key],)).fetchone()
                         if existing:
@@ -44,6 +53,11 @@ def merge_snapshot(conn, path):
                             if updates and (record.get('evaluation_status')=='evaluated' or record.get('actual_crowd_index') is not None):
                                 assignments=','.join(f'"{k}"=?' for k in updates)
                                 conn.execute(f'UPDATE "{table}" SET {assignments} WHERE rowid=?',(*updates.values(),existing[0]))
+                            if table=='model_predictions' and record.get('status') in ('evaluated','insufficient_actual'):
+                                conn.execute('UPDATE model_predictions SET actual=?,error=?,evaluated_at_utc=?,status=? WHERE rowid=? AND status=?',
+                                    (record.get('actual'),record.get('error'),record.get('evaluated_at_utc'),record['status'],existing[0],'pending'))
+                            if table=='admin_events' and record.get('status')=='acknowledged':
+                                conn.execute("UPDATE admin_events SET status='acknowledged',acknowledged_at_utc=? WHERE rowid=?",(record.get('acknowledged_at_utc'),existing[0]))
                             continue
                     else:
                         where=' AND '.join(f'"{k}" IS ?' for k in record)
