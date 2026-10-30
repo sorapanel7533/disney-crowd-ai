@@ -9,6 +9,7 @@ from persistence import sync_public_snapshot
 
 
 def render(st,is_admin=False):
+    st.markdown('<style>[data-testid="stCaptionContainer"] p {color:#566173 !important;}</style>',unsafe_allow_html=True)
     st.subheader('アルコール情報')
     st.caption('東京ディズニーリゾートの非公式情報サイトです。20歳未満の飲酒は禁止されています。')
     st.caption('公式に掲載された販売情報を整理しています。当日の在庫・営業・提供を保証しません。')
@@ -17,7 +18,7 @@ def render(st,is_admin=False):
     try:
         conn=a.connect(directory/'alcohol.db')
         a.bootstrap(conn)
-        sync=sync_public_snapshot(conn,'alcohol.db',directory)
+        sync=sync_public_snapshot(conn,'alcohol.db',directory,ttl=60)
         freshness=a.freshness(conn);rows=a.catalog(conn)
         selected=st.segmented_control('アルコール情報のパーク',['ランド','シー','両方'],default='両方',key='alcohol_park') or '両方'
         parks={'ランド':['Disneyland'],'シー':['DisneySea'],'両方':[]}[selected]

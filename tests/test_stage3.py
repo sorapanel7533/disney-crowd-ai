@@ -229,3 +229,25 @@ def test_new_candidate_frozen_and_late_future_rows_cannot_change_forecast():
     second=models.predict('recent-trend-candidate-v1',training,{},targets,origin)
     assert first==second and 0<=next(iter(first.values()))<=300
     with pytest.raises(ValueError):models.validate_active('recent-trend-candidate-v1',{})
+
+
+def test_weekly_run_keeps_replayable_bootstrap_checkpoint(tmp_path,monkeypatch):
+    import alcohol_collector as ac
+    from data_journal import replay
+    monkeypatch.setattr(ac,'survey',lambda conn,force=False:a.failure(conn,'official_source_timeout: /robots.txt'))
+    result=ac.run(tmp_path)
+    assert result['status']=='failed' and result['checkpoint']['changes']>1000
+    target=a.connect(tmp_path/'restored-from-checkpoint.db')
+    assert replay(target,tmp_path/result['checkpoint']['path'])>1000
+    assert len(a.catalog(target))==165
+    assert a.freshness(target)['latest_run']['status']=='failed'
+    target.close()
+
+
+def test_source_timeout_log_is_specific_and_contains_no_credentials(monkeypatch):
+    import requests
+    from alcohol_collector import OfficialClient
+    client=OfficialClient(delay=0)
+    monkeypatch.setattr(client.session,'get',lambda *args,**kwargs:(_ for _ in ()).throw(requests.ReadTimeout('private diagnostic text must not be logged')))
+    with pytest.raises(RuntimeError,match=r'official_source_timeout: /robots.txt') as err:client.check_robots()
+    assert 'private diagnostic' not in str(err.value)

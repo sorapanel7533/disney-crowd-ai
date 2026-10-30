@@ -39,9 +39,11 @@ class OfficialClient:
             response.raise_for_status()
             if response.status_code!=200 or len(response.content)>2*1024*1024: raise ValueError('Unexpected response status/size')
             response.encoding='utf-8';return response.text
-        except (requests.RequestException,ValueError):
+        except (requests.RequestException,ValueError) as exc:
             self.failed+=1
-            raise RuntimeError('Official source HTTP/timeout/response failure') from None
+            from urllib.parse import urlparse
+            detail='timeout' if isinstance(exc,requests.Timeout) else 'http_'+str(getattr(getattr(exc,'response',None),'status_code','unknown')) if isinstance(exc,requests.HTTPError) else 'connection' if isinstance(exc,requests.ConnectionError) else 'response_validation'
+            raise RuntimeError('official_source_'+detail+': '+urlparse(url).path) from None
 
     def check_robots(self):
         contents=self.get(a.BASE+'/robots.txt')
@@ -51,6 +53,7 @@ class OfficialClient:
 
 
 def survey(conn,client=None,force=False,now=None,run_id=None):
+    real_clock=now is None
     now=r.iso(now);week=r.utc(now).tz_convert(r.JST).strftime('%G-W%V')
     history=a.records(conn,'alcohol_runs')
     # Initial browser verification does not suppress the first automated survey.
@@ -73,8 +76,8 @@ def survey(conn,client=None,force=False,now=None,run_id=None):
                 if not store['menu_url']: raise ValueError('Official menu link unavailable')
                 menus[sid]=a.parse_menu(client.get(store['menu_url']),store)
             except (ValueError,RuntimeError,PermissionError) as exc: failures[sid]=str(exc)
-        return a.apply_survey(conn,stores,menus,failures,now,run_id,force)
-    except (ValueError,RuntimeError,PermissionError) as exc: return a.failure(conn,str(exc),now,run_id)
+        return a.apply_survey(conn,stores,menus,failures,r.iso() if real_clock else now,run_id,force)
+    except (ValueError,RuntimeError,PermissionError) as exc: return a.failure(conn,str(exc),r.iso() if real_clock else now,run_id)
 
 
 def run(directory,force=False):
@@ -90,6 +93,15 @@ def run(directory,force=False):
             except (ValueError,PermissionError,TypeError):
                 result['admin_error']='Invalid administrator note; no annotation applied'
                 result['status']='failed'
+        # The first bootstrap is already in the DB before a weekly attempt.
+        # Keep one complete, independently replayable catalog checkpoint too.
+        manifest=directory/'alcohol-checkpoint.json'
+        if not manifest.exists():
+            empty=a.connect(Path(temp)/'empty.db')
+            try: checkpoint=write_delta(empty,conn,directory,'Alcohol',rid+'-checkpoint')
+            finally: empty.close()
+            manifest.write_text(json.dumps(checkpoint,ensure_ascii=False,indent=2),encoding='utf-8')
+            result['checkpoint']=checkpoint
         before=sqlite3.connect(before_path)
         try: result['journal']=write_delta(before,conn,directory,'Alcohol',rid)
         finally: before.close()
