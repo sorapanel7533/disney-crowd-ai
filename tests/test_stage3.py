@@ -131,6 +131,10 @@ def test_filters_do_not_include_unknown_period_as_confirmed_current(con,store):
     assert len(a.filter_catalog(rows,query='ビール',parks=['Disneyland'],max_price=1000))==1
     assert len(a.filter_catalog(rows,within=True,limited=True))==1
     assert not a.filter_catalog(rows,parks=['DisneySea'])
+    without_beer=a.filter_catalog(rows,exclude_beer=True)
+    assert without_beer and all(x['kind']!='ビール' for x in without_beer)
+    assert any(x['kind']=='ワイン' for x in without_beer)
+    assert len(a.filter_catalog(rows,exclude_beer=False))==len(rows)
 
 
 def test_admin_overlay_auth_ack_and_weekly_preservation(con,store,tmp_path):

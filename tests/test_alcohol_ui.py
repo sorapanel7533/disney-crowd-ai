@@ -31,6 +31,18 @@ def test_alcohol_real_screen_filters_and_fallbacks(tmp_path,monkeypatch,scenario
         assert not at.exception
         at.button_group(key='alcohol_park').set_value('シー').run()
         assert at.multiselect(key='alcohol_stores').value==[]
+        assert at.button_group(key='alcohol_filter_park').value=='シー'
+        at.button_group(key='alcohol_filter_park').set_value('ランド').run()
+        assert at.button_group(key='alcohol_park').value=='ランド'
+        assert not at.exception
+        at.toggle(key='alcohol_exclude_beer').set_value(True).run()
+        assert any('検索結果: 0商品' in x.value for x in at.caption)
+        at.toggle(key='alcohol_exclude_beer').set_value(False).run()
+        assert not any('検索結果: 0商品' in x.value for x in at.caption)
+        at.text_input(key='alcohol_query').set_value('').run()
+        at.toggle(key='alcohol_exclude_beer').set_value(True).run()
+        assert not any('ビール ·' in x.value for x in at.caption)
+        assert any('ワイン' in x.value or 'カクテル' in x.value for x in at.caption)
         at.radio(key='alcohol_search_mode').set_value('店舗から探す').run()
         assert not at.exception
         at.radio(key='alcohol_search_mode').set_value('更新履歴').run()

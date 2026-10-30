@@ -5,51 +5,13 @@ import os
 from pathlib import Path
 import sqlite3
 import tempfile
-import time
-from urllib.parse import urljoin
-from urllib.robotparser import RobotFileParser
-import requests
 import alcohol as a
 import reliability as r
 from persistence import snapshot
 from data_journal import write_delta
 
 
-class OfficialClient:
-    def __init__(self,delay=2):
-        self.session=requests.Session();self.delay=delay;self.previous=0;self.calls=0;self.failed=0
-        self.session.headers['User-Agent']='DisneyCrowdAI/3.0 (+https://github.com/sorapanel7533/disney-crowd-ai; weekly factual menu survey)'
-        self.robot=None
-
-    def get(self,url):
-        if not url.startswith(a.BASE+'/') or '/iframe/' in url or '/app/' in url: raise ValueError('Disallowed source')
-        if self.calls>=100: raise ValueError('Weekly request limit reached')
-        if self.failed>=3: raise RuntimeError('Source circuit open after three failures')
-        if self.robot and not self.robot.can_fetch('DisneyCrowdAI',url): raise PermissionError('robots disallows source')
-        time.sleep(max(0,self.delay-(time.monotonic()-self.previous)))
-        self.previous=time.monotonic();self.calls+=1
-        try:
-            response=self.session.get(url,timeout=(5,15),allow_redirects=False)
-            if response.status_code in (301,302,307,308):
-                target=urljoin(url,response.headers.get('Location',''))
-                if not target.startswith(a.BASE+'/') or not self.robot or not self.robot.can_fetch('DisneyCrowdAI',target):
-                    raise ValueError('Unapproved official source redirect')
-                self.calls+=1
-                response=self.session.get(target,timeout=(5,15),allow_redirects=False)
-            response.raise_for_status()
-            if response.status_code!=200 or len(response.content)>2*1024*1024: raise ValueError('Unexpected response status/size')
-            response.encoding='utf-8';return response.text
-        except (requests.RequestException,ValueError) as exc:
-            self.failed+=1
-            from urllib.parse import urlparse
-            detail='timeout' if isinstance(exc,requests.Timeout) else 'http_'+str(getattr(getattr(exc,'response',None),'status_code','unknown')) if isinstance(exc,requests.HTTPError) else 'connection' if isinstance(exc,requests.ConnectionError) else 'response_validation'
-            raise RuntimeError('official_source_'+detail+': '+urlparse(url).path) from None
-
-    def check_robots(self):
-        contents=self.get(a.BASE+'/robots.txt')
-        self.robot=RobotFileParser();self.robot.parse(contents.splitlines())
-        if not self.robot.can_fetch('DisneyCrowdAI',a.BASE+'/tdl/restaurant/list/'):
-            raise PermissionError('robots disallows menu survey')
+from official_source import OfficialClient
 
 
 def survey(conn,client=None,force=False,now=None,run_id=None):
@@ -57,12 +19,24 @@ def survey(conn,client=None,force=False,now=None,run_id=None):
     now=r.iso(now);week=r.utc(now).tz_convert(r.JST).strftime('%G-W%V')
     history=a.records(conn,'alcohol_runs')
     # Initial browser verification does not suppress the first automated survey.
-    existing=next((x for k,x in history.items() if k.startswith('weekly:') and x.get('week')==week and x['status']=='success'),None)
-    if existing and not force: return existing
+    this_week=[x for k,x in history.items() if k.startswith('weekly:'+week)]
+    existing=max((x for x in this_week if x['status']=='success'),key=lambda x:x['finished_at_utc'],default=None)
+    latest=max(this_week,key=lambda x:x['finished_at_utc'],default=None)
+    if existing and latest['finished_at_utc']<=existing['finished_at_utc'] and not force:
+        return {**existing,'skipped_same_week':True,'collection_performed':False,
+                'source_requests_this_attempt':0,'attempt_finished_at_utc':r.iso() if real_clock else now}
     run_id=run_id or 'weekly:'+week+':'+r.utc().strftime('%Y%m%dT%H%M%S%f')
+    own_client=client is None
     client=client or OfficialClient()
+    def recorded(result):
+        if hasattr(client,'summary'):
+            result={**result,'source':client.summary(),'collection_performed':True,
+                    'source_requests_this_attempt':client.calls}
+            with conn:a.put(conn,'alcohol_runs',result['run_id'],result,r.iso())
+        return result
     try:
         client.check_robots()
+        client.check_terms()
         stores=[]
         for park in a.PARKS: stores.extend(a.parse_stores(client.get(a.BASE+f'/{park}/restaurant/list/'),park))
         previous=a.records(conn,'alcohol_stores')
@@ -76,8 +50,10 @@ def survey(conn,client=None,force=False,now=None,run_id=None):
                 if not store['menu_url']: raise ValueError('Official menu link unavailable')
                 menus[sid]=a.parse_menu(client.get(store['menu_url']),store)
             except (ValueError,RuntimeError,PermissionError) as exc: failures[sid]=str(exc)
-        return a.apply_survey(conn,stores,menus,failures,r.iso() if real_clock else now,run_id,force)
-    except (ValueError,RuntimeError,PermissionError) as exc: return a.failure(conn,str(exc),r.iso() if real_clock else now,run_id)
+        return recorded(a.apply_survey(conn,stores,menus,failures,r.iso() if real_clock else now,run_id,force))
+    except (ValueError,RuntimeError,PermissionError,OSError) as exc: return recorded(a.failure(conn,str(exc),r.iso() if real_clock else now,run_id))
+    finally:
+        if own_client:client.close()
 
 
 def run(directory,force=False):
@@ -112,5 +88,7 @@ def run(directory,force=False):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--data-dir',type=Path,default=Path('.runtime'));parser.add_argument('--force',action='store_true')
-    args=parser.parse_args();result=run(args.data_dir,args.force);print(json.dumps(result,ensure_ascii=False))
+    args=parser.parse_args();result=run(args.data_dir,args.force)
+    summary={key:result[key] for key in ('run_id','status','finished_at_utc','attempt_finished_at_utc','collection_performed','skipped_same_week','source_requests_this_attempt','target_stores','successful_stores','stores_with_products','products','priced_products','dated_products','unconfirmed_stores','diffs','reason','journal') if key in result}
+    print(json.dumps(summary,ensure_ascii=False))
     raise SystemExit(1 if result['status']=='failed' else 0)
