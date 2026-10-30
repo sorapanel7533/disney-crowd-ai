@@ -4,8 +4,8 @@ from alcohol_collector import OfficialClient
 import alcohol as a
 
 
-def probe():
-    client=OfficialClient(transport='browser');result={'transport':'ordinary_headless_chromium','agent':client.session.headers['User-Agent'],'requests':[]}
+def probe(headed=False):
+    client=OfficialClient(transport='browser-headed' if headed else 'browser');result={'transport':'ordinary_headed_chromium' if headed else 'ordinary_headless_chromium','agent':client.session.headers['User-Agent'],'requests':[]}
     try:
         start=time.monotonic();client.check_robots();result['requests'].append({'path':'/robots.txt','success':True,'seconds':round(time.monotonic()-start,3)})
         for path in ('/legal.html','/tdl/restaurant/food/300/'):
@@ -18,4 +18,7 @@ def probe():
     return result
 
 
-if __name__=='__main__':print(json.dumps(probe(),ensure_ascii=False))
+if __name__=='__main__':
+    import argparse
+    p=argparse.ArgumentParser();p.add_argument('--headed',action='store_true');args=p.parse_args()
+    print(json.dumps(probe(args.headed),ensure_ascii=False))

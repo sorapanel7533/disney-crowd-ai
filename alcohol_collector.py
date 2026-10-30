@@ -21,9 +21,9 @@ class OfficialClient:
         self.session=requests.Session();self.delay=delay;self.previous=0;self.calls=0;self.failed=0
         self.session.headers['User-Agent']='DisneyCrowdAI/3.0 (+https://github.com/sorapanel7533/disney-crowd-ai; weekly factual menu survey)'
         self.robot=None
-        if transport=='browser':
+        if transport in ('browser','browser-headed'):
             from official_browser import BrowserSession
-            self.session=BrowserSession(lambda:self.robot)
+            self.session=BrowserSession(lambda:self.robot,headless=transport=='browser')
 
     def close(self):
         self.session.close()

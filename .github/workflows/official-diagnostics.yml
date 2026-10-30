@@ -33,3 +33,4 @@ jobs:
       - run: pip install -r requirements.txt -r requirements-alcohol.txt
       - run: python -m playwright install --with-deps chromium
       - run: python diagnose_official_browser.py
+      - run: xvfb-run -a python diagnose_official_browser.py --headed

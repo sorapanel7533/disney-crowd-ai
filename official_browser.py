@@ -8,10 +8,10 @@ import requests
 
 
 class BrowserSession:
-    def __init__(self,policy):
+    def __init__(self,policy,headless=True):
         from playwright.sync_api import sync_playwright
         self.engine=sync_playwright().start()
-        self.browser=self.engine.chromium.launch(headless=True)
+        self.browser=self.engine.chromium.launch(headless=headless)
         blank=self.browser.new_page()
         actual_agent=blank.evaluate('navigator.userAgent');blank.close()
         self.headers={'User-Agent':actual_agent+' DisneyCrowdAI/3.1 (+https://github.com/sorapanel7533/disney-crowd-ai)'}
