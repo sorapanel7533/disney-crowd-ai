@@ -251,3 +251,15 @@ def test_source_timeout_log_is_specific_and_contains_no_credentials(monkeypatch)
     monkeypatch.setattr(client.session,'get',lambda *args,**kwargs:(_ for _ in ()).throw(requests.ReadTimeout('private diagnostic text must not be logged')))
     with pytest.raises(RuntimeError,match=r'official_source_timeout: /robots.txt') as err:client.check_robots()
     assert 'private diagnostic' not in str(err.value)
+
+
+def test_preserved_context_revisions_do_not_multiply_event_adjustment():
+    import utils
+    day=pd.Timestamp('2026-10-31').date()
+    frame=pd.DataFrame([
+        {'observed_at':pd.Timestamp('2026-10-30'),'park':'Disneyland','target_date':day,'source':'rule_estimate','event_name':'same signal','bonus':1.},
+        {'observed_at':pd.Timestamp('2026-10-31'),'park':'Disneyland','target_date':day,'source':'rule_estimate','event_name':'same signal','bonus':2.},
+        {'observed_at':pd.Timestamp('2026-10-31'),'park':'Disneyland','target_date':day,'source':'rule_estimate','event_name':'another signal','bonus':3.},
+    ])
+    bonus,names=utils.get_event_bonus(frame,day,'Disneyland')
+    assert bonus==5. and set(names)=={'same signal','another signal'}
