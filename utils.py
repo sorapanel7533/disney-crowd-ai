@@ -2121,6 +2121,11 @@ def get_event_bonus(event_signals, target_date, park=None):
     if len(rows) == 0:
         return 0, []
 
+    # Recovery preserves prior revisions; refreshed signals contribute once.
+    if 'observed_at' in rows.columns:
+        rows=rows.sort_values('observed_at')
+    signal_key=[column for column in ('park','target_date','source','event_name') if column in rows.columns]
+    rows=rows.drop_duplicates(signal_key,keep='last')
     bonus = float(rows["bonus"].sum())
     reasons = rows["event_name"].dropna().astype(str).unique().tolist()
     return bonus, reasons
