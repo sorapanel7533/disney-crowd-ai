@@ -1,34 +1,23 @@
-"""Small, honest source connectivity probe; no catalog or park DB mutations."""
+"""Read-only policy/connectivity probe; no database mutations."""
 import json
-import platform
-import time
-from urllib.request import Request,urlopen
-from urllib.error import HTTPError,URLError
-from urllib.robotparser import RobotFileParser
-
-BASE='https://www.tokyodisneyresort.jp'
-AGENT='Mozilla/5.0 (compatible; DisneyCrowdAI/3.1; +https://github.com/sorapanel7533/disney-crowd-ai)'
+from official_source import OfficialClient,BASE
+import alcohol as a
 
 
 def probe():
-    result={'os':platform.system(),'python':platform.python_version(),'agent':AGENT,'requests':[]}
-    policy=None
-    for path in ('/robots.txt','/legal.html','/tdl/restaurant/food/300/'):
-        if path!='/robots.txt' and (not policy or not policy.can_fetch('DisneyCrowdAI',BASE+path)):break
-        if result['requests']:time.sleep(2)
-        start=time.monotonic()
-        try:
-            req=Request(BASE+path,headers={'User-Agent':AGENT,'Accept':'text/plain' if path.endswith('.txt') else 'text/html','Accept-Language':'ja'})
-            with urlopen(req,timeout=12) as response:
-                content=response.read(2*1024*1024+1)
-                entry={'path':path,'status':response.status,'bytes':len(content),'content_type':response.headers.get('Content-Type')}
-                if path=='/robots.txt' and response.status==200 and len(content)<512*1024:
-                    policy=RobotFileParser();policy.parse(content.decode('utf-8').splitlines())
-                    entry['menu_allowed']=policy.can_fetch('DisneyCrowdAI',BASE+'/tdl/restaurant/list/')
-        except HTTPError as exc:entry={'path':path,'error':'http_'+str(exc.code)}
-        except (URLError,TimeoutError,OSError) as exc:entry={'path':path,'error':type(exc).__name__}
-        entry['seconds']=round(time.monotonic()-start,3);result['requests'].append(entry)
+    client=OfficialClient();result={}
+    try:
+        client.check_robots();client.check_terms()
+        stores=a.parse_stores(client.get(BASE+'/tdl/restaurant/list/'),'tdl')
+        products=a.parse_menu(client.get(stores[0]['menu_url']),stores[0])
+        result={'source_access_success':True,'sample_store':stores[0]['name'],'sample_products':len(products)}
+    except (RuntimeError,PermissionError,ValueError) as exc:
+        result={'source_access_success':False,'reason':str(exc)}
+    finally:
+        result['source']=client.summary();client.close()
     return result
 
 
-if __name__=='__main__':print(json.dumps(probe(),ensure_ascii=False))
+if __name__=='__main__':
+    result=probe();print(json.dumps(result,ensure_ascii=False))
+    raise SystemExit(0 if result['source_access_success'] else 1)

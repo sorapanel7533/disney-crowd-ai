@@ -1,36 +1,18 @@
 name: Diagnose official source connectivity
 on:
   workflow_dispatch:
-  push:
-    branches: [fix/weekly-alcohol-update]
-    paths: ['diagnose_official.py', 'diagnose_official_browser.py', 'official_browser.py', '.github/workflows/official-diagnostics.yml']
 permissions:
   contents: read
 jobs:
   probe:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Check a few public resources without bypassing access controls
-        run: python diagnose_official.py
-  browser:
-    runs-on: ubuntu-latest
-    timeout-minutes: 7
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
           cache: pip
-      - run: pip install -r requirements.txt -r requirements-alcohol.txt
-      - run: python -m playwright install --with-deps chromium
-      - run: python diagnose_official_browser.py
-      - run: xvfb-run -a python diagnose_official_browser.py --headed
+      - run: pip install -r requirements.txt
+      - name: Verify current source policy and a small menu sample
+        run: python diagnose_official.py

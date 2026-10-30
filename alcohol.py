@@ -232,9 +232,15 @@ def freshness(conn,now=None):
     local=now.tz_convert(r.JST);next_day=local.normalize()+__import__('pandas').Timedelta(days=(7-local.weekday())%7,hours=6)
     if next_day<=local: next_day+=__import__('pandas').Timedelta(days=7)
     latest=max(records(conn,'alcohol_runs').values(),key=lambda x:x['finished_at_utc'],default=None)
+    week=local.strftime('%G-W%V')
+    automatic=[x for key,x in records(conn,'alcohol_runs').items() if key.startswith('weekly:'+week)]
+    last_auto=max(automatic,key=lambda x:x['finished_at_utc'],default=None)
+    retry=local.normalize()+__import__('pandas').Timedelta(hours=6,minutes=17)
+    if retry<=local:retry+=__import__('pandas').Timedelta(days=1)
     return {'last_success_utc':good['finished_at_utc'] if good else None,'age_days':age,
             'level':'unavailable' if age is None else 'warning' if age>=14 else 'attention' if age>=8 else 'fresh',
             'next_scheduled_jst':next_day.isoformat(),'latest_run':latest,
+            'catch_up_scheduled_jst':retry.isoformat() if not last_auto or last_auto['status']!='success' else None,
             'note':'GitHub Actionsの起動遅延・欠落があるため予定時刻です。'}
 
 

@@ -3,6 +3,8 @@ on:
   schedule:
     # Monday 06:00 JST. GitHub can delay or drop scheduled starts.
     - cron: '0 21 * * 0'
+    # Catch up a missed/failed week at 06:17 JST; completed weeks do no crawl.
+    - cron: '17 21 * * *'
   workflow_dispatch:
     inputs:
       force:
@@ -15,7 +17,7 @@ on:
         default: ''
   push:
     branches: [main]
-    paths: ['alcohol.py', 'alcohol_collector.py', 'data/alcohol-bootstrap.json', '.github/workflows/alcohol.yml']
+    paths: ['alcohol.py', 'alcohol_collector.py', 'official_source.py', 'data/alcohol-bootstrap.json', 'data/official-source-policy.json', '.github/workflows/alcohol.yml']
 permissions:
   contents: write
 concurrency:

@@ -38,12 +38,17 @@ def render(st,is_admin=False):
         latest=freshness['latest_run']
         if latest and latest['status']=='failed': st.warning('直近の更新は失敗しました。前回の確認データを表示しています。')
         if latest and latest['status']=='partial': st.warning('直近の更新は一部未確認です。失敗した店舗は前回データを保持しています。')
+        if freshness.get('catch_up_scheduled_jst'):
+            st.caption('未更新・失敗した週の再確認予定: '+local(freshness['catch_up_scheduled_jst'])+'（完了した週は再取得しません）')
         st.write(f"掲載商品数: {len({x['product_id'] for x in chosen})}件（将来・期間終了を含む）")
         with st.expander('調査範囲と確認状況'):
             good=a.last_success(conn)
             if good:
                 st.write(f"対象{good['target_stores']}店舗 / 解析成功{good['successful_stores']}店舗 / 商品確認{good['stores_with_products']}店舗")
                 st.write(f"商品詳細未確認: {good['unconfirmed_stores']}店舗。公式の提供店舗区分と、具体的な商品の確認を区別します。")
+                if good.get('source'):
+                    source=good['source']
+                    st.caption(f"公式情報の確認: {source['requests']}要求 / 通信失敗{source['failed_requests']}件。robotsと利用条件を確認して取得しています。")
             st.caption(sync)
             for store in a.records(conn,'alcohol_stores').values():
                 if not any(x['store_id']==store['store_id'] for x in rows):
