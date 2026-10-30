@@ -13,7 +13,7 @@ import reliability as r
 from data_quality import training_rows
 
 ROOT=Path(__file__).with_name('models')
-MODELS=('legacy-original-v0','legacy-corrected-v1','weekday-hour-median-v1','weighted-history-candidate-v1')
+MODELS=('legacy-original-v0','legacy-corrected-v1','weekday-hour-median-v1','weighted-history-candidate-v1','recent-trend-candidate-v1')
 LOCK=RLock()
 
 
@@ -68,6 +68,8 @@ def predict(version,training,settings,targets,origin):
     """Return one matched forecast per ride/hour. No future weather/price/feedback."""
     if version not in MODELS: raise ValueError('Unknown model version')
     if training.empty: return {}
+    if version=='recent-trend-candidate-v1':
+        return frozen(version).predict(training,targets,origin,registry()['versions'][version])
     result={}
     if version.startswith('legacy-'):
         module=frozen(version)

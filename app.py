@@ -644,6 +644,7 @@ display_mode_options = [
     "日付指定予測",
     "回り方プランナー",
     "データ管理",
+    "アルコール情報",
 ]
 if "display_mode_value" not in st.session_state:
     st.session_state["display_mode_value"] = "ダッシュボード"
@@ -697,7 +698,11 @@ refresh_tick()
 if st.sidebar.button('今すぐ更新'):
     st.rerun()
 st.sidebar.caption('APIは5分キャッシュ。画面更新だけでは継続収集を保証しません。')
-is_admin = render_access(st) if display_mode in ('データ管理','DPA/PP予測') else False
+is_admin = render_access(st) if display_mode in ('データ管理','DPA/PP予測','アルコール情報') else False
+if display_mode=='アルコール情報':
+    from alcohol_ui import render
+    render(st,is_admin)
+    st.stop()
 st.caption('[Powered by Queue-Times.com](https://queue-times.com/) · 取得値と予測値を区別して表示')
 
 ticket_price_map, ticket_map_source = cached_fetch_ticket_prices()
@@ -2130,6 +2135,13 @@ elif display_mode == "データ管理":
     from data_quality import coverage
     import continuous_evaluation, operations, durable_admin
     quality=coverage(history_df,park,settings['rides'])
+    with st.expander('定期収集の観測率・3日間判定',expanded=False):
+        observed_audit=operations.observation_audit(history_df,park)
+        st.caption('08:00〜22:00 JSTの実際の提供元観測時刻を集計。各枠で施設の80%以上の状態取得が必要です。起動成功件数とは別の指標です。')
+        st.write('完了日数:',observed_audit['completed_days'],'/ 必要3日')
+        st.write('3日間観測率:',observed_audit.get('three_day_rate'))
+        st.write('暫定目標80%:', '達成' if observed_audit['provisional_80_percent'] else '未達成・観測継続中')
+        st.dataframe(pd.DataFrame(observed_audit['daily']),width='stretch')
     with st.expander('収集品質・日別充足率',expanded=False):
         qs=quality['summary']
         st.caption('09:00〜21:00を仮定した15分枠で集計します。公式営業時間の確認値ではありません。営業状態を取得できた割合と、有効な営業中待ち時間の割合を区別します。')

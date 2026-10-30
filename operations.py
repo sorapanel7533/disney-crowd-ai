@@ -4,6 +4,33 @@ import pandas as pd
 import reliability as r
 
 
+def observation_audit(frame,park,now=None):
+    """Actual source-time slots, separate from workflow starts and job success."""
+    from data_quality import classify
+    df=classify(frame,now);now=r.utc(now).tz_convert(r.JST)
+    if df.empty: return {'completed_days':0,'provisional_80_percent':False,'daily':[],'note':'No verified observations'}
+    good=df[df.park.eq(park)&df.quality.eq('valid')&df.exclusion.isin(['','closed_or_suspended'])].copy()
+    if good.empty: return {'completed_days':0,'provisional_80_percent':False,'daily':[]}
+    start=max(good.slot.min().normalize(),now.normalize()-pd.Timedelta(days=3))
+    daily=[]
+    for day in pd.date_range(start,now.normalize(),freq='D'):
+        slots=pd.date_range(day+pd.Timedelta(hours=8),day+pd.Timedelta(hours=22),freq='15min',inclusive='left')
+        elapsed=slots[slots+pd.Timedelta(minutes=15)<=now]
+        counts=good.groupby('slot').attraction.nunique()
+        # A slot needs 80% of the known facility inventory, not just one response.
+        facility_count=37 if park=='Disneyland' else 36
+        observed={stamp for stamp,count in counts.items() if count>=facility_count*.8}
+        count=len(set(elapsed)&observed)
+        daily.append({'date':str(day.date()),'expected_slots':len(elapsed),'observed_slots':count,
+                      'missing_slots':len(elapsed)-count,'rate':count/len(elapsed) if len(elapsed) else None,
+                      'complete_day':day+pd.Timedelta(hours=22)<=now,'facility_denominator':facility_count})
+    completed=[x for x in daily if x['complete_day']][-3:]
+    expected=sum(x['expected_slots'] for x in completed);observed=sum(x['observed_slots'] for x in completed)
+    return {'completed_days':len(completed),'three_day_rate':observed/expected if expected else None,
+            'provisional_80_percent':len(completed)==3 and observed/expected>=.8,
+            'daily':daily,'policy':'08:00–22:00 JST, source timestamp 15-minute bins; >=80% known facilities per slot. Closed states count for collection, not wait-time learning. No backfill.'}
+
+
 def schedule_audit(runs,start,end,grace_minutes=30):
     start,end=r.utc(start),r.utc(end)
     slots=[]

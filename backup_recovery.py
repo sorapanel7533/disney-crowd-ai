@@ -33,5 +33,6 @@ def recover(path,repository,limit=5):
 
 if __name__=='__main__':
     import argparse,json
-    p=argparse.ArgumentParser();p.add_argument('directory',type=Path);args=p.parse_args()
-    print(json.dumps({name:recover(args.directory/name,args.directory) for name in ('disneyland.db','disneysea.db')},ensure_ascii=False))
+    p=argparse.ArgumentParser();p.add_argument('directory',type=Path)
+    p.add_argument('--only',action='append',choices=['disneyland.db','disneysea.db','alcohol.db']);args=p.parse_args()
+    print(json.dumps({name:recover(args.directory/name,args.directory) for name in (args.only or ['disneyland.db','disneysea.db','alcohol.db'])},ensure_ascii=False))

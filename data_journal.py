@@ -10,6 +10,10 @@ TABLES={'wait_times','predictions','daily_crowd_predictions','dpa_sellouts','dpa
     'weather_snapshots','ticket_price_snapshots','attraction_status_snapshots','park_hours','event_signals',
     'show_schedules','show_wait_context','historical_import_logs','collection_runs','dpa_revisions',
     'operation_runs','source_checks','model_issues','model_predictions','admin_events','history_candidates'}
+# Storage transport must not import the optional menu parser: a menu failure
+# must never prevent park collection. Only these explicit envelopes are replayed.
+TABLES |= {'alcohol_products','alcohol_stores','alcohol_sales','alcohol_periods','alcohol_prices',
+           'alcohol_runs','alcohol_sources','alcohol_diffs','alcohol_overrides'}
 
 
 def rows(conn,table):
