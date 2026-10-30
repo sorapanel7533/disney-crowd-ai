@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -16,10 +17,16 @@ from data_journal import write_delta
 
 
 class OfficialClient:
-    def __init__(self,delay=2):
+    def __init__(self,delay=2,transport='requests'):
         self.session=requests.Session();self.delay=delay;self.previous=0;self.calls=0;self.failed=0
         self.session.headers['User-Agent']='DisneyCrowdAI/3.0 (+https://github.com/sorapanel7533/disney-crowd-ai; weekly factual menu survey)'
         self.robot=None
+        if transport=='browser':
+            from official_browser import BrowserSession
+            self.session=BrowserSession(lambda:self.robot)
+
+    def close(self):
+        self.session.close()
 
     def get(self,url):
         if not url.startswith(a.BASE+'/') or '/iframe/' in url or '/app/' in url: raise ValueError('Disallowed source')
@@ -47,6 +54,8 @@ class OfficialClient:
 
     def check_robots(self):
         contents=self.get(a.BASE+'/robots.txt')
+        if '<html' in contents.lower() or not re.search(r'^\s*user-agent\s*:',contents,re.M|re.I):
+            raise ValueError('Invalid robots response; survey stopped')
         self.robot=RobotFileParser();self.robot.parse(contents.splitlines())
         if not self.robot.can_fetch('DisneyCrowdAI',a.BASE+'/tdl/restaurant/list/'):
             raise PermissionError('robots disallows menu survey')
