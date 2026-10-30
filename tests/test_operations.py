@@ -84,6 +84,28 @@ def test_unverified_or_external_duplicate_cannot_hide_direct_api_truth():
     assert valid.loc[valid.eligible,'wait_time'].tolist()==[18.]
 
 
+def test_offline_formal_validation_excludes_legacy_and_incomplete_days(monkeypatch):
+    import evaluation
+    frame=observations(days=16)
+    settings=dict(utils.PARK_SETTINGS['Disneyland'],rides=['a'],park='Disneyland')
+    class Reference:
+        datetime=__import__('datetime').datetime
+        @staticmethod
+        def predict_wait_times_for_date(*args,**kwargs):
+            return pd.DataFrame([{'Attraction':'a','Hour':h,'Minute':0,'Predicted Wait':30} for h in range(9,21)])
+    monkeypatch.setattr(utils,'predict_wait_times_for_date',Reference.predict_wait_times_for_date)
+    legacy=frame.copy();legacy['quality']='legacy_unverified'
+    assert evaluation.backtest(legacy,settings,Reference)[0].empty
+    result,info=evaluation.backtest(frame,settings,Reference)
+    assert info['available_days']==16 and not result.empty
+    assert set(result.horizon_days)=={1} # 7/30-day origins lack 14 prior training dates
+    # These 2 test dates do not satisfy the separate 14-independent-evaluation-day gate.
+    assert result.target_day.nunique()==2
+    frame['wait_time']=0
+    zero_result,_=evaluation.backtest(frame,settings,Reference)
+    assert zero_result.actual.eq(0).all() and len(zero_result)>0
+
+
 def test_frozen_models_and_promotion_requires_more_than_fourteen_days():
     for version in ('legacy-original-v0','legacy-corrected-v1'): assert models.frozen(version)
     with pytest.raises(ValueError): models.validate_active('weighted-history-candidate-v1',{})
@@ -205,9 +227,12 @@ def test_collector_failure_then_recovery_both_parks_and_no_duplicates(tmp_path,m
         raw={'rides':[{'id':1,'name':'a','wait_time':40,'is_open':True,'last_updated':r.iso()}]}
         f=r.parse_queue(raw,settings['park']);return f,f
     monkeypatch.setattr(utils,'fetch_wait_times',fetch)
+    monkeypatch.setenv('GITHUB_RUN_ID','test-failure')
+    monkeypatch.setenv('GITHUB_RUN_ATTEMPT','1')
     first=collector.collect(tmp_path,force=True)
     assert len(first)==2 and all(x['status']=='failed' for x in first)
-    state['fail']=False;second=collector.collect(tmp_path,force=True)
+    state['fail']=False;monkeypatch.setenv('GITHUB_RUN_ID','test-recovery')
+    second=collector.collect(tmp_path,force=True)
     assert all(x['status']=='success' and x['inserted']==1 for x in second)
     for park in utils.PARK_SETTINGS:
         con=sqlite3.connect(tmp_path/(park+'.db'))

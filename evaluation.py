@@ -47,13 +47,27 @@ def load_legacy(path):
 
 def backtest(raw,settings,legacy,diagnostic=False):
     data=raw.copy()
+    if not diagnostic:
+        from data_quality import classify,coverage
+        import reliability as r
+        checked=classify(data)
+        data=checked[checked.eligible].copy()
+        quality=coverage(raw,settings.get('park') or ('DisneySea' if 'sea' in settings['db'] else 'Disneyland'),settings['rides'])
+        ready={row['date'] for row in quality['daily'] if row['evaluation_ready']}
+        data=data[data['day'].isin(ready)] if len(data) else data
+    if data.empty:
+        return pd.DataFrame(),{'available_days':0,'first_day':None,'last_day':None,'observations':len(raw),'hourly_samples':0}
     data['datetime']=pd.to_datetime(data.datetime)
+    if 'fetched_at_utc' in data and not diagnostic:
+        data['available_at']=pd.to_datetime(data.fetched_at_utc,utc=True).dt.tz_convert(utils.JST).dt.tz_localize(None)
+    else:
+        data['available_at']=data.datetime # legacy diagnostic only; historical fetch vintage unavailable
     data['wait_time']=pd.to_numeric(data.wait_time,errors='coerce')
-    data=data[data.wait_time.between(1,300)] # legacy zero has unknown operational status
+    data=data[data.wait_time.between(1 if diagnostic else 0,300)] # only legacy diagnostic zeros have unknown operating status
     if 'is_open' in data: data=data[data.is_open.eq(1)]
     data=data.drop_duplicates(['datetime','attraction'])
     data['datetime']=data.datetime.dt.floor('h')
-    data=data.groupby(['attraction','datetime'],as_index=False).wait_time.mean()
+    data=data.groupby(['attraction','datetime'],as_index=False).agg(wait_time=('wait_time','mean'),available_at=('available_at','max'))
     data['date']=data.datetime.dt.date; data['hour']=data.datetime.dt.hour
     days=sorted(data.date.unique())
     origins=[]
@@ -67,7 +81,7 @@ def backtest(raw,settings,legacy,diagnostic=False):
                 origins.append((origin,horizon))
     results=[]
     for origin,horizon in origins:
-        train=data[data.datetime<origin].copy()
+        train=data[(data.datetime<origin)&(data.available_at<origin)].copy()
         if train.empty or (not diagnostic and train.date.nunique()<14): continue
         if diagnostic:
             test=data[(data.date==origin.date()) & data.datetime.between(origin,origin+pd.Timedelta(hours=2),inclusive='left')]
