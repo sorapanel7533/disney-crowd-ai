@@ -31,7 +31,8 @@ def survey(conn,client=None,force=False,now=None,run_id=None):
     def recorded(result):
         if hasattr(client,'summary'):
             result={**result,'source':client.summary(),'collection_performed':True,
-                    'source_requests_this_attempt':client.calls}
+                    'source_requests_this_attempt':client.calls,
+                    'execution_environment':'github_actions' if os.environ.get('GITHUB_ACTIONS')=='true' else 'local'}
             with conn:a.put(conn,'alcohol_runs',result['run_id'],result,r.iso())
         return result
     try:

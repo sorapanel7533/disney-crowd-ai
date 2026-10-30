@@ -106,6 +106,10 @@ def test_real_survey_protocol_success_duplicate_week_and_retry_after_failure(cli
     assert retried['status']=='success' and client.calls>calls
     assert len(a.records(conn,'alcohol_products'))==5
     assert a.freshness(conn,'2026-10-30T17:00:00Z')['catch_up_scheduled_jst'] is None
+    calls=client.calls
+    following=survey(conn,client,now='2026-11-01T21:00:00Z',run_id='weekly:2026-W45:scheduled')
+    assert following['status']=='success' and following['week']=='2026-W45'
+    assert client.calls==calls+6 and not following.get('skipped_same_week')
     conn.close()
 
 
