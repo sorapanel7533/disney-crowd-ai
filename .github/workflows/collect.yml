@@ -2,13 +2,19 @@ name: Collect park observations
 on:
   push:
     branches: [main]
-    paths: ['collector.py', 'reliability.py', '.github/workflows/collect.yml']
+    paths: ['collector.py', 'reliability.py', 'continuous_evaluation.py', '.github/workflows/collect.yml']
   schedule:
     # UTC: 08:07-21:52 JST, 15-minute cadence with off-hour-start offsets.
     - cron: '7,22,37,52 23,0-12 * * *'
   workflow_dispatch:
+    inputs:
+      admin_event:
+        description: 'Optional validated DPA outbox JSON exported by an administrator'
+        required: false
+        default: ''
 permissions:
   contents: write
+  actions: read
 concurrency:
   group: crowd-data-collector
   cancel-in-progress: false
@@ -36,24 +42,39 @@ jobs:
             git -C .data remote add origin "$(git remote get-url origin)"
             git -C .data config http.https://github.com/.extraheader "$(git config http.https://github.com/.extraheader)"
           fi
+      - name: Verify or recover durable databases
+        run: python backup_recovery.py .data
       - name: Collect and evaluate
         id: collect
         continue-on-error: true
         env:
           EVENT_NAME: ${{ github.event_name }}
+          COLLECTOR_EVENT: ${{ github.event_name }}
+          ADMIN_EVENT_JSON: ${{ inputs.admin_event }}
         run: |
           if [ "$EVENT_NAME" = "schedule" ]; then
             python collector.py --data-dir .data --context
           else
             python collector.py --data-dir .data --context --force
           fi
+      - name: Audit schedule coverage and storage
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python audit_runtime.py --data-dir .data
       - name: Persist observations and failure log
         if: always()
         shell: bash
         run: |
           git -C .data config user.name 'github-actions[bot]'
           git -C .data config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git -C .data add -- '*.db' 'last-run.json'
+          git -C .data add -- '*.db' last-run.json
+          for file in operational-report.json runtime-audit.json; do
+            if [ -f ".data/$file" ]; then git -C .data add -- "$file"; fi
+          done
+          for directory in journal recovery; do
+            if [ -d ".data/$directory" ]; then git -C .data add -- "$directory/"; fi
+          done
           if ! git -C .data diff --cached --quiet; then
             git -C .data commit -m 'Record park observations and forecast evaluations'
             git -C .data push origin HEAD:crowd-data

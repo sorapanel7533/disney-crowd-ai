@@ -446,6 +446,9 @@ def get_weather():
         else:
             weather_text = "その他"
 
+        for frame in (hourly,daily):
+            frame.attrs.update(fetched_at_utc=reliable.iso(),source_url='https://api.open-meteo.com/v1/forecast',
+                observed_at_utc=reliable.iso(current['time']) if current.get('time') else None)
         return temp, rain, weather_text, hourly, daily
 
     except Exception:
@@ -1272,33 +1275,12 @@ def _historical_date_imported(conn, park, target_date):
 
 
 def save_historical_wait_rows(cursor, conn, rows, park, source_url):
-    if not rows:
-        return 0
-    saved = 0
-    for row in rows:
-        cursor.execute(
-            "SELECT 1 FROM wait_times WHERE datetime = ? AND attraction = ? LIMIT 1",
-            (row["datetime"], row["attraction"]),
-        )
-        if cursor.fetchone():
-            continue
-        cursor.execute("""
-        INSERT INTO wait_times
-        (datetime, attraction, wait_time, temperature, rain, is_open, park, source)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            row["datetime"],
-            row["attraction"],
-            int(row["wait_time"]),
-            row.get("temperature"),
-            row.get("rain"),
-            int(row.get("is_open", 1)),
-            park,
-            source_url,
-        ))
-        saved += 1
-    conn.commit()
-    return saved
+    # HTML/OCR values require independent date, facility and numeric review.
+    # Preserve candidates; never silently treat an OCR result as training truth.
+    from ocr_review import quarantine
+    if rows:
+        quarantine(conn, rows, park, str(rows[0].get('datetime',''))[:10], source_url)
+    return 0
 
 
 def import_disneyreal_history(cursor, conn, park, start_date, end_date, max_days=None):
@@ -1331,11 +1313,14 @@ def import_disneyreal_history(cursor, conn, park, start_date, end_date, max_days
 
         saved_count = save_historical_wait_rows(cursor, conn, rows, park, url)
         status = "success" if saved_count > 0 else "empty"
+        if rows and saved_count==0:
+            status='quarantined'
+            message=f'{len(rows)}件を品質審査待ちとして隔離。学習データへの追加は0件。'+message
         if method in ("failed", "skipped") and saved_count == 0:
             status = method
         _log_historical_import(cursor, conn, park, target_date, url, status, safe_display_text(message, "取得できませんでした"), saved_count, method)
 
-        if saved_count == 0 and should_try_alternative_source(conn, park, target_date):
+        if saved_count == 0 and not rows and should_try_alternative_source(conn, park, target_date):
             alt_rows, alt_message, alt_method, alt_url = fetch_alternative_wait_history(park, target_date)
             alt_saved = save_historical_wait_rows(cursor, conn, alt_rows, park, alt_url)
             alt_status = "success" if alt_saved > 0 else "failed"
@@ -2907,7 +2892,8 @@ def _prepare_model_history(history_df, rides=None):
 def prepare_prediction_history(history_df, park=None, all_attractions=None):
     if history_df is None or len(history_df) == 0:
         return pd.DataFrame()
-    df = history_df.copy()
+    from data_quality import training_rows
+    df = training_rows(history_df, allow_legacy_reference=True)
     if all_attractions is not None:
         allowed = {str(a) for a in all_attractions if str(a).strip()}
         if allowed:

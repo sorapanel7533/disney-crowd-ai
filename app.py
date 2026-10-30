@@ -1955,7 +1955,9 @@ elif display_mode == "DPA/PP予測":
                 sellout_hour,
                 "manual"
             )
-            st.success("DPA売切れ時刻を保存しました。")
+            import durable_admin
+            durable_admin.enqueue(conn,park,sellout_attraction,datetime.now(JST).date(),sellout_hour,authorized=is_admin)
+            st.success("DPA売切れ時刻をローカルに保存しました。外部保存への送信・確認はデータ管理で行えます。")
 
 elif display_mode == "日付指定予測":
 
@@ -2125,6 +2127,50 @@ elif display_mode == "データ管理":
     st.subheader("🗂 データ管理")
     st.caption(storage_status)
     st.dataframe(pd.DataFrame([reliable.diagnostics(conn)]), width="stretch")
+    from data_quality import coverage
+    import continuous_evaluation, operations, durable_admin
+    quality=coverage(history_df,park,settings['rides'])
+    with st.expander('収集品質・日別充足率',expanded=False):
+        qs=quality['summary']
+        st.caption('09:00〜21:00を仮定した15分枠で集計します。公式営業時間の確認値ではありません。営業状態を取得できた割合と、有効な営業中待ち時間の割合を区別します。')
+        st.write(f"有効な営業中観測日: {qs.get('days_with_open_observations',0)}日 / 独立評価に使える完了日: {qs.get('eligible_evaluation_days',0)}日")
+        st.write(f"観測の鮮度: {qs.get('freshness_minutes',None)}分 / 営業中0分: {qs.get('open_zero_rows',0)}件")
+        st.caption('評価日条件：終了済みの日に主要5施設の各施設で全日枠75%以上かつ8時間以上。日数だけで精度確立とは判定しません。旧DBの未検証履歴は参考用として別扱いです。')
+        st.dataframe(pd.DataFrame(quality.get('daily',[])),width='stretch')
+        rides_quality=pd.DataFrame(quality.get('attractions',[]))
+        if len(rides_quality): rides_quality['attraction']=rides_quality.attraction.map(reliable.japanese_name)
+        st.dataframe(rides_quality,width='stretch')
+        st.download_button('施設・日・時間別の品質データを保存',__import__('json').dumps(quality,ensure_ascii=False,default=str),file_name=f'{park}-quality.json',mime='application/json')
+    with st.expander('モデル継続比較・外部情報の鮮度',expanded=False):
+        model_report=continuous_evaluation.report(conn)
+        st.caption('採用モデルはlegacy-corrected-v1。比較用予測は発行時点の検証済み履歴だけで生成し、対象時間終了後に採点します。各時間に15分枠3個以上の実測が必要です。')
+        st.write('比較予測の状態',model_report['counts'])
+        st.dataframe(pd.DataFrame(model_report.get('paired_metrics',[])),width='stretch')
+        st.caption('主要/非主要、パーク別に独立評価14日以上・複数期間・日単位の不確実性を確認するまで候補は未採用です。14日は最低条件です。')
+        st.dataframe(pd.DataFrame(operations.freshness(conn)),width='stretch')
+        st.caption('失敗率は記録された取得試行に対する割合です。未実行の予定ジョブは成功率に含めません。定期実行の欠落診断は保存済み運用レポートで確認できます。')
+    if is_admin:
+        with st.expander('管理入力の永続保存',expanded=False):
+            pending=pd.read_sql_query('SELECT * FROM admin_events ORDER BY created_at_utc',conn)
+            st.dataframe(pending.drop(columns=['payload_json'],errors='ignore'),width='stretch')
+            token=os.environ.get('DISNEY_GITHUB_ACTIONS_TOKEN','')
+            if not token:
+                try: token=st.secrets.get('DISNEY_GITHUB_ACTIONS_TOKEN','')
+                except Exception: token=''
+            unacked=pending[pending.status.ne('acknowledged')] if len(pending) else pending
+            if not token: st.info('送信認証が未設定です。保留JSONを保存し、GitHub Actionsの手動実行へ入力できます。設定方法は運用手順に記載しています。')
+            if len(unacked):
+                payload_text=unacked.iloc[0].payload_json
+                st.download_button('先頭の保留入力JSONを保存',payload_text,file_name='admin-event.json',mime='application/json')
+                if st.button('保留入力を永続保存へ送信',disabled=not token) and is_admin:
+                    try:
+                        durable_admin.dispatch(__import__('json').loads(payload_text),token,authorized=is_admin)
+                        st.info('Actionsへ送信しました。外部保存の完了後、同期でacknowledgedになるまで永続保存済みとは判定しません。')
+                    except Exception:
+                        st.error('送信に失敗しました。保留入力は残っています。権限・Actionsログを確認してください。')
+    with st.expander('外部履歴の品質審査状況',expanded=False):
+        st.dataframe(pd.read_sql_query('SELECT status,count(*) AS count FROM history_candidates GROUP BY status',conn),width='stretch')
+        st.caption('HTML・OCR候補は隔離し、日付・施設・数値を独立に確認するまで学習へ使用しません。審査・承認は運用手順の管理者用処理で行います。')
     st.caption('DB: ' + conn.execute('PRAGMA database_list').fetchone()[2] + ' / 原本DBは保全。永続収集先はGitHub crowd-dataブランチ。同期状態は収集ログを確認してください。')
     if is_admin:
         import tempfile, sqlite3

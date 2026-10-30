@@ -1,0 +1,27 @@
+{
+  "active_version": "legacy-corrected-v1",
+  "reference_commit": "a3a3c59044a128af0960f7c6fea3ae6b17866874",
+  "versions": {
+    "legacy-corrected-v1": {
+      "file": "legacy_corrected_v1.py",
+      "sha256": "1a585c9d0d96d387d917d4525cdedd0ffa52848b88d25cf0fe298f7ad52249c4"
+    },
+    "legacy-original-v0": {
+      "file": "legacy_original_v0.py",
+      "sha256": "da19996482a23cdd0255727b126b4b2184cba4503826a5a66d37d356aada2167"
+    },
+    "weighted-history-candidate-v1": {
+      "half_life_scale_days": 28,
+      "hour_decay_scale": 2,
+      "same_weekday_weight": 2
+    },
+    "weekday-hour-median-v1": {
+      "fallback": [
+        "same_weekday_hour",
+        "same_hour",
+        "ride_median"
+      ]
+    }
+  },
+  "source_hash_encoding": "UTF-8 with LF line endings"
+}
