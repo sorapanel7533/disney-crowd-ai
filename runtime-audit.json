@@ -1,5 +1,5 @@
 {
-  "as_of_utc": "2026-10-31T13:07:02.390874+00:00",
+  "as_of_utc": "2026-10-31T14:42:29.052737+00:00",
   "parks": {
     "DisneySea": {
       "integrity": "ok",
@@ -7,7 +7,7 @@
       "quality": {
         "summary": {
           "park": "DisneySea",
-          "as_of_utc": "2026-10-31T13:07:02.390874+00:00",
+          "as_of_utc": "2026-10-31T14:42:29.052737+00:00",
           "rows": 2643,
           "verified_rows": 1649,
           "valid_open_rows": 1049,
@@ -24,7 +24,7 @@
           "days_with_open_observations": 2,
           "eligible_evaluation_days": 0,
           "latest_observed_utc": "2026-10-31T12:46:09+00:00",
-          "freshness_minutes": 20.8898479,
+          "freshness_minutes": 116.33421228333333,
           "denominator": "Assumed 09:00–21:00 JST, 15-minute slots; not verified official hours",
           "ready_rule": "Completed day; each major ride >= 75% of full-day slots and >= 8 hours"
         },
@@ -8479,7 +8479,7 @@
       "quality": {
         "summary": {
           "park": "Disneyland",
-          "as_of_utc": "2026-10-31T13:07:02.390874+00:00",
+          "as_of_utc": "2026-10-31T14:42:29.052737+00:00",
           "rows": 1963,
           "verified_rows": 1739,
           "valid_open_rows": 1291,
@@ -8495,7 +8495,7 @@
           "days_with_open_observations": 2,
           "eligible_evaluation_days": 1,
           "latest_observed_utc": "2026-10-31T12:46:03+00:00",
-          "freshness_minutes": 20.989847899999997,
+          "freshness_minutes": 116.43421228333334,
           "denominator": "Assumed 09:00–21:00 JST, 15-minute slots; not verified official hours",
           "ready_rule": "Completed day; each major ride >= 75% of full-day slots and >= 8 hours"
         },
@@ -17187,7 +17187,7 @@
     "partition_required": false,
     "partition_warning_threshold_bytes": 20971520,
     "retention_policy": "No destructive prune. Immutable row journals plus original DB and retained Git snapshots. Plan monthly partitions before threshold.",
-    "git_object_statistics": "count: 281\nsize: 25712\nin-pack: 358\npacks: 1\nsize-pack: 1992\nprune-packable: 0\ngarbage: 1\nsize-garbage: 4",
+    "git_object_statistics": "count: 82\nsize: 640\nin-pack: 564\npacks: 1\nsize-pack: 4296\nprune-packable: 0\ngarbage: 1\nsize-garbage: 4",
     "db_commit_history": [
       "2c8e7cae6851584943d0811a99a60ae8d283275b 2026-10-31T12:52:08Z",
       "cfa92d3311b1cdbbfc57d537e4421ca0bad56eeb 2026-10-31T12:37:08Z",
@@ -17289,7 +17289,7 @@
     "bytes": 1007616,
     "freshness": {
       "last_success_utc": "2026-10-30T16:50:22.372097+00:00",
-      "age_days": 0.8449076247337963,
+      "age_days": 0.9111884333333334,
       "level": "fresh",
       "next_scheduled_jst": "2026-11-02T06:00:00+09:00",
       "latest_run": {
@@ -17721,12 +17721,12 @@
   },
   "schedule": {
     "start_utc": "2026-10-29T17:22:03+00:00",
-    "end_utc": "2026-10-31T13:07:02.390874+00:00",
+    "end_utc": "2026-10-31T14:42:29.052737+00:00",
     "grace_minutes": 30,
     "expected_slots": 112,
-    "observed_scheduled_runs": 5,
-    "not_observed_slots": 107,
-    "completed_jobs": 8,
+    "observed_scheduled_runs": 6,
+    "not_observed_slots": 108,
+    "completed_jobs": 9,
     "failed_jobs": 0,
     "failure_rate_of_executed_jobs": 0.0,
     "note": "Missing slots may be delayed/dropped/not dispatched. They are not HTTP failures. Delay attribution is inferred.",
@@ -18384,7 +18384,7 @@
       },
       {
         "due_utc": "2026-10-31T08:22:00+00:00",
-        "status": "in_progress",
+        "status": "success",
         "run_id": 41184963907,
         "inferred_delay_minutes": 9.67,
         "attribution": "inferred_previous_slot"
@@ -18510,23 +18510,33 @@
       },
       {
         "due_utc": "2026-10-31T12:52:00+00:00",
-        "status": "within_grace",
+        "status": "not_observed",
         "run_id": null,
         "inferred_delay_minutes": null,
         "attribution": "absence_of_run_is_not_a_failed_job"
       }
     ],
     "unmatched_runs": [
-      41084230039
+      41084230039,
+      41211327947
     ],
     "executed_runs": [
+      {
+        "id": 41211327947,
+        "event": "schedule",
+        "created_at": "2026-10-31T14:41:53Z",
+        "updated_at": "2026-10-31T14:41:56Z",
+        "status": "in_progress",
+        "conclusion": null,
+        "html_url": "https://github.com/sorapanel7533/disney-crowd-ai/actions/runs/41211327947"
+      },
       {
         "id": 41184963907,
         "event": "schedule",
         "created_at": "2026-10-31T08:31:40Z",
-        "updated_at": "2026-10-31T08:31:44Z",
-        "status": "in_progress",
-        "conclusion": null,
+        "updated_at": "2026-10-31T13:07:09Z",
+        "status": "completed",
+        "conclusion": "success",
         "html_url": "https://github.com/sorapanel7533/disney-crowd-ai/actions/runs/41184963907"
       },
       {
@@ -18603,6 +18613,7 @@
       }
     ],
     "wall_seconds": [
+      16529.0,
       19344.0,
       35.0,
       97.0,
