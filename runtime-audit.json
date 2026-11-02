@@ -1,5 +1,5 @@
 {
-  "as_of_utc": "2026-11-02T13:07:02.634856+00:00",
+  "as_of_utc": "2026-11-02T20:16:11.889620+00:00",
   "parks": {
     "DisneySea": {
       "integrity": "ok",
@@ -7,7 +7,7 @@
       "quality": {
         "summary": {
           "park": "DisneySea",
-          "as_of_utc": "2026-11-02T13:07:02.634856+00:00",
+          "as_of_utc": "2026-11-02T20:16:11.889620+00:00",
           "rows": 5268,
           "verified_rows": 4274,
           "valid_open_rows": 2798,
@@ -24,7 +24,7 @@
           "days_with_open_observations": 4,
           "eligible_evaluation_days": 0,
           "latest_observed_utc": "2026-11-02T12:46:12+00:00",
-          "freshness_minutes": 20.843914266666665,
+          "freshness_minutes": 449.9981603333334,
           "denominator": "Assumed 09:00–21:00 JST, 15-minute slots; not verified official hours",
           "ready_rule": "Completed day; each major ride >= 75% of full-day slots and >= 8 hours"
         },
@@ -16383,15 +16383,6 @@
         "provisional_80_percent": false,
         "daily": [
           {
-            "date": "2026-10-30",
-            "expected_slots": 56,
-            "observed_slots": 3,
-            "missing_slots": 53,
-            "rate": 0.05357142857142857,
-            "complete_day": true,
-            "facility_denominator": 36
-          },
-          {
             "date": "2026-10-31",
             "expected_slots": 56,
             "observed_slots": 41,
@@ -16416,6 +16407,15 @@
             "missing_slots": 20,
             "rate": 0.6428571428571429,
             "complete_day": true,
+            "facility_denominator": 36
+          },
+          {
+            "date": "2026-11-03",
+            "expected_slots": 0,
+            "observed_slots": 0,
+            "missing_slots": 0,
+            "rate": null,
+            "complete_day": false,
             "facility_denominator": 36
           }
         ],
@@ -16537,7 +16537,7 @@
       "quality": {
         "summary": {
           "park": "Disneyland",
-          "as_of_utc": "2026-11-02T13:07:02.634856+00:00",
+          "as_of_utc": "2026-11-02T20:16:11.889620+00:00",
           "rows": 4738,
           "verified_rows": 4514,
           "valid_open_rows": 3420,
@@ -16553,7 +16553,7 @@
           "days_with_open_observations": 4,
           "eligible_evaluation_days": 1,
           "latest_observed_utc": "2026-11-02T12:51:16+00:00",
-          "freshness_minutes": 15.7772476,
+          "freshness_minutes": 444.9314936666667,
           "denominator": "Assumed 09:00–21:00 JST, 15-minute slots; not verified official hours",
           "ready_rule": "Completed day; each major ride >= 75% of full-day slots and >= 8 hours"
         },
@@ -33365,15 +33365,6 @@
         "provisional_80_percent": false,
         "daily": [
           {
-            "date": "2026-10-30",
-            "expected_slots": 56,
-            "observed_slots": 3,
-            "missing_slots": 53,
-            "rate": 0.05357142857142857,
-            "complete_day": true,
-            "facility_denominator": 37
-          },
-          {
             "date": "2026-10-31",
             "expected_slots": 56,
             "observed_slots": 41,
@@ -33398,6 +33389,15 @@
             "missing_slots": 20,
             "rate": 0.6428571428571429,
             "complete_day": true,
+            "facility_denominator": 37
+          },
+          {
+            "date": "2026-11-03",
+            "expected_slots": 0,
+            "observed_slots": 0,
+            "missing_slots": 0,
+            "rate": null,
+            "complete_day": false,
             "facility_denominator": 37
           }
         ],
@@ -33525,7 +33525,7 @@
     "partition_required": false,
     "partition_warning_threshold_bytes": 20971520,
     "retention_policy": "No destructive prune. Immutable row journals plus original DB and retained Git snapshots. Plan monthly partitions before threshold.",
-    "git_object_statistics": "count: 221\nsize: 54604\nin-pack: 1296\npacks: 1\nsize-pack: 12342\nprune-packable: 0\ngarbage: 1\nsize-garbage: 4",
+    "git_object_statistics": "count: 82\nsize: 652\nin-pack: 1442\npacks: 1\nsize-pack: 13797\nprune-packable: 0\ngarbage: 1\nsize-garbage: 4",
     "db_commit_history": [
       "9f46190695923f50c7023eb9ed23e7d1e1938d18 2026-11-02T12:52:21Z",
       "4d6a287fc63fb73f9465ba51dd15dd8b1305f19a 2026-11-02T12:37:21Z",
@@ -33676,7 +33676,7 @@
     "bytes": 1056768,
     "freshness": {
       "last_success_utc": "2026-10-30T16:50:22.372097+00:00",
-      "age_days": 2.844910448599537,
+      "age_days": 3.142934230590278,
       "level": "fresh",
       "next_scheduled_jst": "2026-11-09T06:00:00+09:00",
       "latest_run": {
@@ -33716,12 +33716,12 @@
   },
   "schedule": {
     "start_utc": "2026-10-29T17:22:03+00:00",
-    "end_utc": "2026-11-02T13:07:02.634856+00:00",
+    "end_utc": "2026-11-02T20:16:11.889620+00:00",
     "grace_minutes": 30,
     "expected_slots": 224,
-    "observed_scheduled_runs": 11,
-    "not_observed_slots": 215,
-    "completed_jobs": 14,
+    "observed_scheduled_runs": 12,
+    "not_observed_slots": 216,
+    "completed_jobs": 15,
     "failed_jobs": 0,
     "failure_rate_of_executed_jobs": 0.0,
     "note": "Missing slots may be delayed/dropped/not dispatched. They are not HTTP failures. Delay attribution is inferred.",
@@ -35205,7 +35205,7 @@
       },
       {
         "due_utc": "2026-11-02T09:52:00+00:00",
-        "status": "in_progress",
+        "status": "success",
         "run_id": 41424307706,
         "inferred_delay_minutes": 1.42,
         "attribution": "inferred_previous_slot"
@@ -35289,7 +35289,7 @@
       },
       {
         "due_utc": "2026-11-02T12:52:00+00:00",
-        "status": "within_grace",
+        "status": "not_observed",
         "run_id": null,
         "inferred_delay_minutes": null,
         "attribution": "absence_of_run_is_not_a_failed_job"
@@ -35298,16 +35298,26 @@
     "unmatched_runs": [
       41084230039,
       41211327947,
-      41324698251
+      41324698251,
+      41517553810
     ],
     "executed_runs": [
+      {
+        "id": 41517553810,
+        "event": "schedule",
+        "created_at": "2026-11-02T20:15:28Z",
+        "updated_at": "2026-11-02T20:15:31Z",
+        "status": "in_progress",
+        "conclusion": null,
+        "html_url": "https://github.com/sorapanel7533/disney-crowd-ai/actions/runs/41517553810"
+      },
       {
         "id": 41424307706,
         "event": "schedule",
         "created_at": "2026-11-02T09:53:25Z",
-        "updated_at": "2026-11-02T09:53:28Z",
-        "status": "in_progress",
-        "conclusion": null,
+        "updated_at": "2026-11-02T13:07:09Z",
+        "status": "completed",
+        "conclusion": "success",
         "html_url": "https://github.com/sorapanel7533/disney-crowd-ai/actions/runs/41424307706"
       },
       {
@@ -35438,6 +35448,7 @@
       }
     ],
     "wall_seconds": [
+      11624.0,
       19823.0,
       51.0,
       14300.0,
