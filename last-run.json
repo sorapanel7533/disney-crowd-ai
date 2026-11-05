@@ -1,8 +1,8 @@
 {
-  "sample": 0,
-  "started_at_utc": "2026-11-05T03:26:17.613979+00:00",
-  "finished_at_utc": "2026-11-05T03:29:23.024111+00:00",
-  "due_slot_utc": "2026-11-05T03:22:00+00:00",
+  "sample": 1,
+  "started_at_utc": "2026-11-05T03:37:00.000226+00:00",
+  "finished_at_utc": "2026-11-05T03:37:35.459409+00:00",
+  "due_slot_utc": "2026-11-05T03:37:00+00:00",
   "event": "schedule",
   "github_run_id": "41961518154",
   "results": [
@@ -11,20 +11,20 @@
       "status": "success",
       "received": 36,
       "inserted": 33,
-      "observed_at": "2026-11-05T03:21:06+00:00",
+      "observed_at": "2026-11-05T03:36:07+00:00",
       "open_positive": 27,
       "open_zero": 2,
       "closed": 7,
       "source_stale": 3,
-      "evaluated_predictions": 0,
+      "evaluated_predictions": 8,
       "shadow_evaluated": 0,
-      "shadow_issued": 310,
-      "duration_seconds": 86.249,
+      "shadow_issued": 0,
+      "duration_seconds": 16.752,
       "journal": {
-        "path": "journal/2026-11/41961518154-1-s000-DisneySea.jsonl.gz",
-        "changes": 734,
-        "compressed_bytes": 26004,
-        "sha256": "4fef812c089f23c77d75644005a2eadd03bdc73d3ff62dfe40043da7bdfe482f"
+        "path": "journal/2026-11/41961518154-1-s001-DisneySea.jsonl.gz",
+        "changes": 45,
+        "compressed_bytes": 2379,
+        "sha256": "e356b6f6848056b763d38e75c6852c58ba8ae46cf2fcddaddd15d9fb385bcd94"
       }
     },
     {
@@ -32,20 +32,20 @@
       "status": "success",
       "received": 37,
       "inserted": 37,
-      "observed_at": "2026-11-05T03:26:11+00:00",
+      "observed_at": "2026-11-05T03:36:07+00:00",
       "open_positive": 32,
       "open_zero": 2,
       "closed": 3,
       "source_stale": 0,
-      "evaluated_predictions": 0,
+      "evaluated_predictions": 10,
       "shadow_evaluated": 0,
-      "shadow_issued": 350,
-      "duration_seconds": 96.719,
+      "shadow_issued": 0,
+      "duration_seconds": 16.763,
       "journal": {
-        "path": "journal/2026-11/41961518154-1-s000-Disneyland.jsonl.gz",
-        "changes": 778,
-        "compressed_bytes": 28137,
-        "sha256": "d1931a5fdaa4fd530dcc7a87637c2f97ca774beed040732b1443026465e13b78"
+        "path": "journal/2026-11/41961518154-1-s001-Disneyland.jsonl.gz",
+        "changes": 51,
+        "compressed_bytes": 2470,
+        "sha256": "48009d6f96dbed849b04c50db38720737197b6aaee5a58038a184d6a0d22dbf0"
       }
     }
   ]
