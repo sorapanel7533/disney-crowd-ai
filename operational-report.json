@@ -1,19 +1,19 @@
 {
-  "generated_at_utc": "2026-11-08T02:23:06.084792+00:00",
+  "generated_at_utc": "2026-11-08T02:37:27.467868+00:00",
   "parks": {
     "DisneySea": {
       "quality": {
         "summary": {
           "park": "DisneySea",
-          "as_of_utc": "2026-11-08T02:21:46.088867+00:00",
-          "rows": 10583,
-          "verified_rows": 9589,
-          "valid_open_rows": 6517,
-          "open_positive_rows": 5868,
-          "open_zero_rows": 649,
+          "as_of_utc": "2026-11-08T02:37:10.681998+00:00",
+          "rows": 10616,
+          "verified_rows": 9622,
+          "valid_open_rows": 6541,
+          "open_positive_rows": 5890,
+          "open_zero_rows": 651,
           "legacy_reference_rows": 994,
           "exclusions": {
-            "closed_or_suspended": 3069,
+            "closed_or_suspended": 3078,
             "unverified_source": 994,
             "stale_at_fetch": 3
           },
@@ -21,8 +21,8 @@
           "legacy_exact_duplicates": 0,
           "days_with_open_observations": 10,
           "eligible_evaluation_days": 0,
-          "latest_observed_utc": "2026-11-08T02:16:04+00:00",
-          "freshness_minutes": 5.701481116666667,
+          "latest_observed_utc": "2026-11-08T02:36:05+00:00",
+          "freshness_minutes": 1.0946999666666666,
           "denominator": "Assumed 09:00–21:00 JST, 15-minute slots; not verified official hours",
           "ready_rule": "Completed day; each major ride >= 75% of full-day slots and >= 8 hours"
         },
@@ -101,10 +101,10 @@
           },
           {
             "date": "2026-11-08",
-            "expected_slots": 324,
-            "valid_open_slots": 0,
-            "state_slots": 0,
-            "open_coverage": 0.0,
+            "expected_slots": 360,
+            "valid_open_slots": 24,
+            "state_slots": 33,
+            "open_coverage": 0.06666666666666667,
             "evaluation_ready": false
           }
         ],
@@ -112,20 +112,20 @@
           {
             "attraction": "20,000 Leagues Under the Sea",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 247,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 248,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Anna and Elsa's Frozen Journey",
             "major": true,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 0,
-            "valid_slots": 218,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 69
+            "valid_slots": 219,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 70
           },
           {
             "attraction": "Aquatopia",
@@ -133,44 +133,44 @@
             "days_with_valid_open": 0,
             "evaluation_ready_days": 0,
             "valid_slots": 0,
-            "expected_elapsed_slots": 441,
+            "expected_elapsed_slots": 442,
             "valid_hours": 0
           },
           {
             "attraction": "Ariel's Playground",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 247,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 248,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Big City Vehicles",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 0,
-            "valid_slots": 107,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 41
+            "valid_slots": 108,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 42
           },
           {
             "attraction": "Blowfish Balloon Race",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 247,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 248,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Caravan Carousel",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 247,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 248,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "DisneySea Electric Railway (American Waterfront)",
@@ -178,7 +178,7 @@
             "days_with_valid_open": 9,
             "evaluation_ready_days": 1,
             "valid_slots": 247,
-            "expected_elapsed_slots": 441,
+            "expected_elapsed_slots": 442,
             "valid_hours": 72
           },
           {
@@ -187,7 +187,7 @@
             "days_with_valid_open": 9,
             "evaluation_ready_days": 1,
             "valid_slots": 247,
-            "expected_elapsed_slots": 441,
+            "expected_elapsed_slots": 442,
             "valid_hours": 72
           },
           {
@@ -196,7 +196,7 @@
             "days_with_valid_open": 8,
             "evaluation_ready_days": 0,
             "valid_slots": 52,
-            "expected_elapsed_slots": 441,
+            "expected_elapsed_slots": 442,
             "valid_hours": 29
           },
           {
@@ -205,7 +205,7 @@
             "days_with_valid_open": 8,
             "evaluation_ready_days": 0,
             "valid_slots": 49,
-            "expected_elapsed_slots": 441,
+            "expected_elapsed_slots": 442,
             "valid_hours": 28
           },
           {
@@ -214,35 +214,35 @@
             "days_with_valid_open": 0,
             "evaluation_ready_days": 0,
             "valid_slots": 0,
-            "expected_elapsed_slots": 441,
+            "expected_elapsed_slots": 442,
             "valid_hours": 0
           },
           {
             "attraction": "Fairy Tinker Bell's Busy Buggies",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 236,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 71
+            "valid_slots": 237,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 72
           },
           {
             "attraction": "Flounder's Flying Fish Coaster",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 0,
-            "valid_slots": 243,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 244,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Fortress Explorations",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 247,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 248,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Indiana Jones Adventure: Temple of the Crystal Skull",
@@ -250,35 +250,35 @@
             "days_with_valid_open": 0,
             "evaluation_ready_days": 0,
             "valid_slots": 0,
-            "expected_elapsed_slots": 441,
+            "expected_elapsed_slots": 442,
             "valid_hours": 0
           },
           {
             "attraction": "Jasmine's Flying Carpets",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 244,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 71
+            "valid_slots": 245,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 72
           },
           {
             "attraction": "Journey to the Center of the Earth",
             "major": true,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 245,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 70
+            "valid_slots": 246,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 71
           },
           {
             "attraction": "Jumpin' Jellyfish",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 247,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 248,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Lost River Delta (Miguel: from 1:30 p.m.)",
@@ -286,7 +286,7 @@
             "days_with_valid_open": 4,
             "evaluation_ready_days": 0,
             "valid_slots": 76,
-            "expected_elapsed_slots": 441,
+            "expected_elapsed_slots": 442,
             "valid_hours": 24
           },
           {
@@ -295,7 +295,7 @@
             "days_with_valid_open": 4,
             "evaluation_ready_days": 0,
             "valid_slots": 24,
-            "expected_elapsed_slots": 441,
+            "expected_elapsed_slots": 442,
             "valid_hours": 7
           },
           {
@@ -304,71 +304,71 @@
             "days_with_valid_open": 0,
             "evaluation_ready_days": 0,
             "valid_slots": 0,
-            "expected_elapsed_slots": 441,
+            "expected_elapsed_slots": 442,
             "valid_hours": 0
           },
           {
             "attraction": "Nemo & Friends SeaRider",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 247,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 248,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Peter Pan's Never Land Adventure",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 243,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 244,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Raging Spirits",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 244,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 245,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Rapunzel's Lantern Festival",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 246,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 247,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Scuttle's Scooters",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 246,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 247,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Sindbad's Storybook Voyage",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 245,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 246,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Soaring: Fantastic Flight",
             "major": true,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 247,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 248,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "The Leonardo Challenge",
@@ -376,53 +376,53 @@
             "days_with_valid_open": 9,
             "evaluation_ready_days": 0,
             "valid_slots": 173,
-            "expected_elapsed_slots": 441,
+            "expected_elapsed_slots": 442,
             "valid_hours": 49
           },
           {
             "attraction": "The Magic Lamp Theater",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 238,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 71
+            "valid_slots": 239,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 72
           },
           {
             "attraction": "The Whirlpool",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 247,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 248,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Tower of Terror",
             "major": true,
-            "days_with_valid_open": 2,
+            "days_with_valid_open": 3,
             "evaluation_ready_days": 0,
-            "valid_slots": 61,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 17
+            "valid_slots": 62,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 18
           },
           {
             "attraction": "Toy Story Mania!",
             "major": true,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 247,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 248,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Turtle Talk",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 247,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 248,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Venetian Gondolas",
@@ -430,7 +430,7 @@
             "days_with_valid_open": 8,
             "evaluation_ready_days": 0,
             "valid_slots": 44,
-            "expected_elapsed_slots": 441,
+            "expected_elapsed_slots": 442,
             "valid_hours": 24
           }
         ],
@@ -31559,9 +31559,9 @@
             "date": "2026-11-08",
             "attraction": "20,000 Leagues Under the Sea",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -31655,9 +31655,9 @@
             "date": "2026-11-08",
             "attraction": "Anna and Elsa's Frozen Journey",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -31751,7 +31751,7 @@
             "date": "2026-11-08",
             "attraction": "Aquatopia",
             "hour": 11,
-            "expected_slots": 1,
+            "expected_slots": 2,
             "valid_slots": 0,
             "coverage": 0.0
           },
@@ -31847,9 +31847,9 @@
             "date": "2026-11-08",
             "attraction": "Ariel's Playground",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -31943,9 +31943,9 @@
             "date": "2026-11-08",
             "attraction": "Big City Vehicles",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -32039,9 +32039,9 @@
             "date": "2026-11-08",
             "attraction": "Blowfish Balloon Race",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -32135,9 +32135,9 @@
             "date": "2026-11-08",
             "attraction": "Caravan Carousel",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -32231,7 +32231,7 @@
             "date": "2026-11-08",
             "attraction": "DisneySea Electric Railway (American Waterfront)",
             "hour": 11,
-            "expected_slots": 1,
+            "expected_slots": 2,
             "valid_slots": 0,
             "coverage": 0.0
           },
@@ -32327,7 +32327,7 @@
             "date": "2026-11-08",
             "attraction": "DisneySea Electric Railway (Port Discovery)",
             "hour": 11,
-            "expected_slots": 1,
+            "expected_slots": 2,
             "valid_slots": 0,
             "coverage": 0.0
           },
@@ -32423,7 +32423,7 @@
             "date": "2026-11-08",
             "attraction": "DisneySea Transit Steamer Line (American Waterfront)",
             "hour": 11,
-            "expected_slots": 1,
+            "expected_slots": 2,
             "valid_slots": 0,
             "coverage": 0.0
           },
@@ -32519,7 +32519,7 @@
             "date": "2026-11-08",
             "attraction": "DisneySea Transit Steamer Line (Lost River Delta)",
             "hour": 11,
-            "expected_slots": 1,
+            "expected_slots": 2,
             "valid_slots": 0,
             "coverage": 0.0
           },
@@ -32615,7 +32615,7 @@
             "date": "2026-11-08",
             "attraction": "DisneySea Transit Steamer Line (Mediterranean Harbor)",
             "hour": 11,
-            "expected_slots": 1,
+            "expected_slots": 2,
             "valid_slots": 0,
             "coverage": 0.0
           },
@@ -32711,9 +32711,9 @@
             "date": "2026-11-08",
             "attraction": "Fairy Tinker Bell's Busy Buggies",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -32807,9 +32807,9 @@
             "date": "2026-11-08",
             "attraction": "Flounder's Flying Fish Coaster",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -32903,9 +32903,9 @@
             "date": "2026-11-08",
             "attraction": "Fortress Explorations",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -32999,7 +32999,7 @@
             "date": "2026-11-08",
             "attraction": "Indiana Jones Adventure: Temple of the Crystal Skull",
             "hour": 11,
-            "expected_slots": 1,
+            "expected_slots": 2,
             "valid_slots": 0,
             "coverage": 0.0
           },
@@ -33095,9 +33095,9 @@
             "date": "2026-11-08",
             "attraction": "Jasmine's Flying Carpets",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -33191,9 +33191,9 @@
             "date": "2026-11-08",
             "attraction": "Journey to the Center of the Earth",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -33287,9 +33287,9 @@
             "date": "2026-11-08",
             "attraction": "Jumpin' Jellyfish",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -33383,7 +33383,7 @@
             "date": "2026-11-08",
             "attraction": "Lost River Delta (Miguel: from 1:30 p.m.)",
             "hour": 11,
-            "expected_slots": 1,
+            "expected_slots": 2,
             "valid_slots": 0,
             "coverage": 0.0
           },
@@ -33479,7 +33479,7 @@
             "date": "2026-11-08",
             "attraction": "Lost River Delta (Miguel: until 1:00 p.m.)",
             "hour": 11,
-            "expected_slots": 1,
+            "expected_slots": 2,
             "valid_slots": 0,
             "coverage": 0.0
           },
@@ -33575,7 +33575,7 @@
             "date": "2026-11-08",
             "attraction": "Mermaid Lagoon Theater",
             "hour": 11,
-            "expected_slots": 1,
+            "expected_slots": 2,
             "valid_slots": 0,
             "coverage": 0.0
           },
@@ -33671,9 +33671,9 @@
             "date": "2026-11-08",
             "attraction": "Nemo & Friends SeaRider",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -33767,9 +33767,9 @@
             "date": "2026-11-08",
             "attraction": "Peter Pan's Never Land Adventure",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -33863,9 +33863,9 @@
             "date": "2026-11-08",
             "attraction": "Raging Spirits",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -33959,9 +33959,9 @@
             "date": "2026-11-08",
             "attraction": "Rapunzel's Lantern Festival",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -34055,9 +34055,9 @@
             "date": "2026-11-08",
             "attraction": "Scuttle's Scooters",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -34151,9 +34151,9 @@
             "date": "2026-11-08",
             "attraction": "Sindbad's Storybook Voyage",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -34247,9 +34247,9 @@
             "date": "2026-11-08",
             "attraction": "Soaring: Fantastic Flight",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -34343,7 +34343,7 @@
             "date": "2026-11-08",
             "attraction": "The Leonardo Challenge",
             "hour": 11,
-            "expected_slots": 1,
+            "expected_slots": 2,
             "valid_slots": 0,
             "coverage": 0.0
           },
@@ -34439,9 +34439,9 @@
             "date": "2026-11-08",
             "attraction": "The Magic Lamp Theater",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -34535,9 +34535,9 @@
             "date": "2026-11-08",
             "attraction": "The Whirlpool",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -34631,9 +34631,9 @@
             "date": "2026-11-08",
             "attraction": "Tower of Terror",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -34727,9 +34727,9 @@
             "date": "2026-11-08",
             "attraction": "Toy Story Mania!",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -34823,9 +34823,9 @@
             "date": "2026-11-08",
             "attraction": "Turtle Talk",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -34919,7 +34919,7 @@
             "date": "2026-11-08",
             "attraction": "Venetian Gondolas",
             "hour": 11,
-            "expected_slots": 1,
+            "expected_slots": 2,
             "valid_slots": 0,
             "coverage": 0.0
           },
@@ -39862,14 +39862,14 @@
             "date": "2026-11-08",
             "attraction": "20,000 Leagues Under the Sea",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -39877,14 +39877,14 @@
             "date": "2026-11-08",
             "attraction": "Anna and Elsa's Frozen Journey",
             "major": true,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -39892,7 +39892,7 @@
             "date": "2026-11-08",
             "attraction": "Aquatopia",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
             "observed_state_slots": 0,
             "valid_open_slots": 0,
@@ -39907,14 +39907,14 @@
             "date": "2026-11-08",
             "attraction": "Ariel's Playground",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -39922,14 +39922,14 @@
             "date": "2026-11-08",
             "attraction": "Big City Vehicles",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -39937,14 +39937,14 @@
             "date": "2026-11-08",
             "attraction": "Blowfish Balloon Race",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -39952,14 +39952,14 @@
             "date": "2026-11-08",
             "attraction": "Caravan Carousel",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -39967,13 +39967,13 @@
             "date": "2026-11-08",
             "attraction": "DisneySea Electric Railway (American Waterfront)",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
+            "observed_state_slots": 1,
             "valid_open_slots": 0,
             "elapsed_open_coverage": 0.0,
             "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
+            "missing_state_rate": 0.9,
             "valid_hours": 0,
             "evaluation_ready": false
           },
@@ -39982,13 +39982,13 @@
             "date": "2026-11-08",
             "attraction": "DisneySea Electric Railway (Port Discovery)",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
+            "observed_state_slots": 1,
             "valid_open_slots": 0,
             "elapsed_open_coverage": 0.0,
             "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
+            "missing_state_rate": 0.9,
             "valid_hours": 0,
             "evaluation_ready": false
           },
@@ -39997,13 +39997,13 @@
             "date": "2026-11-08",
             "attraction": "DisneySea Transit Steamer Line (American Waterfront)",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
+            "observed_state_slots": 1,
             "valid_open_slots": 0,
             "elapsed_open_coverage": 0.0,
             "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
+            "missing_state_rate": 0.9,
             "valid_hours": 0,
             "evaluation_ready": false
           },
@@ -40012,13 +40012,13 @@
             "date": "2026-11-08",
             "attraction": "DisneySea Transit Steamer Line (Lost River Delta)",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
+            "observed_state_slots": 1,
             "valid_open_slots": 0,
             "elapsed_open_coverage": 0.0,
             "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
+            "missing_state_rate": 0.9,
             "valid_hours": 0,
             "evaluation_ready": false
           },
@@ -40027,13 +40027,13 @@
             "date": "2026-11-08",
             "attraction": "DisneySea Transit Steamer Line (Mediterranean Harbor)",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
+            "observed_state_slots": 1,
             "valid_open_slots": 0,
             "elapsed_open_coverage": 0.0,
             "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
+            "missing_state_rate": 0.9,
             "valid_hours": 0,
             "evaluation_ready": false
           },
@@ -40042,14 +40042,14 @@
             "date": "2026-11-08",
             "attraction": "Fairy Tinker Bell's Busy Buggies",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -40057,14 +40057,14 @@
             "date": "2026-11-08",
             "attraction": "Flounder's Flying Fish Coaster",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -40072,14 +40072,14 @@
             "date": "2026-11-08",
             "attraction": "Fortress Explorations",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -40087,13 +40087,13 @@
             "date": "2026-11-08",
             "attraction": "Indiana Jones Adventure: Temple of the Crystal Skull",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
+            "observed_state_slots": 1,
             "valid_open_slots": 0,
             "elapsed_open_coverage": 0.0,
             "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
+            "missing_state_rate": 0.9,
             "valid_hours": 0,
             "evaluation_ready": false
           },
@@ -40102,14 +40102,14 @@
             "date": "2026-11-08",
             "attraction": "Jasmine's Flying Carpets",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -40117,14 +40117,14 @@
             "date": "2026-11-08",
             "attraction": "Journey to the Center of the Earth",
             "major": true,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -40132,14 +40132,14 @@
             "date": "2026-11-08",
             "attraction": "Jumpin' Jellyfish",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -40147,7 +40147,7 @@
             "date": "2026-11-08",
             "attraction": "Lost River Delta (Miguel: from 1:30 p.m.)",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
             "observed_state_slots": 0,
             "valid_open_slots": 0,
@@ -40162,7 +40162,7 @@
             "date": "2026-11-08",
             "attraction": "Lost River Delta (Miguel: until 1:00 p.m.)",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
             "observed_state_slots": 0,
             "valid_open_slots": 0,
@@ -40177,13 +40177,13 @@
             "date": "2026-11-08",
             "attraction": "Mermaid Lagoon Theater",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
+            "observed_state_slots": 1,
             "valid_open_slots": 0,
             "elapsed_open_coverage": 0.0,
             "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
+            "missing_state_rate": 0.9,
             "valid_hours": 0,
             "evaluation_ready": false
           },
@@ -40192,14 +40192,14 @@
             "date": "2026-11-08",
             "attraction": "Nemo & Friends SeaRider",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -40207,14 +40207,14 @@
             "date": "2026-11-08",
             "attraction": "Peter Pan's Never Land Adventure",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -40222,14 +40222,14 @@
             "date": "2026-11-08",
             "attraction": "Raging Spirits",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -40237,14 +40237,14 @@
             "date": "2026-11-08",
             "attraction": "Rapunzel's Lantern Festival",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -40252,14 +40252,14 @@
             "date": "2026-11-08",
             "attraction": "Scuttle's Scooters",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -40267,14 +40267,14 @@
             "date": "2026-11-08",
             "attraction": "Sindbad's Storybook Voyage",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -40282,14 +40282,14 @@
             "date": "2026-11-08",
             "attraction": "Soaring: Fantastic Flight",
             "major": true,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -40297,13 +40297,13 @@
             "date": "2026-11-08",
             "attraction": "The Leonardo Challenge",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
+            "observed_state_slots": 1,
             "valid_open_slots": 0,
             "elapsed_open_coverage": 0.0,
             "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
+            "missing_state_rate": 0.9,
             "valid_hours": 0,
             "evaluation_ready": false
           },
@@ -40312,14 +40312,14 @@
             "date": "2026-11-08",
             "attraction": "The Magic Lamp Theater",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -40327,14 +40327,14 @@
             "date": "2026-11-08",
             "attraction": "The Whirlpool",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -40342,14 +40342,14 @@
             "date": "2026-11-08",
             "attraction": "Tower of Terror",
             "major": true,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -40357,14 +40357,14 @@
             "date": "2026-11-08",
             "attraction": "Toy Story Mania!",
             "major": true,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -40372,14 +40372,14 @@
             "date": "2026-11-08",
             "attraction": "Turtle Talk",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -40387,13 +40387,13 @@
             "date": "2026-11-08",
             "attraction": "Venetian Gondolas",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
+            "observed_state_slots": 1,
             "valid_open_slots": 0,
             "elapsed_open_coverage": 0.0,
             "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
+            "missing_state_rate": 0.9,
             "valid_hours": 0,
             "evaluation_ready": false
           }
@@ -42978,7 +42978,7 @@
           "target_date": "2026-11-08",
           "source_age_minutes": null,
           "status": "success",
-          "age_minutes": 0.8,
+          "age_minutes": 16.2,
           "stale": false,
           "last_success_utc": "2026-11-08T02:21:00+00:00",
           "attempts": 10,
@@ -42998,7 +42998,7 @@
           "target_date": "2026-11-08",
           "source_age_minutes": null,
           "status": "success",
-          "age_minutes": 1.0,
+          "age_minutes": 16.4,
           "stale": false,
           "last_success_utc": "2026-11-08T02:20:51+00:00",
           "attempts": 10,
@@ -43018,7 +43018,7 @@
           "target_date": "2026-11-08",
           "source_age_minutes": null,
           "status": "estimated",
-          "age_minutes": 1.0,
+          "age_minutes": 16.4,
           "stale": false,
           "last_success_utc": null,
           "attempts": 10,
@@ -43038,7 +43038,7 @@
           "target_date": "2026-11-08",
           "source_age_minutes": null,
           "status": "empty",
-          "age_minutes": 0.8,
+          "age_minutes": 16.2,
           "stale": false,
           "last_success_utc": null,
           "attempts": 10,
@@ -43058,7 +43058,7 @@
           "target_date": "2026-11-08",
           "source_age_minutes": null,
           "status": "empty",
-          "age_minutes": 0.7,
+          "age_minutes": 16.1,
           "stale": false,
           "last_success_utc": null,
           "attempts": 19,
@@ -43073,15 +43073,15 @@
         {
           "park": "DisneySea",
           "source": "weather",
-          "latest_attempt_utc": "2026-11-08T02:20:40.251436+00:00",
-          "source_observed_utc": "2026-11-08T02:15:00+00:00",
+          "latest_attempt_utc": "2026-11-08T02:37:00.639276+00:00",
+          "source_observed_utc": "2026-11-08T02:30:00+00:00",
           "target_date": "2026-11-08",
-          "source_age_minutes": 6.8,
+          "source_age_minutes": 7.2,
           "status": "success",
-          "age_minutes": 1.1,
+          "age_minutes": 0.2,
           "stale": false,
-          "last_success_utc": "2026-11-08T02:20:40.251436+00:00",
-          "attempts": 280,
+          "last_success_utc": "2026-11-08T02:37:00.639276+00:00",
+          "attempts": 281,
           "failed_attempts": 0,
           "failure_rate": 0.0,
           "estimated_attempts": 0,
@@ -43096,23 +43096,23 @@
       "quality": {
         "summary": {
           "park": "Disneyland",
-          "as_of_utc": "2026-11-08T02:23:02.810823+00:00",
-          "rows": 10695,
-          "verified_rows": 10471,
-          "valid_open_rows": 7843,
-          "open_positive_rows": 7284,
-          "open_zero_rows": 559,
+          "as_of_utc": "2026-11-08T02:37:24.199637+00:00",
+          "rows": 10732,
+          "verified_rows": 10508,
+          "valid_open_rows": 7877,
+          "open_positive_rows": 7316,
+          "open_zero_rows": 561,
           "legacy_reference_rows": 224,
           "exclusions": {
-            "closed_or_suspended": 2628,
+            "closed_or_suspended": 2631,
             "unverified_source": 224
           },
           "semantic_duplicates": 0,
           "legacy_exact_duplicates": 0,
           "days_with_open_observations": 10,
           "eligible_evaluation_days": 1,
-          "latest_observed_utc": "2026-11-08T02:20:59+00:00",
-          "freshness_minutes": 2.063513716666667,
+          "latest_observed_utc": "2026-11-08T02:35:59+00:00",
+          "freshness_minutes": 1.4199939499999998,
           "denominator": "Assumed 09:00–21:00 JST, 15-minute slots; not verified official hours",
           "ready_rule": "Completed day; each major ride >= 75% of full-day slots and >= 8 hours"
         },
@@ -43191,10 +43191,10 @@
           },
           {
             "date": "2026-11-08",
-            "expected_slots": 333,
-            "valid_open_slots": 0,
-            "state_slots": 0,
-            "open_coverage": 0.0,
+            "expected_slots": 370,
+            "valid_open_slots": 34,
+            "state_slots": 37,
+            "open_coverage": 0.0918918918918919,
             "evaluation_ready": false
           }
         ],
@@ -43202,47 +43202,47 @@
           {
             "attraction": "Alice's Tea Party",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 244,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 245,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Beaver Brothers Explorer Canoes",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 0,
-            "valid_slots": 125,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 39
+            "valid_slots": 126,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 40
           },
           {
             "attraction": "Big Thunder Mountain",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 231,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 68
+            "valid_slots": 232,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 69
           },
           {
             "attraction": "Castle Carrousel",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 245,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 246,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Chip 'n Dale's Treehouse",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 246,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 247,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Cinderella's Fairy Tale Hall",
@@ -43250,206 +43250,206 @@
             "days_with_valid_open": 0,
             "evaluation_ready_days": 0,
             "valid_slots": 0,
-            "expected_elapsed_slots": 441,
+            "expected_elapsed_slots": 442,
             "valid_hours": 0
           },
           {
             "attraction": "Country Bear Theater",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 0,
-            "valid_slots": 206,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 62
+            "valid_slots": 207,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 63
           },
           {
             "attraction": "Donald's Boat",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 246,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 247,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Dumbo The Flying Elephant",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 239,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 240,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Enchanted Tale of Beauty and the Beast",
             "major": true,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 241,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 71
+            "valid_slots": 242,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 72
           },
           {
             "attraction": "Gadget's Go Coaster",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 245,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 246,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Goofy's Paint 'n' Play House",
             "major": false,
-            "days_with_valid_open": 8,
+            "days_with_valid_open": 9,
             "evaluation_ready_days": 0,
-            "valid_slots": 215,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 61
+            "valid_slots": 216,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 62
           },
           {
             "attraction": "Haunted Mansion",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 245,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 246,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Jungle Cruise: Wildlife Expeditions",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 246,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 247,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Mark Twain Riverboat",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 0,
-            "valid_slots": 209,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 63
+            "valid_slots": 210,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 64
           },
           {
             "attraction": "Mickey's PhilharMagic",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 244,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 245,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Minnie's House",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 244,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 245,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Monsters, Inc. Ride & Go Seek!",
             "major": true,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 241,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 71
+            "valid_slots": 242,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 72
           },
           {
             "attraction": "Omnibus",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 0,
-            "valid_slots": 93,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 30
+            "valid_slots": 94,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 31
           },
           {
             "attraction": "Penny Arcade",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 246,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 247,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Peter Pan's Flight",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 242,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 243,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Pinocchio's Daring Journey",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 246,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 247,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Pirates of the Caribbean",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 245,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 246,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Pooh's Hunny Hunt",
             "major": true,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 233,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 70
+            "valid_slots": 234,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 71
           },
           {
             "attraction": "Roger Rabbit's Car Toon Spin",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 244,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 245,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Snow White's Adventures",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 243,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 244,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Splash Mountain",
             "major": true,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 236,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 69
+            "valid_slots": 237,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 70
           },
           {
             "attraction": "Star Tours: The Adventures Continue",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 245,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 246,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Stitch Encounter",
@@ -43457,7 +43457,7 @@
             "days_with_valid_open": 3,
             "evaluation_ready_days": 0,
             "valid_slots": 59,
-            "expected_elapsed_slots": 441,
+            "expected_elapsed_slots": 442,
             "valid_hours": 18
           },
           {
@@ -43466,71 +43466,71 @@
             "days_with_valid_open": 0,
             "evaluation_ready_days": 0,
             "valid_slots": 0,
-            "expected_elapsed_slots": 441,
+            "expected_elapsed_slots": 442,
             "valid_hours": 0
           },
           {
             "attraction": "The Enchanted Tiki Room: Stitch Presents “Aloha E Komo Mai!”",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 0,
-            "valid_slots": 218,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 64
+            "valid_slots": 219,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 65
           },
           {
             "attraction": "The Happy Ride with Baymax",
             "major": true,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 246,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 247,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Tom Sawyer Island Rafts",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 0,
-            "valid_slots": 131,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 39
+            "valid_slots": 132,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 40
           },
           {
             "attraction": "Toon Park",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 246,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 247,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "Western River Railroad",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 0,
-            "valid_slots": 204,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 63
+            "valid_slots": 205,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 64
           },
           {
             "attraction": "Westernland Shootin' Gallery",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 246,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 247,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           },
           {
             "attraction": "“it's a small world”",
             "major": false,
-            "days_with_valid_open": 9,
+            "days_with_valid_open": 10,
             "evaluation_ready_days": 1,
-            "valid_slots": 245,
-            "expected_elapsed_slots": 441,
-            "valid_hours": 72
+            "valid_slots": 246,
+            "expected_elapsed_slots": 442,
+            "valid_hours": 73
           }
         ],
         "hourly": [
@@ -75522,9 +75522,9 @@
             "date": "2026-11-08",
             "attraction": "Alice's Tea Party",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -75618,9 +75618,9 @@
             "date": "2026-11-08",
             "attraction": "Beaver Brothers Explorer Canoes",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -75714,9 +75714,9 @@
             "date": "2026-11-08",
             "attraction": "Big Thunder Mountain",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -75810,9 +75810,9 @@
             "date": "2026-11-08",
             "attraction": "Castle Carrousel",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -75906,9 +75906,9 @@
             "date": "2026-11-08",
             "attraction": "Chip 'n Dale's Treehouse",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -76002,7 +76002,7 @@
             "date": "2026-11-08",
             "attraction": "Cinderella's Fairy Tale Hall",
             "hour": 11,
-            "expected_slots": 1,
+            "expected_slots": 2,
             "valid_slots": 0,
             "coverage": 0.0
           },
@@ -76098,9 +76098,9 @@
             "date": "2026-11-08",
             "attraction": "Country Bear Theater",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -76194,9 +76194,9 @@
             "date": "2026-11-08",
             "attraction": "Donald's Boat",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -76290,9 +76290,9 @@
             "date": "2026-11-08",
             "attraction": "Dumbo The Flying Elephant",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -76386,9 +76386,9 @@
             "date": "2026-11-08",
             "attraction": "Enchanted Tale of Beauty and the Beast",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -76482,9 +76482,9 @@
             "date": "2026-11-08",
             "attraction": "Gadget's Go Coaster",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -76578,9 +76578,9 @@
             "date": "2026-11-08",
             "attraction": "Goofy's Paint 'n' Play House",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -76674,9 +76674,9 @@
             "date": "2026-11-08",
             "attraction": "Haunted Mansion",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -76770,9 +76770,9 @@
             "date": "2026-11-08",
             "attraction": "Jungle Cruise: Wildlife Expeditions",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -76866,9 +76866,9 @@
             "date": "2026-11-08",
             "attraction": "Mark Twain Riverboat",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -76962,9 +76962,9 @@
             "date": "2026-11-08",
             "attraction": "Mickey's PhilharMagic",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -77058,9 +77058,9 @@
             "date": "2026-11-08",
             "attraction": "Minnie's House",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -77154,9 +77154,9 @@
             "date": "2026-11-08",
             "attraction": "Monsters, Inc. Ride & Go Seek!",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -77250,9 +77250,9 @@
             "date": "2026-11-08",
             "attraction": "Omnibus",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -77346,9 +77346,9 @@
             "date": "2026-11-08",
             "attraction": "Penny Arcade",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -77442,9 +77442,9 @@
             "date": "2026-11-08",
             "attraction": "Peter Pan's Flight",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -77538,9 +77538,9 @@
             "date": "2026-11-08",
             "attraction": "Pinocchio's Daring Journey",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -77634,9 +77634,9 @@
             "date": "2026-11-08",
             "attraction": "Pirates of the Caribbean",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -77730,9 +77730,9 @@
             "date": "2026-11-08",
             "attraction": "Pooh's Hunny Hunt",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -77826,9 +77826,9 @@
             "date": "2026-11-08",
             "attraction": "Roger Rabbit's Car Toon Spin",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -77922,9 +77922,9 @@
             "date": "2026-11-08",
             "attraction": "Snow White's Adventures",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -78018,9 +78018,9 @@
             "date": "2026-11-08",
             "attraction": "Splash Mountain",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -78114,9 +78114,9 @@
             "date": "2026-11-08",
             "attraction": "Star Tours: The Adventures Continue",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -78210,7 +78210,7 @@
             "date": "2026-11-08",
             "attraction": "Stitch Encounter",
             "hour": 11,
-            "expected_slots": 1,
+            "expected_slots": 2,
             "valid_slots": 0,
             "coverage": 0.0
           },
@@ -78306,7 +78306,7 @@
             "date": "2026-11-08",
             "attraction": "Swiss Family Treehouse",
             "hour": 11,
-            "expected_slots": 1,
+            "expected_slots": 2,
             "valid_slots": 0,
             "coverage": 0.0
           },
@@ -78402,9 +78402,9 @@
             "date": "2026-11-08",
             "attraction": "The Enchanted Tiki Room: Stitch Presents “Aloha E Komo Mai!”",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -78498,9 +78498,9 @@
             "date": "2026-11-08",
             "attraction": "The Happy Ride with Baymax",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -78594,9 +78594,9 @@
             "date": "2026-11-08",
             "attraction": "Tom Sawyer Island Rafts",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -78690,9 +78690,9 @@
             "date": "2026-11-08",
             "attraction": "Toon Park",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -78786,9 +78786,9 @@
             "date": "2026-11-08",
             "attraction": "Western River Railroad",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -78882,9 +78882,9 @@
             "date": "2026-11-08",
             "attraction": "Westernland Shootin' Gallery",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -78978,9 +78978,9 @@
             "date": "2026-11-08",
             "attraction": "“it's a small world”",
             "hour": 11,
-            "expected_slots": 1,
-            "valid_slots": 0,
-            "coverage": 0.0
+            "expected_slots": 2,
+            "valid_slots": 1,
+            "coverage": 0.5
           },
           {
             "date": "2026-11-08",
@@ -84056,14 +84056,14 @@
             "date": "2026-11-08",
             "attraction": "Alice's Tea Party",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84071,14 +84071,14 @@
             "date": "2026-11-08",
             "attraction": "Beaver Brothers Explorer Canoes",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84086,14 +84086,14 @@
             "date": "2026-11-08",
             "attraction": "Big Thunder Mountain",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84101,14 +84101,14 @@
             "date": "2026-11-08",
             "attraction": "Castle Carrousel",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84116,14 +84116,14 @@
             "date": "2026-11-08",
             "attraction": "Chip 'n Dale's Treehouse",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84131,13 +84131,13 @@
             "date": "2026-11-08",
             "attraction": "Cinderella's Fairy Tale Hall",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
+            "observed_state_slots": 1,
             "valid_open_slots": 0,
             "elapsed_open_coverage": 0.0,
             "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
+            "missing_state_rate": 0.9,
             "valid_hours": 0,
             "evaluation_ready": false
           },
@@ -84146,14 +84146,14 @@
             "date": "2026-11-08",
             "attraction": "Country Bear Theater",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84161,14 +84161,14 @@
             "date": "2026-11-08",
             "attraction": "Donald's Boat",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84176,14 +84176,14 @@
             "date": "2026-11-08",
             "attraction": "Dumbo The Flying Elephant",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84191,14 +84191,14 @@
             "date": "2026-11-08",
             "attraction": "Enchanted Tale of Beauty and the Beast",
             "major": true,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84206,14 +84206,14 @@
             "date": "2026-11-08",
             "attraction": "Gadget's Go Coaster",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84221,14 +84221,14 @@
             "date": "2026-11-08",
             "attraction": "Goofy's Paint 'n' Play House",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84236,14 +84236,14 @@
             "date": "2026-11-08",
             "attraction": "Haunted Mansion",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84251,14 +84251,14 @@
             "date": "2026-11-08",
             "attraction": "Jungle Cruise: Wildlife Expeditions",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84266,14 +84266,14 @@
             "date": "2026-11-08",
             "attraction": "Mark Twain Riverboat",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84281,14 +84281,14 @@
             "date": "2026-11-08",
             "attraction": "Mickey's PhilharMagic",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84296,14 +84296,14 @@
             "date": "2026-11-08",
             "attraction": "Minnie's House",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84311,14 +84311,14 @@
             "date": "2026-11-08",
             "attraction": "Monsters, Inc. Ride & Go Seek!",
             "major": true,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84326,14 +84326,14 @@
             "date": "2026-11-08",
             "attraction": "Omnibus",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84341,14 +84341,14 @@
             "date": "2026-11-08",
             "attraction": "Penny Arcade",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84356,14 +84356,14 @@
             "date": "2026-11-08",
             "attraction": "Peter Pan's Flight",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84371,14 +84371,14 @@
             "date": "2026-11-08",
             "attraction": "Pinocchio's Daring Journey",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84386,14 +84386,14 @@
             "date": "2026-11-08",
             "attraction": "Pirates of the Caribbean",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84401,14 +84401,14 @@
             "date": "2026-11-08",
             "attraction": "Pooh's Hunny Hunt",
             "major": true,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84416,14 +84416,14 @@
             "date": "2026-11-08",
             "attraction": "Roger Rabbit's Car Toon Spin",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84431,14 +84431,14 @@
             "date": "2026-11-08",
             "attraction": "Snow White's Adventures",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84446,14 +84446,14 @@
             "date": "2026-11-08",
             "attraction": "Splash Mountain",
             "major": true,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84461,14 +84461,14 @@
             "date": "2026-11-08",
             "attraction": "Star Tours: The Adventures Continue",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84476,13 +84476,13 @@
             "date": "2026-11-08",
             "attraction": "Stitch Encounter",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
+            "observed_state_slots": 1,
             "valid_open_slots": 0,
             "elapsed_open_coverage": 0.0,
             "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
+            "missing_state_rate": 0.9,
             "valid_hours": 0,
             "evaluation_ready": false
           },
@@ -84491,13 +84491,13 @@
             "date": "2026-11-08",
             "attraction": "Swiss Family Treehouse",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
+            "observed_state_slots": 1,
             "valid_open_slots": 0,
             "elapsed_open_coverage": 0.0,
             "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
+            "missing_state_rate": 0.9,
             "valid_hours": 0,
             "evaluation_ready": false
           },
@@ -84506,14 +84506,14 @@
             "date": "2026-11-08",
             "attraction": "The Enchanted Tiki Room: Stitch Presents “Aloha E Komo Mai!”",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84521,14 +84521,14 @@
             "date": "2026-11-08",
             "attraction": "The Happy Ride with Baymax",
             "major": true,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84536,14 +84536,14 @@
             "date": "2026-11-08",
             "attraction": "Tom Sawyer Island Rafts",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84551,14 +84551,14 @@
             "date": "2026-11-08",
             "attraction": "Toon Park",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84566,14 +84566,14 @@
             "date": "2026-11-08",
             "attraction": "Western River Railroad",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84581,14 +84581,14 @@
             "date": "2026-11-08",
             "attraction": "Westernland Shootin' Gallery",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           },
           {
@@ -84596,14 +84596,14 @@
             "date": "2026-11-08",
             "attraction": "“it's a small world”",
             "major": false,
-            "expected_elapsed_slots": 9,
+            "expected_elapsed_slots": 10,
             "expected_full_day_slots": 48,
-            "observed_state_slots": 0,
-            "valid_open_slots": 0,
-            "elapsed_open_coverage": 0.0,
-            "full_day_open_coverage": 0.0,
-            "missing_state_rate": 1.0,
-            "valid_hours": 0,
+            "observed_state_slots": 1,
+            "valid_open_slots": 1,
+            "elapsed_open_coverage": 0.1,
+            "full_day_open_coverage": 0.020833333333333332,
+            "missing_state_rate": 0.9,
+            "valid_hours": 1,
             "evaluation_ready": false
           }
         ]
@@ -87193,7 +87193,7 @@
           "target_date": "2026-11-08",
           "source_age_minutes": null,
           "status": "success",
-          "age_minutes": 0.9,
+          "age_minutes": 15.3,
           "stale": false,
           "last_success_utc": "2026-11-08T02:22:10+00:00",
           "attempts": 10,
@@ -87213,7 +87213,7 @@
           "target_date": "2026-11-08",
           "source_age_minutes": null,
           "status": "success",
-          "age_minutes": 1.1,
+          "age_minutes": 15.4,
           "stale": false,
           "last_success_utc": "2026-11-08T02:22:00+00:00",
           "attempts": 10,
@@ -87233,7 +87233,7 @@
           "target_date": "2026-11-08",
           "source_age_minutes": null,
           "status": "estimated",
-          "age_minutes": 1.1,
+          "age_minutes": 15.4,
           "stale": false,
           "last_success_utc": null,
           "attempts": 10,
@@ -87253,7 +87253,7 @@
           "target_date": "2026-11-08",
           "source_age_minutes": null,
           "status": "empty",
-          "age_minutes": 0.9,
+          "age_minutes": 15.3,
           "stale": false,
           "last_success_utc": null,
           "attempts": 10,
@@ -87273,7 +87273,7 @@
           "target_date": "2026-11-08",
           "source_age_minutes": null,
           "status": "empty",
-          "age_minutes": 0.8,
+          "age_minutes": 15.2,
           "stale": false,
           "last_success_utc": null,
           "attempts": 19,
@@ -87288,15 +87288,15 @@
         {
           "park": "Disneyland",
           "source": "weather",
-          "latest_attempt_utc": "2026-11-08T02:21:49.683808+00:00",
-          "source_observed_utc": "2026-11-08T02:15:00+00:00",
+          "latest_attempt_utc": "2026-11-08T02:37:14.261528+00:00",
+          "source_observed_utc": "2026-11-08T02:30:00+00:00",
           "target_date": "2026-11-08",
-          "source_age_minutes": 8.1,
+          "source_age_minutes": 7.4,
           "status": "success",
-          "age_minutes": 1.3,
+          "age_minutes": 0.2,
           "stale": false,
-          "last_success_utc": "2026-11-08T02:21:49.683808+00:00",
-          "attempts": 280,
+          "last_success_utc": "2026-11-08T02:37:14.261528+00:00",
+          "attempts": 281,
           "failed_attempts": 0,
           "failure_rate": 0.0,
           "estimated_attempts": 0,
