@@ -645,6 +645,7 @@ display_mode_options = [
     "回り方プランナー",
     "データ管理",
     "アルコール情報",
+    "実測待ち時間",
 ]
 if "display_mode_value" not in st.session_state:
     st.session_state["display_mode_value"] = "ダッシュボード"
@@ -686,7 +687,7 @@ last_update_text = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
 next_update_text = (datetime.now(JST) + timedelta(seconds=AUTO_REFRESH_SECONDS)).strftime("%H:%Mごろ")
 st.sidebar.caption(f'画面更新: {last_update_text}')
 st.sidebar.caption(f'次回自動更新: {next_update_text}')
-@st.fragment(run_every=AUTO_REFRESH_SECONDS if auto_refresh_enabled and display_mode != 'データ管理' else None)
+@st.fragment(run_every=AUTO_REFRESH_SECONDS if auto_refresh_enabled and display_mode not in ('データ管理','実測待ち時間') else None)
 def refresh_tick():
     previous = st.session_state.get('refresh_tick', time.monotonic())
     current = time.monotonic()
@@ -699,6 +700,10 @@ if st.sidebar.button('今すぐ更新'):
     st.rerun()
 st.sidebar.caption('APIは5分キャッシュ。画面更新だけでは継続収集を保証しません。')
 is_admin = render_access(st) if display_mode in ('データ管理','DPA/PP予測','アルコール情報') else False
+if display_mode=='実測待ち時間':
+    from measured_ui import render as render_measured
+    render_measured(st,park)
+    st.stop()
 if display_mode=='アルコール情報':
     from alcohol_ui import render
     render(st,is_admin)
@@ -1371,12 +1376,8 @@ elif display_mode == "全アトラクション":
         ascending=[False, True]
     )
 
-    st.dataframe(
-        all_display[
-            ["日本語名", "Attraction", "Wait", "Status"]
-        ],
-        width="stretch"
-    )
+    from measured_views import parallel as actual_parallel
+    actual_parallel(st,all_display,park,current=True)
 
     st.subheader("📈 アトラクション別 履歴グラフ")
 
@@ -1643,6 +1644,8 @@ elif display_mode == 'アトラクション別予測':
             st.info('このアトラクションの予測データがまだ不足しています。')
         else:
             reason_col = '理由' if '理由' in pred_df.columns else None
+            from measured_views import parallel as actual_parallel
+            actual_parallel(st,pred_df,park,'Predicted Wait',target=attraction_target_date)
             used_fallback = bool(
                 pred_df[reason_col].astype(str).str.contains('補完', na=False).any()
             ) if reason_col else False
@@ -2055,6 +2058,8 @@ elif display_mode == "日付指定予測":
 
 
     st.subheader("🧭 この日のおすすめ行動プラン")
+    from measured_views import parallel as actual_parallel
+    actual_parallel(st,target_wait_df,park,'Predicted Wait',target=target_date)
     st.dataframe(
         get_guest_action_plan(
             target_wait_df,
@@ -2128,6 +2133,8 @@ elif display_mode == "日付指定予測":
     )
 
 elif display_mode == "データ管理":
+    from measured_ui import moderation as moderate_measurements
+    moderate_measurements(st,is_admin)
 
     st.subheader("🗂 データ管理")
     st.caption(storage_status)

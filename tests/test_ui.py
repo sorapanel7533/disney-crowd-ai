@@ -9,6 +9,7 @@ import utils
 import reliability as r
 
 VIEWS=['ダッシュボード','全アトラクション','アトラクション別予測','DPA/PP予測','日付指定予測','回り方プランナー','データ管理','アルコール情報']
+VIEWS.append('実測待ち時間')
 ROOT=Path(__file__).resolve().parents[1]
 
 
