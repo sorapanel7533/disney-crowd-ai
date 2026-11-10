@@ -17,7 +17,7 @@ DISNEY_MEASURED_GITHUB_TOKEN = "作成した保存用トークン"
 
 トークンをチャット・ソースコード・Git・スクリーンショットに記載しない。CodexのGitHub接続は、公開アプリの実行時資格情報とは別であり、自動転用しない。未設定時は両入力方法を表示するが送信ボタンを無効にし、「保存完了」と表示しない。
 
-管理者は既存の `ADMIN_PASSWORD_SHA256`（パスワードのSHA-256）を同じSecretsに設定する。既存の認証を継続する。パスワードそのものをソースへ書かない。一般ユーザーはこの値を必要としない。
+管理者は同じSecretsへ `ADMIN_PASSWORD = "本人が決めた12文字以上のパスワード"` を設定できる。値はStreamlitのサーバー側Secretsだけに保存し、認証時にサーバー内でSHA-256へ変換する。ソース・ブラウザーの一般画面・ログ・Gitには書かない。新しいパスワードの選択・入力・保存は所有者本人が行う。既存の `ADMIN_PASSWORD_SHA256` と環境変数 `DISNEY_ADMIN_PASSWORD_SHA256` は引き続き使え、設定済みのハッシュを優先する。一般ユーザーは管理者用の値を必要としない。
 
 公式説明：[Streamlit Secrets](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management)、[アプリ設定](https://docs.streamlit.io/deploy/streamlit-community-cloud/manage-your-app/app-settings)、[GitHub参照の非強制更新](https://docs.github.com/en/rest/git/refs)。
 
