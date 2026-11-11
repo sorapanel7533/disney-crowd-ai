@@ -12,6 +12,8 @@ import reliability as r
 
 VERSION = 'actual-wait-v1'
 METHODS = ('mean', 'median', 'band', 'attraction', 'context', 'hierarchical')
+MAX_WAIT_MINUTES = 360
+LIVE_CAPTURE_WINDOW = timedelta(minutes=1)
 
 def stamp(value=None):
     return r.iso(value)
@@ -43,8 +45,8 @@ def number(value):
     if n is None or not 0<=n<=1440: raise ValueError('待ち時間は0〜1440分で入力してください')
     return n
 
-def displayed(history, park, ride_id, start):
-    """Only observations AND acquisitions available before queue entry qualify."""
+def displayed(history, park, ride_id, start, *, live=False):
+    """Match observations at entry; a live request may finish shortly after the click."""
     if history is None or history.empty:return None
     f=history.copy()
     required={'park','ride_id','observed_at_utc','fetched_at_utc','quality','is_open','wait_time'}
@@ -53,12 +55,13 @@ def displayed(history, park, ride_id, start):
     fetched=pd.to_datetime(f.fetched_at_utc,utc=True,errors='coerce')
     t=r.utc(start)
     keep=(f.park==park)&(pd.to_numeric(f.ride_id,errors='coerce')==int(ride_id))&f.quality.eq('valid')&f.is_open.eq(1)
-    keep &= observed.between(t-pd.Timedelta(minutes=20),t)&fetched.le(t)
+    acquisition_limit = t + LIVE_CAPTURE_WINDOW if live else t
+    keep &= observed.between(t-pd.Timedelta(minutes=20),t)&fetched.between(observed,acquisition_limit)
     keep &= pd.to_numeric(f.wait_time,errors='coerce').between(0,300)
     f=f[keep].assign(_observed=observed[keep]).sort_values('_observed')
     if f.empty:return None
     row=f.iloc[-1]
-    return {'displayed_wait':float(row.wait_time),'display_source':'queue-times-history',
+    return {'displayed_wait':float(row.wait_time),'display_source':'queue-times-live' if live else 'queue-times-history',
             'display_observed_at':stamp(row.observed_at_utc),'display_fetched_at':stamp(row.fetched_at_utc)}
 
 def derive(row):
@@ -69,17 +72,33 @@ def derive(row):
     out['calculation_version']=VERSION
     return out
 
+def validate_wait(start, end, now, *, allow_zero=False):
+    start, end, now = (r.utc(value) for value in (start, end, now))
+    if any(pd.isna(value) for value in (start, end, now)):
+        raise ValueError('開始・乗車日時を確認してください')
+    if start > now or end > now:
+        raise ValueError('未来の日時は記録できません')
+    if start.tz_convert(r.JST).date() != end.tz_convert(r.JST).date():
+        raise ValueError('開始と乗車は同じ日で入力してください')
+    if end < start:
+        raise ValueError('乗車時刻は開始時刻より後にしてください')
+    if end == start and not allow_zero:
+        raise ValueError('0分で乗車した場合は、待ち時間の直接入力を使ってください')
+    minutes = (end - start).total_seconds() / 60
+    if minutes > MAX_WAIT_MINUTES:
+        raise ValueError(f'待ち時間は{MAX_WAIT_MINUTES}分以内で入力してください')
+    return minutes
+
+
 def make(park,ride_id,start,*,end=None,minutes=None,display=None,receipt='',record_id=None,now=None,is_test=False):
     now=stamp(now);start=stamp(start);ride=attraction(park,ride_id)
-    if r.utc(start)>r.utc(now):raise ValueError('未来の開始日時は投稿できません')
+    if pd.isna(r.utc(start)) or r.utc(start)>r.utc(now):raise ValueError('開始日時を確認してください。未来の日時は記録できません')
     if end is not None:
-        end=stamp(end);actual=(r.utc(end)-r.utc(start)).total_seconds()/60;method='timestamps';computed=False
+        end=stamp(end);actual=validate_wait(start,end,now);method='timestamps';computed=False
     elif minutes is not None:
         actual=number(minutes);end=stamp(r.utc(start)+pd.Timedelta(minutes=actual));method='minutes';computed=True
+        validate_wait(start,end,now,allow_zero=True)
     else:actual=None;end=None;method='timer';computed=False
-    if actual is not None:
-        actual=number(actual)
-        if r.utc(end)>r.utc(now):raise ValueError('乗車日時が未来です。日付・時刻を確認してください')
     if not receipt or len(receipt)<32:raise ValueError('再開キーが不足しています')
     row={'id':record_id or str(uuid.uuid4()),'park':park,'ride_id':int(ride_id),'attraction':ride['name'],
          'started_at':start,'boarded_at':end,'input_method':method,'end_is_calculated':computed,'actual_wait':actual,
@@ -89,8 +108,11 @@ def make(park,ride_id,start,*,end=None,minutes=None,display=None,receipt='',reco
         d=number(display['displayed_wait']);source=display['display_source']
         if source not in ('queue-times-live','queue-times-history','manual-sign'):raise ValueError('不正な表示値の取得元です')
         observed=stamp(display['display_observed_at']);fetched=stamp(display.get('display_fetched_at') or observed)
-        if not r.utc(start)-pd.Timedelta(minutes=20)<=r.utc(observed)<=r.utc(start) or r.utc(fetched)>r.utc(start):
-            raise ValueError('表示値は開始以前20分以内に観測・取得したものを指定してください')
+        acquisition_limit = r.utc(start)
+        if method == 'timer' and source == 'queue-times-live':
+            acquisition_limit = min(r.utc(now), acquisition_limit + LIVE_CAPTURE_WINDOW)
+        if not r.utc(start)-pd.Timedelta(minutes=20)<=r.utc(observed)<=r.utc(start) or not r.utc(observed)<=r.utc(fetched)<=acquisition_limit:
+            raise ValueError('開始時点の表示待ち時間を確認できません')
         row.update(displayed_wait=d,display_source=source,display_observed_at=observed,display_fetched_at=fetched if source!='manual-sign' else None)
     return derive(row)
 
@@ -110,6 +132,16 @@ def save(db,row,now=None):
             if any(existing.get(k)!=row.get(k) for k in fields):raise ValueError('この記録IDは保存済みです。再取得して内容を確認してください。')
             return existing
         row=dict(row);flags=[]
+        if pd.isna(r.utc(row['started_at'])) or r.utc(row['started_at']) > r.utc(now):
+            raise ValueError('開始日時を確認してください')
+        if row['actual_wait'] is not None:
+            if row['boarded_at'] is None:
+                raise ValueError('乗車日時を確認してください')
+            duration = validate_wait(row['started_at'], row['boarded_at'], now, allow_zero=row['input_method']=='minutes')
+            if not math.isclose(number(row['actual_wait']), duration, abs_tol=1e-6):
+                raise ValueError('待ち時間が開始・乗車日時と一致しません')
+        elif row['boarded_at'] is not None or row['input_method'] != 'timer':
+            raise ValueError('計測の開始情報を確認してください')
         old=records(db)
         if sum(r.utc(x['created_at']).date()==r.utc(now).date() for x in old)>=2000:
             raise ValueError('本日の投稿上限です。時間をおいて再試行してください')
@@ -118,7 +150,7 @@ def save(db,row,now=None):
         if len(recent)>=5:flags.append('rapid_submissions')
         row['fingerprint']=digest('|'.join(str(row.get(k)) for k in ('park','ride_id','started_at','actual_wait','is_test')))
         if any(x.get('fingerprint')==row['fingerprint'] for x in old):flags.append('duplicate_candidate')
-        if row['actual_wait'] is not None and (row['actual_wait']>360 or (row.get('ratio') is not None and not .1<=row['ratio']<=3)):
+        if row['actual_wait'] is not None and row.get('ratio') is not None and not .1<=row['ratio']<=3:
             flags.append('extreme_wait')
         row['quality_flags']=flags
         row['status']='draft' if row['actual_wait'] is None else 'quarantined' if flags else 'pending'
@@ -134,12 +166,11 @@ def finish(db,record_id,receipt,end,now=None):
         old=next((x for x in records(db) if x['id']==record_id),None)
         if not old or old['receipt_hash']!=digest(receipt):raise PermissionError('再開キーが一致しません')
         if old['status']!='draft':return old
-        end=stamp(end);actual=number((r.utc(end)-r.utc(old['started_at'])).total_seconds()/60)
-        if r.utc(end)>r.utc(now):raise ValueError('未来の乗車日時です')
+        end=stamp(end);actual=validate_wait(old['started_at'],end,now)
         new=derive({**old,'boarded_at':end,'actual_wait':actual,'updated_at':now})
         flags=list(old['quality_flags'])
-        if actual>360 or (new.get('ratio') is not None and not .1<=new['ratio']<=3):flags.append('extreme_wait')
-        new.update(status='quarantined' if flags else 'pending',quality_flags=flags)
+        if new.get('ratio') is not None and not .1<=new['ratio']<=3:flags.append('extreme_wait')
+        new.update(status='quarantined' if flags else 'pending',quality_flags=flags,quality='needs_review' if flags else 'unreviewed')
         db.execute('UPDATE measurements SET payload=? WHERE id=?',(json.dumps(new,ensure_ascii=False),record_id))
         audit(db,new,old,'finish',now)
     return new
@@ -156,7 +187,7 @@ def moderate(db,record_id,status,*,authorized=False,correction=None,reason='',no
         new=dict(old)
         if correction is not None:
             actual=number(correction);end=stamp(r.utc(old['started_at'])+pd.Timedelta(minutes=actual))
-            if r.utc(end)>r.utc(now):raise ValueError('修正後の乗車時刻が未来です')
+            validate_wait(old['started_at'],end,now,allow_zero=True)
             new.update(actual_wait=actual,boarded_at=end,end_is_calculated=True)
         new=derive({**new,'status':status,'quality':'reviewed','approved_at':now if status=='approved' else None,'updated_at':now})
         db.execute('UPDATE measurements SET payload=? WHERE id=?',(json.dumps(new,ensure_ascii=False),record_id))
