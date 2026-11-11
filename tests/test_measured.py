@@ -16,18 +16,22 @@ def row(**kw):
         display={'displayed_wait':70,'display_source':'manual-sign','display_observed_at':START})
     values.update(kw);return m.make(**values)
 
-def test_two_methods_cross_midnight_and_zero():
+def test_two_methods_and_explicit_zero_minutes():
     a=row();b=row(minutes=None,end='2026-11-01T11:05:00+09:00')
     assert a['actual_wait']==b['actual_wait']==45
     assert a['end_is_calculated'] and not b['end_is_calculated']
     assert a['deviation']==-25 and a['ratio']==pytest.approx(45/70)
     assert a['deviation_pct']==pytest.approx(-35.7142857)
-    assert row(start='2026-11-01T23:50:00+09:00',minutes=None,end='2026-11-02T00:10:00+09:00',display=None)['actual_wait']==20
     zero=row(minutes=0,display={'displayed_wait':0,'display_source':'manual-sign','display_observed_at':START})
     assert zero['deviation']==0 and zero['ratio'] is None and zero['deviation_pct'] is None
 
 @pytest.mark.parametrize('kw',[{'minutes':-1},{'minutes':float('nan')},{'minutes':1441},{'start':'2027-01-01'},
-    {'minutes':None,'end':'2026-11-01T10:00:00+09:00'},{'park':'DisneySea'},{'ride_id':999999}])
+    {'minutes':None,'end':'2026-11-01T10:00:00+09:00'},
+    {'minutes':None,'end':START},
+    {'minutes':None,'end':'2026-11-02T00:10:00+09:00'},
+    {'start':'2026-11-01T23:50:00+09:00','minutes':20,'display':None},
+    {'minutes':None,'end':'2026-11-01T11:05:00+09:00','now':'2026-11-01T10:30:00+09:00'},
+    {'minutes':361},{'park':'DisneySea'},{'ride_id':999999}])
 def test_invalid_input(kw):
     with pytest.raises(ValueError):row(**kw)
 
@@ -66,6 +70,32 @@ def test_timer_resume_and_owned_completion(tmp_path):
     assert done['actual_wait']==45 and done['displayed_wait']==70
     assert m.finish(db,draft['id'],RECEIPT,NOW,now=NOW)==done
     assert len(m.records(db))==1
+
+
+def test_storage_rejects_invalid_duration_and_preserves_draft():
+    db=m.connect()
+    draft=m.save(db,row(minutes=None),now=NOW)
+    for end,now in [(START,NOW),('2026-11-02T00:10:00+09:00',NOW),
+                    ('2026-11-01T16:21:00+09:00',NOW),('2026-11-01T11:05:00+09:00',START)]:
+        with pytest.raises(ValueError):m.finish(db,draft['id'],RECEIPT,end,now=now)
+    invalid={**row(),'boarded_at':'2026-11-02T00:10:00+09:00'}
+    with pytest.raises(ValueError):m.save(db,invalid,now=NOW)
+    assert m.records(db)==[draft]
+    assert db.execute('SELECT COUNT(*) FROM measurement_audit').fetchone()[0]==1
+
+
+def test_live_observation_is_fixed_to_queue_entry():
+    data={'park':'Disneyland','ride_id':7987,'quality':'valid','is_open':1,'wait_time':70,
+          'observed_at_utc':'2026-11-01T10:19:00+09:00','fetched_at_utc':'2026-11-01T10:20:10+09:00'}
+    history=pd.DataFrame([data,{**data,'wait_time':90,'observed_at_utc':'2026-11-01T10:20:05+09:00'}])
+    assert m.displayed(history,'Disneyland',7987,START) is None
+    live=m.displayed(history,'Disneyland',7987,START,live=True)
+    assert live['display_source']=='queue-times-live' and live['displayed_wait']==70
+    saved=row(minutes=None,display=live,now='2026-11-01T10:20:11+09:00')
+    assert saved['started_at']==m.stamp(START)
+    assert saved['display_fetched_at']==m.stamp(data['fetched_at_utc'])
+    too_late=pd.DataFrame([{**data,'fetched_at_utc':'2026-11-01T10:21:01+09:00'}])
+    assert m.displayed(too_late,'Disneyland',7987,START,live=True) is None
 
 def test_statistics_denominators_and_distribution():
     f=pd.DataFrame([{'deviation':-25,'deviation_pct':-35.7},{'deviation':0,'deviation_pct':None},{'deviation':15,'deviation_pct':30}])

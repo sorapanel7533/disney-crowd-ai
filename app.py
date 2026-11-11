@@ -596,7 +596,8 @@ def filter_crowd_hours(df):
 now_display = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
 
 if "park" not in st.session_state:
-    st.session_state["park"] = "DisneySea"
+    resume_park = st.query_params.get('measurement_park')
+    st.session_state["park"] = resume_park if resume_park in PARK_SETTINGS and st.query_params.get('measurement_key') else "DisneySea"
 
 st.markdown(f"""
 <div class="ios-title-card">
@@ -648,7 +649,7 @@ display_mode_options = [
     "実測待ち時間",
 ]
 if "display_mode_value" not in st.session_state:
-    st.session_state["display_mode_value"] = "ダッシュボード"
+    st.session_state["display_mode_value"] = "実測待ち時間" if st.query_params.get('measurement_key') else "ダッシュボード"
 if st.session_state["display_mode_value"] not in display_mode_options:
     st.session_state["display_mode_value"] = "ダッシュボード"
 
@@ -686,7 +687,8 @@ st.session_state["auto_refresh_enabled"] = auto_refresh_enabled
 last_update_text = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
 next_update_text = (datetime.now(JST) + timedelta(seconds=AUTO_REFRESH_SECONDS)).strftime("%H:%Mごろ")
 st.sidebar.caption(f'画面更新: {last_update_text}')
-st.sidebar.caption(f'次回自動更新: {next_update_text}')
+if display_mode != '実測待ち時間':
+    st.sidebar.caption(f'次回自動更新: {next_update_text}')
 @st.fragment(run_every=AUTO_REFRESH_SECONDS if auto_refresh_enabled and display_mode not in ('データ管理','実測待ち時間') else None)
 def refresh_tick():
     previous = st.session_state.get('refresh_tick', time.monotonic())
@@ -698,7 +700,8 @@ def refresh_tick():
 refresh_tick()
 if st.sidebar.button('今すぐ更新'):
     st.rerun()
-st.sidebar.caption('APIは5分キャッシュ。画面更新だけでは継続収集を保証しません。')
+if display_mode != '実測待ち時間':
+    st.sidebar.caption('APIは5分キャッシュ。画面更新だけでは継続収集を保証しません。')
 is_admin = render_access(st) if display_mode in ('データ管理','DPA/PP予測','アルコール情報') else False
 if display_mode=='実測待ち時間':
     from measured_ui import render as render_measured

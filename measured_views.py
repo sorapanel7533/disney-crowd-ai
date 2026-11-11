@@ -37,9 +37,18 @@ def parallel(st,source,park,value_column='Wait',target=None,current=False):
     st.caption('表示・予測待ち時間に実測補正を併記します。承認済みの件数・日数が不足すると推定値は表示しません。')
     columns=[c for c in ('日本語名','Attraction','TimeLabel','Time','Wait','Predicted Wait','Status','推定実測（分）','実測推定の状態') if c in out]
     st.dataframe(out[columns].rename(columns={'Wait':'表示待ち時間（分）','Predicted Wait':'予測表示待ち時間（分）'}),hide_index=True,width='stretch')
-    with st.expander('推定実測の根拠・件数・期間・モデル'):
-        st.caption('表示待ち時間モデル: '+r.MODEL_VERSION+' / 実測補正: '+m.VERSION+' / 階層縮約。20件・5日を暫定的な最低条件とし、精度を保証する基準にはしません。')
-        if results:st.dataframe(pd.DataFrame(results),hide_index=True,width='stretch')
+    with st.expander('推定に使った実測件数と期間'):
+        st.caption('承認済みの実測が20件・5日以上ある場合に暫定値を表示します。予測精度は検証中です。')
+        if results:
+            evidence = []
+            for name, prediction in zip(out['Attraction'], results):
+                evidence.append({
+                    'アトラクション': r.japanese_name(name),
+                    '実測件数': prediction['n'],
+                    '計測日数': prediction['days'],
+                    '集計期間': '〜'.join(prediction.get('period', [])),
+                })
+            st.dataframe(evidence,hide_index=True,width='stretch')
     return out
 
 def timeline(st,db,park,ride,actuals):
