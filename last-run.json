@@ -1,8 +1,8 @@
 {
-  "sample": 3,
-  "started_at_utc": "2026-11-12T12:37:00.000229+00:00",
-  "finished_at_utc": "2026-11-12T12:37:31.598642+00:00",
-  "due_slot_utc": "2026-11-12T12:37:00+00:00",
+  "sample": 4,
+  "started_at_utc": "2026-11-12T12:52:00.000209+00:00",
+  "finished_at_utc": "2026-11-12T12:52:32.160923+00:00",
+  "due_slot_utc": "2026-11-12T12:52:00+00:00",
   "event": "schedule",
   "github_run_id": "43213190825",
   "results": [
@@ -11,7 +11,7 @@
       "status": "success",
       "received": 33,
       "inserted": 33,
-      "observed_at": "2026-11-12T12:36:02+00:00",
+      "observed_at": "2026-11-12T12:46:10+00:00",
       "open_positive": 0,
       "open_zero": 0,
       "closed": 33,
@@ -19,12 +19,12 @@
       "evaluated_predictions": 0,
       "shadow_evaluated": 0,
       "shadow_issued": 0,
-      "duration_seconds": 14.037,
+      "duration_seconds": 14.463,
       "journal": {
-        "path": "journal/2026-11/43213190825-1-s003-DisneySea.jsonl.gz",
+        "path": "journal/2026-11/43213190825-1-s004-DisneySea.jsonl.gz",
         "changes": 37,
-        "compressed_bytes": 1687,
-        "sha256": "39af92924d774f24675deed39ccbcb0f71c16e48816aac1b6f47fa6d317bd15b"
+        "compressed_bytes": 1688,
+        "sha256": "352f38a74d8ca4e82a575537d366335a1449cd5cc42e82db963bb8ce6624381b"
       }
     },
     {
@@ -32,7 +32,7 @@
       "status": "success",
       "received": 37,
       "inserted": 37,
-      "observed_at": "2026-11-12T12:35:56+00:00",
+      "observed_at": "2026-11-12T12:51:02+00:00",
       "open_positive": 0,
       "open_zero": 0,
       "closed": 37,
@@ -40,12 +40,12 @@
       "evaluated_predictions": 0,
       "shadow_evaluated": 0,
       "shadow_issued": 0,
-      "duration_seconds": 14.296,
+      "duration_seconds": 14.395,
       "journal": {
-        "path": "journal/2026-11/43213190825-1-s003-Disneyland.jsonl.gz",
+        "path": "journal/2026-11/43213190825-1-s004-Disneyland.jsonl.gz",
         "changes": 41,
         "compressed_bytes": 1761,
-        "sha256": "4169d478662f1145060a42d0ab44ed12f4435ce760a4dc93202067300cfd2842"
+        "sha256": "4f4296e18b5cbf9d051630fb319ada62a90bfc4cf43182f891ed0b5de821f26d"
       }
     }
   ]
