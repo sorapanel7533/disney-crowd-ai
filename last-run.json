@@ -1,8 +1,8 @@
 {
-  "sample": 1,
-  "started_at_utc": "2026-11-12T03:52:00.000225+00:00",
-  "finished_at_utc": "2026-11-12T03:52:22.064137+00:00",
-  "due_slot_utc": "2026-11-12T03:52:00+00:00",
+  "sample": 2,
+  "started_at_utc": "2026-11-12T04:07:00.000221+00:00",
+  "finished_at_utc": "2026-11-12T04:10:10.113969+00:00",
+  "due_slot_utc": "2026-11-12T04:07:00+00:00",
   "event": "schedule",
   "github_run_id": "43150249410",
   "results": [
@@ -11,26 +11,42 @@
       "status": "success",
       "received": 33,
       "inserted": 33,
-      "observed_at": "2026-11-12T03:51:00+00:00",
+      "observed_at": "2026-11-12T04:06:05+00:00",
       "open_positive": 25,
       "open_zero": 2,
       "closed": 6,
       "source_stale": 0,
-      "evaluated_predictions": 0,
+      "evaluated_predictions": 10,
       "shadow_evaluated": 0,
-      "shadow_issued": 0,
-      "duration_seconds": 20.24,
+      "shadow_issued": 320,
+      "duration_seconds": 83.193,
       "journal": {
-        "path": "journal/2026-11/43150249410-1-s001-DisneySea.jsonl.gz",
-        "changes": 37,
-        "compressed_bytes": 1779,
-        "sha256": "4b50282fb94eb8f84c5c44bb4469f3371a3cec4fd467aa5c321462fb8a82adb7"
+        "path": "journal/2026-11/43150249410-1-s002-DisneySea.jsonl.gz",
+        "changes": 395,
+        "compressed_bytes": 20407,
+        "sha256": "5ec3a92398d869e687408a2d63e7e7400ecb53ea7bf7741c664dc20a3a0b6a3f"
       }
     },
     {
       "park": "Disneyland",
-      "status": "skipped",
-      "reason": "A current collection was persisted less than five minutes ago; no duplicate API request"
+      "status": "success",
+      "received": 37,
+      "inserted": 37,
+      "observed_at": "2026-11-12T04:06:01+00:00",
+      "open_positive": 31,
+      "open_zero": 2,
+      "closed": 4,
+      "source_stale": 0,
+      "evaluated_predictions": 10,
+      "shadow_evaluated": 0,
+      "shadow_issued": 350,
+      "duration_seconds": 103.39,
+      "journal": {
+        "path": "journal/2026-11/43150249410-1-s002-Disneyland.jsonl.gz",
+        "changes": 407,
+        "compressed_bytes": 20539,
+        "sha256": "c20234a65407c3fa1a1ec9e4c27816a31ca49d431eb9445256193da68d875f8b"
+      }
     }
   ]
 }
