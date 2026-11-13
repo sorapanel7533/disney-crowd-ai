@@ -1,52 +1,20 @@
 {
-  "sample": 0,
-  "started_at_utc": "2026-11-13T11:18:16.738010+00:00",
-  "finished_at_utc": "2026-11-13T11:19:20.390587+00:00",
-  "due_slot_utc": "2026-11-13T11:07:00+00:00",
+  "sample": 1,
+  "started_at_utc": "2026-11-13T11:22:00.000244+00:00",
+  "finished_at_utc": "2026-11-13T11:22:00.234416+00:00",
+  "due_slot_utc": "2026-11-13T11:22:00+00:00",
   "event": "schedule",
   "github_run_id": "43415820518",
   "results": [
     {
       "park": "DisneySea",
-      "status": "success",
-      "received": 33,
-      "inserted": 33,
-      "observed_at": "2026-11-13T11:16:14+00:00",
-      "open_positive": 17,
-      "open_zero": 7,
-      "closed": 9,
-      "source_stale": 0,
-      "evaluated_predictions": 10,
-      "shadow_evaluated": 405,
-      "shadow_issued": 0,
-      "duration_seconds": 29.618,
-      "journal": {
-        "path": "journal/2026-11/43415820518-1-s000-DisneySea.jsonl.gz",
-        "changes": 1583,
-        "compressed_bytes": 78646,
-        "sha256": "97cc8a817340dfa4c83d5f26cea316d17a2c3de3098ebadcf2c32cedf5a61203"
-      }
+      "status": "skipped",
+      "reason": "A current collection was persisted less than five minutes ago; no duplicate API request"
     },
     {
       "park": "Disneyland",
-      "status": "success",
-      "received": 37,
-      "inserted": 37,
-      "observed_at": "2026-11-13T11:16:06+00:00",
-      "open_positive": 23,
-      "open_zero": 3,
-      "closed": 11,
-      "source_stale": 0,
-      "evaluated_predictions": 10,
-      "shadow_evaluated": 465,
-      "shadow_issued": 0,
-      "duration_seconds": 29.96,
-      "journal": {
-        "path": "journal/2026-11/43415820518-1-s000-Disneyland.jsonl.gz",
-        "changes": 1747,
-        "compressed_bytes": 87426,
-        "sha256": "155b3555097199437582698a6a0749911d8f6bd49dd43a3d40b21de75b2fa3c4"
-      }
+      "status": "skipped",
+      "reason": "A current collection was persisted less than five minutes ago; no duplicate API request"
     }
   ]
 }
