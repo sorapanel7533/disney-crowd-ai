@@ -16,8 +16,9 @@ def training(st):
         st.caption('実測補正用DBは取得できません。既存の表示値・予測値を表示します。')
         return pd.DataFrame()
 
-def parallel(st,source,park,value_column='Wait',target=None,current=False):
-    f=training(st);out=source.copy()
+def estimate_rows(st,source,park,value_column='Wait',target=None,current=False,training_frame=None):
+    f = training(st) if training_frame is None else training_frame
+    out = source.copy()
     lookup={v['name']:int(k) for k,v in r.load_catalog().items() if v['park']==park}
     results=[]
     for row in out.to_dict('records'):
@@ -34,6 +35,10 @@ def parallel(st,source,park,value_column='Wait',target=None,current=False):
         results.append(p)
     out['推定実測（分）']=[x['estimate'] for x in results]
     out['実測推定の状態']=[x['state'] for x in results]
+    return out, results
+
+def parallel(st,source,park,value_column='Wait',target=None,current=False):
+    out, results = estimate_rows(st, source, park, value_column, target=target, current=current)
     st.caption('表示・予測待ち時間に実測補正を併記します。承認済みの件数・日数が不足すると推定値は表示しません。')
     columns=[c for c in ('日本語名','Attraction','TimeLabel','Time','Wait','Predicted Wait','Status','推定実測（分）','実測推定の状態') if c in out]
     st.dataframe(out[columns].rename(columns={'Wait':'表示待ち時間（分）','Predicted Wait':'予測表示待ち時間（分）'}),hide_index=True,width='stretch')
