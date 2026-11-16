@@ -28,7 +28,7 @@ def expected_digest(secrets):
 def render_access(st):
     digest = expected_digest(st.secrets)
     if not digest:
-        st.sidebar.caption('管理者認証が未設定のため、共有データの変更は無効です。')
+        st.sidebar.warning('管理者認証が未設定のため、共有データの変更は無効です。')
         return False
     password = st.sidebar.text_input('管理者パスワード',type='password',key='admin_password')
     ok = authorized(password,digest)

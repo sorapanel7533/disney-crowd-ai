@@ -13,7 +13,7 @@ def training(st):
         try:return m.frame(db,as_of=r.iso())
         finally:db.close()
     except Unavailable:
-        st.caption('実測補正用DBは取得できません。既存の表示値・予測値を表示します。')
+        st.warning('推定実測を取得できません。表示待ち時間の予測は確認できます。')
         return pd.DataFrame()
 
 def estimate_rows(st,source,park,value_column='Wait',target=None,current=False,training_frame=None):
@@ -39,11 +39,10 @@ def estimate_rows(st,source,park,value_column='Wait',target=None,current=False,t
 
 def parallel(st,source,park,value_column='Wait',target=None,current=False):
     out, results = estimate_rows(st, source, park, value_column, target=target, current=current)
-    st.caption('表示・予測待ち時間に実測補正を併記します。承認済みの件数・日数が不足すると推定値は表示しません。')
     columns=[c for c in ('日本語名','Attraction','TimeLabel','Time','Wait','Predicted Wait','Status','推定実測（分）','実測推定の状態') if c in out]
     st.dataframe(out[columns].rename(columns={'Wait':'表示待ち時間（分）','Predicted Wait':'予測表示待ち時間（分）'}),hide_index=True,width='stretch')
     with st.expander('推定に使った実測件数と期間'):
-        st.caption('承認済みの実測が20件・5日以上ある場合に暫定値を表示します。予測精度は検証中です。')
+        st.write('承認済みの実測が20件・5日以上ある場合に暫定値を表示します。予測精度は検証中です。')
         if results:
             evidence = []
             for name, prediction in zip(out['Attraction'], results):
@@ -89,9 +88,8 @@ def timeline(st,db,park,ride,actuals):
                 if '将来の推定実測' in chosen:
                     y=[m.estimate(approved,park,ride,v,at,as_of=r.iso())['estimate'] for at,v in zip(t,forecasts.predicted_wait)]
                     ax.plot(t,y,'--',color='purple',label='Forecast actual (unvalidated)')
-                st.caption('将来線は保存済みの表示待ち時間予測です。実測と異なります。')
-            else:st.caption('この施設の将来予測はまだ保存されていません。')
-        except (ValueError,KeyError,TypeError,AttributeError):st.caption('将来線を計算できる履歴が不足しています。')
+            else:st.write('この施設の将来予測はまだ保存されていません。')
+        except (ValueError,KeyError,TypeError,AttributeError):st.write('将来線を計算できる履歴が不足しています。')
     ax.set(xlabel='JST queue entry / target time',ylabel='Minutes')
     handles,_=ax.get_legend_handles_labels()
     if handles:ax.legend()

@@ -62,6 +62,7 @@ def test_all_views(tmp_path,monkeypatch,park,scenario):
         plot_titles.clear()
         at.button_group(key='display_mode_segmented').set_value(view).run()
         assert not at.exception, (park,scenario,view,[(e.message,e.stack_trace) for e in at.exception])
+        assert not at.caption, (park, scenario, view)
         if view == "ダッシュボード":
             assert not any("投稿用 X文面" in header.value for header in at.subheader)
             assert not any("Crowd Index" in frame.value.columns and "予測種別" in frame.value.columns for frame in at.dataframe)

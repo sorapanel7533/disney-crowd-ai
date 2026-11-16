@@ -36,7 +36,8 @@ def analytics(st,db,park):
     approved=st.radio('集計対象',['承認済み','未承認を含む参考集計'],horizontal=True)
     f=m.frame(db,approved=approved=='承認済み')
     if not f.empty:f=f[f.park==park]
-    st.caption('未承認は自己申告の参考集計です。隔離・無効・計測途中は除外し、推定の学習には使いません。')
+    if approved != '承認済み':
+        st.write('未承認の自己申告を含む参考集計です。予測の学習には使われません。')
     if f.empty:
         st.info('対象の記録は0件です。推定準備中です。');return
     ids=sorted(f.ride_id.unique());selected=st.selectbox('分析する施設',['すべて']+ids,format_func=lambda x:x if x=='すべて' else r.japanese_name(m.attraction(park,x)['name']))
@@ -67,7 +68,7 @@ def analytics(st,db,park):
     st.dataframe(f.groupby('band',observed=True).deviation.agg(['count','mean','median']).reset_index(),hide_index=True)
     st.line_chart(f.groupby('date').deviation.agg(['mean','median']))
     st.subheader('施設別の時間推移')
-    if selected=='すべて':st.caption('施設を1つ選ぶと時間推移を表示します。');return
+    if selected=='すべて':st.write('施設を1つ選ぶと時間推移を表示します。');return
     from measured_views import timeline
     timeline(st,db,park,selected,f)
 
@@ -86,8 +87,6 @@ def show_record(st, row):
     st.write(f"開始　{clock_label(row['started_at'])}（日本時間）")
     wait = row['displayed_wait']
     st.write('開始時の表示待ち時間　' + (f'{wait:g}分' if wait is not None else '取得できませんでした'))
-    if row['display_observed_at'] and row['display_source'] != 'manual-sign':
-        st.caption(f"表示待ち時間の観測　{clock_label(row['display_observed_at'])}（日本時間）")
     if row['boarded_at'] is None:
         return
     st.write(f"乗車　{clock_label(row['boarded_at'])}（日本時間）")
@@ -98,7 +97,7 @@ def show_record(st, row):
             difference += f"（{row['deviation_pct']:+.1f}%）"
         st.write(f'表示との差　{difference}')
     labels = {'pending': '承認待ち', 'approved': '承認済み', 'quarantined': '確認が必要', 'invalid': '無効'}
-    st.caption(labels[row['status']])
+    st.write(labels[row['status']])
     st.success('保存完了')
 
 
@@ -140,7 +139,7 @@ def timer(st, backend, park, receipt, own):
         if started.date() == end.date() and timedelta(0) <= end - started <= timedelta(minutes=m.MAX_WAIT_MINUTES):
             active.append(row)
     if active:
-        st.caption('あとで再開する場合は、このページのURLを自分用に保存してください。')
+        st.info('あとで再開するには、このページを自分用にブックマークしてください。')
         for row in active:
             show_record(st, row)
 
@@ -170,7 +169,7 @@ def timer(st, backend, park, receipt, own):
     if completed:
         show_record(st, max(completed, key=lambda row: row['boarded_at']))
     if drafts:
-        st.caption('日付が変わった計測と、6時間を過ぎた計測は終了できません。')
+        st.warning('日付が変わった計測と、6時間を過ぎた計測は終了できません。')
     ride = choose_ride(st, park, 'mw_timer_ride')
     key = f'mw_started_{park}_{ride}'
     row_key = key + '_record'
@@ -244,7 +243,6 @@ def manual_input(st, backend, park, receipt, own):
 
 def render(st, park, is_admin=False):
     st.subheader('実測待ち時間')
-    st.caption('ログイン不要。待ち時間の記録は承認後に推定へ使われます。')
     mode = st.radio('記録方法', ['リアルタイム計測', '過去の記録を手動入力'], key='mw_mode', horizontal=True)
     backend = configured(st)
     if not backend.token:
@@ -276,7 +274,7 @@ def moderation(st,is_admin):
     db,head=shared(st)
     if db is None:return
     try:
-        st.caption('外部DBの確認コミット: '+str(head or '初回投稿前'))
+        st.write('外部DBの確認コミット: '+str(head or '初回投稿前'))
         rows=m.records(db)
         st.write('総件数',len(rows),' / 承認待ち',sum(x['status']=='pending' for x in rows),' / 隔離',sum(x['status']=='quarantined' for x in rows))
         st.dataframe(pd.DataFrame([{k:v for k,v in x.items() if k not in ('receipt_hash','fingerprint')} for x in rows]),hide_index=True)
@@ -299,7 +297,7 @@ def moderation(st,is_admin):
             audit['payload']=audit.payload.map(sanitize)
             st.dataframe(audit,hide_index=True)
         f=m.frame(db,as_of=r.iso());evaluation=m.evaluate(f)
-        st.caption('モデル '+m.VERSION+'。未検証モデルを正式採用しません。承認が評価日より後なら過去の学習には使いません。')
+        st.write('モデル '+m.VERSION+'。未検証モデルを正式採用しません。承認が評価日より後なら過去の学習には使いません。')
         if evaluation.empty:st.info('独立した評価日・記録が不足しています。実測精度は未検証です。')
         else:
             summaries=[]

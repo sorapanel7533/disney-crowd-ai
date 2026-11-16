@@ -1,5 +1,6 @@
 """Shared display controls and graphs for the existing wait forecasts."""
 from datetime import timedelta
+from textwrap import fill
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -73,7 +74,7 @@ def render_wait_chart(predictions, attraction, target, park, observed=None, show
         st.info("このアトラクションの予測データがまだ不足しています。")
         return False
 
-    fig, ax = plt.subplots(figsize=(7, 3.4), layout="constrained")
+    fig, ax = plt.subplots(figsize=(5.25, 3.4), layout="constrained")
     try:
         ax.plot(series["chart_time"], predicted, label="予測待ち時間", color="#1471bd", linewidth=2.1, marker=".", markersize=3)
         if observed is not None and {"TimeLabel", "Actual Wait"}.issubset(observed):
@@ -90,7 +91,7 @@ def render_wait_chart(predictions, attraction, target, park, observed=None, show
                            label="承認済みの実測", color="#282828", zorder=4)
         estimate = pd.to_numeric(series["推定実測（分）"], errors="coerce").astype(float)
         if estimate.notna().any():
-            ax.plot(series["chart_time"], estimate, "--o", label="推定実測", color="#15724c", markersize=3)
+            ax.plot(series["chart_time"], estimate, "--o", label="推定実測（参考）", color="#15724c", markersize=3)
 
         left, right = ax.get_xlim()
         ticks = [int(x) for x in range(0, 1440, 120) if left <= x <= right]
@@ -98,11 +99,10 @@ def render_wait_chart(predictions, attraction, target, park, observed=None, show
             ticks = [int(series["chart_time"].iloc[0])]
         ax.set_xticks(ticks, [f"{t // 60:02d}:{t % 60:02d}" for t in ticks])
         ax.set_ylim(bottom=0)
-        ax.set(xlabel="時刻（日本時間）", ylabel="待ち時間（分）", title=f"{japanese_name(attraction)}  {target:%m/%d}")
+        ax.set(xlabel="時刻（日本時間）", ylabel="待ち時間（分）", title=fill(f"{japanese_name(attraction)}  {target:%m/%d}", width=26))
         ax.grid(axis="y", alpha=0.2)
-        ax.legend(fontsize=9)
+        ax.legend(fontsize=10)
         st.pyplot(fig)
     finally:
         plt.close(fig)
-    st.caption("承認済みの実測が20件・5日以上ある場合に推定実測を表示します。推定精度は検証中です。")
     return True
