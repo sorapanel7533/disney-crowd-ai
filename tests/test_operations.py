@@ -309,10 +309,16 @@ def test_admin_ui_authorizes_save_and_restart_retains_outbox(tmp_path,monkeypatc
     assert not [b for b in app.button if b.label=='保存'][0].disabled
     [b for b in app.button if b.label=='保存'][0].click().run()
     assert not app.exception
-    con=sqlite3.connect(tmp_path/'disneysea.db')
+    con=sqlite3.connect(tmp_path/'disneyland.db')
     assert con.execute("SELECT count(*) FROM dpa_sellouts WHERE source='manual'").fetchone()[0]==1
     assert con.execute("SELECT count(*) FROM admin_events WHERE status='pending'").fetchone()[0]==1
     con.close()
     restarted=AppTest.from_file(str(Path(__file__).parents[1]/'app.py'),default_timeout=45).run()
-    restarted.button_group(key='display_mode_segmented').set_value('データ管理').run()
+    restarted.secrets["ADMIN_VIEW_PIN"] = "2468"
+    restarted.button_group(key="display_mode_segmented").set_value("管理者画面").run()
+    restarted.text_input[0].set_value("2468")
+    next(b for b in restarted.button if b.label == "管理者画面を開く").click().run()
+    restarted.selectbox(key="_admin_section").set_value("データ・システム管理").run()
     assert not restarted.exception
+    with sqlite3.connect(tmp_path / "disneyland.db") as reopened:
+        assert reopened.execute("SELECT count(*) FROM admin_events WHERE status='pending'").fetchone()[0] == 1

@@ -1,6 +1,10 @@
+import logging
 import os
 import reliability as reliable
 from admin import render_access
+from admin_access import render_view_access
+import admin_views
+from forecast_views import date_conditions, render_wait_chart, retained_input
 from dpa import eligible as eligible_dpa
 import time
 from datetime import datetime, timedelta
@@ -595,9 +599,9 @@ def filter_crowd_hours(df):
 
 now_display = datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S")
 
-if "park" not in st.session_state:
+if st.session_state.get("park") not in PARK_SETTINGS:
     resume_park = st.query_params.get('measurement_park')
-    st.session_state["park"] = resume_park if resume_park in PARK_SETTINGS and st.query_params.get('measurement_key') else "DisneySea"
+    st.session_state["park"] = resume_park if resume_park in PARK_SETTINGS and st.query_params.get('measurement_key') else "Disneyland"
 
 st.markdown(f"""
 <div class="ios-title-card">
@@ -612,7 +616,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-park_options = ["DisneySea", "Disneyland"]
+park_options = ["Disneyland", "DisneySea"]
 if hasattr(st, "segmented_control"):
     park = st.segmented_control(
         "パーク",
@@ -644,9 +648,9 @@ display_mode_options = [
     "DPA/PP予測",
     "日付指定予測",
     "回り方プランナー",
-    "データ管理",
     "アルコール情報",
     "実測待ち時間",
+    "管理者画面",
 ]
 if "display_mode_value" not in st.session_state:
     st.session_state["display_mode_value"] = "実測待ち時間" if st.query_params.get('measurement_key') else "ダッシュボード"
@@ -689,7 +693,7 @@ next_update_text = (datetime.now(JST) + timedelta(seconds=AUTO_REFRESH_SECONDS))
 st.sidebar.caption(f'画面更新: {last_update_text}')
 if display_mode != '実測待ち時間':
     st.sidebar.caption(f'次回自動更新: {next_update_text}')
-@st.fragment(run_every=AUTO_REFRESH_SECONDS if auto_refresh_enabled and display_mode not in ('データ管理','実測待ち時間') else None)
+@st.fragment(run_every=AUTO_REFRESH_SECONDS if auto_refresh_enabled and display_mode not in ('管理者画面','実測待ち時間') else None)
 def refresh_tick():
     previous = st.session_state.get('refresh_tick', time.monotonic())
     current = time.monotonic()
@@ -702,15 +706,62 @@ if st.sidebar.button('今すぐ更新'):
     st.rerun()
 if display_mode != '実測待ち時間':
     st.sidebar.caption('APIは5分キャッシュ。画面更新だけでは継続収集を保証しません。')
-is_admin = render_access(st) if display_mode in ('データ管理','DPA/PP予測','アルコール情報') else False
-if display_mode=='実測待ち時間':
+admin_section = None
+if display_mode == "管理者画面":
+    st.subheader("管理者画面")
+    if not render_view_access():
+        st.stop()
+    admin_section = retained_input(
+        st.selectbox, "管理者の表示モード", "admin_section", options=admin_views.ADMIN_SECTIONS,
+    )
+
+is_admin = render_access(st) if display_mode == "DPA/PP予測" or admin_section in (
+    "データ・システム管理", "実測待ち時間", "アルコール情報",
+) else False
+
+if display_mode == "実測待ち時間":
     from measured_ui import render as render_measured
-    render_measured(st,park)
+    render_measured(st, park)
     st.stop()
-if display_mode=='アルコール情報':
-    from alcohol_ui import render
-    render(st,is_admin)
+if admin_section == "実測待ち時間":
+    from measured_ui import moderation as moderate_measurements
+    moderate_measurements(st, is_admin)
     st.stop()
+# Switch to False when the public alcohol catalog is ready to reopen.
+ALCOHOL_MAINTENANCE = True
+if display_mode == "アルコール情報" or admin_section == "アルコール情報":
+    if display_mode == "アルコール情報" and ALCOHOL_MAINTENANCE:
+        st.subheader("アルコール情報")
+        st.info("現在メンテナンス中です。")
+        st.write("より正確な販売商品・店舗・価格情報を提供するため、内容を調整しています。")
+        st.write("公開までしばらくお待ちください。")
+    else:
+        from alcohol_ui import render
+        render(st, is_admin)
+    st.stop()
+
+def open_park_database():
+    from persistence import sync_public_snapshot
+    db, cur = connect_db(settings["db"])
+    try:
+        status = sync_public_snapshot(db, settings['db'], os.environ.get('DISNEY_DB_DIR', '.runtime'))
+    except Exception:
+        db.close()
+        raise
+    return db, cur, status
+
+
+if admin_section == "全アトラクション":
+    from contextlib import closing
+    from sqlite3 import Error as SQLiteError
+    try:
+        db, _, _ = open_park_database()
+        with closing(db):
+            admin_views.history(db, park, datetime.now(JST).date())
+    except (SQLiteError, pd.errors.DatabaseError, OSError):
+        st.warning("保存履歴を読み込めませんでした。パークを選び直すか、時間をおいてお試しください。")
+    st.stop()
+
 st.caption('[Powered by Queue-Times.com](https://queue-times.com/) · 取得値と予測値を区別して表示')
 
 ticket_price_map, ticket_map_source = cached_fetch_ticket_prices()
@@ -728,57 +779,70 @@ today_bonus, today_reasons = get_calendar_bonus(
 )
 temperature, rain_mm, weather_text, hourly_weather, daily_weather = cached_weather()
 
-conn, cursor = connect_db(settings["db"])
-from persistence import sync_public_snapshot
-storage_status = sync_public_snapshot(conn, settings['db'], os.environ.get('DISNEY_DB_DIR', '.runtime'))
-auto_context_results = ['定期収集ジョブで関連情報を収集します。未取得の項目はデータ管理で確認できます。']
-if display_mode == 'データ管理' and is_admin and st.button('関連情報を更新'):
+try:
+    conn, cursor, storage_status = open_park_database()
+except Exception:
+    if not admin_section:
+        raise
+    logging.getLogger(__name__).exception("Could not open management data for %s", park)
+    st.warning("選択したパークのデータを読み込めませんでした。時間をおいてお試しください。")
+    st.stop()
+is_system = admin_section == "データ・システム管理"
+auto_context_results = ['定期収集ジョブで関連情報を収集します。未取得の項目は管理者画面で確認できます。']
+if is_system and is_admin and st.button('関連情報を更新'):
     with st.spinner('営業時間・イベント・ショーを確認中'):
         auto_context_results = auto_save_context_data(cursor,conn,park,ticket_price_map,ticket_map_source,temperature,rain_mm,weather_text)
         auto_context_results.extend(auto_collect_prediction_context(cursor,conn,park))
-data_fetch_logs = load_data_fetch_logs(conn)
-weather_snapshots = load_weather_snapshots(conn)
-ticket_price_snapshots = load_ticket_price_snapshots(conn)
+
 park_hours_df = load_park_hours(conn)
 event_signals = load_event_signals(conn)
-show_schedules = load_show_schedules(conn)
-show_wait_context = load_show_wait_context(conn)
-historical_import_logs = load_historical_import_logs(conn)
+if admin_section is None or is_system:
+    show_schedules = load_show_schedules(conn)
+if is_system:
+    data_fetch_logs = load_data_fetch_logs(conn)
+    weather_snapshots = load_weather_snapshots(conn)
+    ticket_price_snapshots = load_ticket_price_snapshots(conn)
+    historical_import_logs = load_historical_import_logs(conn)
 
 with st.spinner('待ち時間を確認中'):
     all_df, target_df, fetch_error = cached_waits(park)
 if fetch_error:
-    reliable.record_collection(conn, park, 'failed', fetch_error)
-    st.warning('待ち時間の取得に失敗しました。履歴・予測・データ管理は利用できます。')
-    st.caption(fetch_error)
+    if admin_section is None:
+        reliable.record_collection(conn, park, 'failed', fetch_error)
+    st.warning('待ち時間の取得に失敗しました。履歴・予測は利用できます。')
+    if admin_section is None:
+        st.caption(fetch_error)
     previous = reliable.last_snapshot(conn, park)
     if len(previous):
         with st.expander('最後の正常取得データ（現在値ではありません）'):
             st.write('最終取得UTC:', previous.FetchedUTC.max())
             st.dataframe(previous, width="stretch")
 else:
-    count = save_wait_times(cursor, conn, all_df, temperature, rain_mm, park)
-    reliable.record_collection(conn, park, 'success', f'{len(all_df)}施設', count)
+    if admin_section is None:
+        count = save_wait_times(cursor, conn, all_df, temperature, rain_mm, park)
+        reliable.record_collection(conn, park, 'success', f'{len(all_df)}施設', count)
     if len(all_df):
         observed = pd.to_datetime(all_df.UpdatedUTC, utc=True, errors='coerce')
         st.caption('提供元の最新観測: ' + str(observed.max().tz_convert(JST)) + ' / API取得: ' + str(pd.to_datetime(all_df.FetchedUTC.max()).tz_convert(JST)))
         if (pd.Timestamp.now(tz='UTC') - observed.max()).total_seconds() > 1200:
             st.warning('提供元データは20分以上前です。現在の待ち時間・行動提案には使いません。')
-attraction_status_snapshots = load_attraction_status_snapshots(conn)
 
 valid_all_df = get_valid_open_df(all_df)
 valid_target_df = get_valid_open_df(target_df)
-today_show_schedules = show_schedules[
-    show_schedules.get("target_date", "") == str(datetime.now(JST).date())
-].copy() if len(show_schedules) > 0 else pd.DataFrame()
-save_show_wait_context(cursor, conn, park, today_show_schedules, valid_target_df)
-show_wait_context = load_show_wait_context(conn)
+if admin_section is None:
+    today_show_schedules = show_schedules[
+        show_schedules.get("target_date", "") == str(datetime.now(JST).date())
+    ].copy() if len(show_schedules) > 0 else pd.DataFrame()
+    save_show_wait_context(cursor, conn, park, today_show_schedules, valid_target_df)
+if admin_section is None or is_system:
+    show_wait_context = load_show_wait_context(conn)
+    attraction_status_snapshots = load_attraction_status_snapshots(conn)
 
-# Save the latest current data before loading history so first render reflects it.
-try:
-    save_wait_times(cursor, conn, all_df, temperature, rain_mm, park)
-except Exception as exc:
-    st.warning(f"現在の待ち時間データを保存できませんでした: {exc}")
+if admin_section is None:
+    try:
+        save_wait_times(cursor, conn, all_df, temperature, rain_mm, park)
+    except Exception as exc:
+        st.warning(f"現在の待ち時間データを保存できませんでした: {exc}")
 
 history_df = load_history(conn)
 
@@ -814,33 +878,14 @@ daily_prediction_history = load_daily_crowd_predictions(conn)
 dpa_sellout_history = load_dpa_sellouts(conn)
 dpa_auto_fetch_result = {'status':'skipped','message':'収集済みの履歴を表示。公式販売状況は未確認です。','saved_count':0}
 
-dpa_sellout_history = load_dpa_sellouts(conn)
-dpa_fetch_logs = load_dpa_fetch_logs(conn)
+if admin_section is None or is_system:
+    dpa_fetch_logs = load_dpa_fetch_logs(conn)
 
-global_feedback_error = get_feedback_error(
-    prediction_history,
-    GLOBAL_PREDICTION_NAME
-)
-
-update_prediction_feedback(
-    cursor,
-    conn,
-    valid_target_df,
-    current_target_avg_wait,
-    settings["rides"]
-)
-
-prediction_history = load_prediction_history(conn)
-
-update_daily_crowd_feedback(
-    cursor,
-    conn,
-    history_df,
-    settings,
-    park
-)
-
-daily_prediction_history = load_daily_crowd_predictions(conn)
+if admin_section is None:
+    update_prediction_feedback(cursor, conn, valid_target_df, current_target_avg_wait, settings["rides"])
+    prediction_history = load_prediction_history(conn)
+    update_daily_crowd_feedback(cursor, conn, history_df, settings, park)
+    daily_prediction_history = load_daily_crowd_predictions(conn)
 
 global_feedback_error = get_feedback_error(
     prediction_history,
@@ -935,7 +980,148 @@ if len(valid_all_df) > 0 and len(history_df) > 20:
         key=lambda x: x["ratio"]
     )
 
-history_df = load_history(conn)
+def weekly_forecast():
+    return build_week_forecast(
+        history_df, settings, datetime.now(JST).date(), temperature, rain_mm,
+        prediction_history, daily_prediction_history, ticket_price_map, valid_all_df,
+        event_signals, park_hours_df, park, daily_weather, cursor=cursor, conn=conn,
+        persist_missing=admin_section is None,
+    )
+
+
+def attraction_names():
+    names = {row['name'] for row in reliable.load_catalog().values() if row['park'] == park}
+    names.update(settings.get("rides", []))
+    if "attraction" in history_df:
+        names.update(history_df["attraction"].dropna().astype(str).unique())
+    for column in ("Name", "Attraction"):
+        if column in all_df:
+            names.update(all_df[column].dropna().astype(str).unique())
+    return sorted(name for name in names if name.strip())
+
+
+def attraction_forecast(ride, day, names):
+    temp, rain, source = get_forecast_weather_for_date(daily_weather, day, temperature, rain_mm)
+    result = predict_wait_times_for_date(
+        history_df, settings, day, temp, rain, prediction_history, ticket_price,
+        valid_all_df if day == datetime.now(JST).date() else None, all_attractions=names,
+    )
+    selected = result.loc[result["Attraction"].eq(ride)].copy() if "Attraction" in result else pd.DataFrame()
+    return selected, temp, rain, source
+
+
+def date_forecast(day, temp, rain):
+    price, source = get_ticket_price_from_castel(day, ticket_price_map)
+    index, waits, reasons = predict_crowd_index_for_date(
+        history_df, settings, day, temp, rain, prediction_history, daily_prediction_history,
+        price, valid_all_df if day == datetime.now(JST).date() else None, event_signals, park_hours_df, park,
+    )
+    confidence = get_prediction_confidence(
+        history_df, prediction_history, dpa_sellout_history, settings, day, "手入力/日付指定",
+    )
+    return index, waits, reasons, price, source, confidence
+
+
+def dashboard_x_copy():
+    x_base_now = datetime.now(JST)
+    x_target_date = (
+        x_base_now.date() + timedelta(days=1)
+        if x_base_now.hour >= 21
+        else x_base_now.date()
+    )
+    x_ticket_price, _ = get_ticket_price_from_castel(
+        x_target_date,
+        ticket_price_map
+    )
+    x_temperature, x_rain, x_weather_source = get_forecast_weather_for_date(
+        daily_weather,
+        x_target_date,
+        temperature,
+        rain_mm
+    )
+    x_crowd, x_wait_df, x_reasons = predict_crowd_index_for_date(
+        history_df,
+        settings,
+        x_target_date,
+        x_temperature,
+        x_rain,
+        prediction_history,
+        daily_prediction_history,
+        x_ticket_price,
+        valid_all_df if x_target_date == x_base_now.date() else None,
+        event_signals,
+        park_hours_df,
+        park
+    )
+    x_post_text = make_x_post_summary(
+        park,
+        x_target_date,
+        x_crowd,
+        x_wait_df,
+        x_weather_source,
+        x_ticket_price,
+        x_reasons
+    )
+    st.subheader("📝 21時投稿用 X文面")
+    st.code(x_post_text, language="text")
+    st.text_area(
+        "投稿文コピー用",
+        value=x_post_text,
+        height=150,
+        key=f"x_post_text_v29_{park}_{x_target_date}_{format_crowd_index(x_crowd)}_{sum(ord(ch) for ch in x_post_text)}"
+    )
+    st.caption("上に最新の生成文を固定表示しています。本文に天気・価格・営業時間は入れません。")
+
+
+if admin_section in ("ダッシュボード", "アトラクション別予測", "日付指定予測"):
+    today = datetime.now(JST).date()
+    try:
+        if admin_section == "ダッシュボード":
+            st.subheader("1週間混雑指数予測")
+            dashboard_x_copy()
+            admin_views.table("1週間予測の詳細", weekly_forecast(), "weekly", park, "日別固定予測・天気・待ち時間モデル")
+        elif admin_section == "アトラクション別予測":
+            names = attraction_names()
+            if names:
+                ride = st.selectbox("アトラクション", names, format_func=reliable.japanese_name, key=f"admin_pred_ride_{park}")
+                day = st.date_input("予測する日付", today, min_value=today, max_value=today + timedelta(days=30), key=f"admin_pred_day_{park}")
+                pred, *_ = attraction_forecast(ride, day, names)
+                admin_views.table("予測待ち時間の詳細", pred, "ride_forecast", park, "待ち時間予測モデル")
+                errors = pd.DataFrame()
+                if {"attraction", "error"}.issubset(prediction_history):
+                    errors = prediction_history.loc[prediction_history["attraction"].eq(ride) & prediction_history["error"].notna()]
+                if not errors.empty:
+                    errors = errors.sort_values("created_at", ascending=False)
+                    start = errors["created_at"].min().date()
+                    end = errors["created_at"].max().date()
+                    period = st.date_input("予測誤差の作成日範囲", (start, end), key=f"admin_error_period_{park}_{ride}")
+                    if len(period) == 2:
+                        errors = errors.loc[errors["created_at"].dt.date.between(*period)]
+                    else:
+                        errors = errors.iloc[:0]
+                admin_views.table("このアトラクションの予測誤差履歴", errors, "ride_errors", park, "予測履歴DB", "created_at")
+            else:
+                st.info("選択したパークで利用できる施設データがありません。")
+        else:
+            day, temp, rain = date_conditions(park, today, temperature)
+            index, waits, _, price, _, confidence = date_forecast(day, temp, rain)
+            admin_views.table("この日のおすすめ行動プラン", get_guest_action_plan(waits, index, price), "action_plan", park, "日付指定予測")
+            admin_views.table("時間帯別・アトラクション別待ち時間予測の詳細", waits, "day_forecast", park, "待ち時間予測モデル")
+            admin_views.table("この日の予測リスク診断", get_prediction_risk_diagnosis(
+                history_df, prediction_history, valid_target_df if day == today else pd.DataFrame(),
+                settings, price, "手入力/日付指定",
+            ), "day_risk", park, "履歴と日付指定条件")
+            admin_views.table("予測データの健全性", get_data_quality_report(
+                history_df, prediction_history, dpa_sellout_history, settings,
+            ), "day_quality", park, "観測・予測履歴DB")
+            admin_views.table("予測の注意点", get_prediction_alerts(waits, confidence), "day_notes", park, "日付指定予測")
+    except Exception:
+        logging.getLogger(__name__).exception("Management section %s failed for %s", admin_section, park)
+        st.warning("選択した分類の詳細を読み込めませんでした。条件を変更するか時間をおいてお試しください。")
+    finally:
+        conn.close()
+    st.stop()
+
 
 if display_mode == "ダッシュボード":
 
@@ -1177,54 +1363,6 @@ if display_mode == "ダッシュボード":
                 )
 
 
-        x_base_now = datetime.now(JST)
-        x_target_date = (
-            x_base_now.date() + timedelta(days=1)
-            if x_base_now.hour >= 21
-            else x_base_now.date()
-        )
-        x_ticket_price, _ = get_ticket_price_from_castel(
-            x_target_date,
-            ticket_price_map
-        )
-        x_temperature, x_rain, x_weather_source = get_forecast_weather_for_date(
-            daily_weather,
-            x_target_date,
-            temperature,
-            rain_mm
-        )
-        x_crowd, x_wait_df, x_reasons = predict_crowd_index_for_date(
-            history_df,
-            settings,
-            x_target_date,
-            x_temperature,
-            x_rain,
-            prediction_history,
-            daily_prediction_history,
-            x_ticket_price,
-            valid_all_df if x_target_date == x_base_now.date() else None,
-            event_signals,
-            park_hours_df,
-            park
-        )
-        x_post_text = make_x_post_summary(
-            park,
-            x_target_date,
-            x_crowd,
-            x_wait_df,
-            x_weather_source,
-            x_ticket_price,
-            x_reasons
-        )
-        st.subheader("📝 21時投稿用 X文面")
-        st.code(x_post_text, language="text")
-        st.text_area(
-            "投稿文コピー用",
-            value=x_post_text,
-            height=150,
-            key=f"x_post_text_v29_{park}_{x_target_date}_{format_crowd_index(x_crowd)}_{sum(ord(ch) for ch in x_post_text)}"
-        )
-        st.caption("上に最新の生成文を固定表示しています。本文に天気・価格・営業時間は入れません。")
         st.subheader("予測の注意点")
         st.dataframe(
             get_prediction_alerts(
@@ -1314,24 +1452,7 @@ if display_mode == "ダッシュボード":
     st.caption('混雑指数は保存時点の固定値です。天気・平均待ち時間の補助列は今回再計算した参考値です。')
 
     try:
-        week_df = build_week_forecast(
-            history_df,
-            settings,
-            datetime.now(JST).date(),
-            temperature,
-            rain_mm,
-            prediction_history,
-            daily_prediction_history,
-            ticket_price_map,
-            valid_all_df,
-            event_signals,
-            park_hours_df,
-            park,
-            daily_weather,
-            cursor=cursor,
-            conn=conn,
-            use_live_current_data=False,
-        )
+        week_df = weekly_forecast()
     except Exception as exc:
         week_df = pd.DataFrame()
         st.warning(f"1週間混雑指数予測を作成できませんでした: {exc}")
@@ -1354,7 +1475,6 @@ if display_mode == "ダッシュボード":
         plt.tight_layout()
         st.pyplot(fig_week)
         plt.close(fig_week)
-        st.dataframe(clean_dataframe(week_df), width="stretch")
     else:
         st.info('1週間予測データがまだありません。')
 
@@ -1512,29 +1632,6 @@ elif display_mode == "全アトラクション":
             st.pyplot(fig)
             plt.close(fig)
 
-            st.subheader("📋 保存履歴")
-
-            history_table = one_history[
-                [
-                    "datetime",
-                    "wait_time",
-                    "temperature",
-                    "rain"
-                ]
-            ].tail(100)
-
-            history_table.columns = [
-                "保存時間",
-                "待ち時間",
-                "気温",
-                "降水量"
-            ]
-
-            st.dataframe(
-                history_table,
-                width="stretch"
-            )
-
             st.subheader("📊 統計")
 
             s1, s2, s3 = st.columns(3)
@@ -1576,15 +1673,7 @@ elif display_mode == 'アトラクション別予測':
 
     st.subheader('アトラクション別予測')
 
-    source_attractions = [r['name'] for r in reliable.load_catalog().values() if r['park']==park]
-    if len(history_df) > 0 and "attraction" in history_df.columns:
-        source_attractions += history_df["attraction"].dropna().astype(str).tolist()
-    if len(all_df) > 0 and "Name" in all_df.columns:
-        source_attractions += all_df["Name"].dropna().astype(str).tolist()
-    if len(all_df) > 0 and "Attraction" in all_df.columns:
-        source_attractions += all_df["Attraction"].dropna().astype(str).tolist()
-    source_attractions += settings.get("rides", [])
-    attraction_list = sorted({name for name in source_attractions if str(name).strip()})
+    attraction_list = attraction_names()
 
     if not attraction_list:
         st.info('アトラクション履歴がまだありません。営業中に待ち時間を取得すると表示されます。')
@@ -1610,45 +1699,29 @@ elif display_mode == 'アトラクション別予測':
             max_value=datetime.now(JST).date() + timedelta(days=30),
             key="attraction_prediction_date",
         )
-        attraction_temperature, attraction_rain, attraction_weather_source = get_forecast_weather_for_date(
-            daily_weather, attraction_target_date, temperature, rain_mm
-        )
-        st.caption(
-            f"{attraction_target_date} の天気情報: "
-            f"{safe_display_text(attraction_weather_source, '取得できませんでした')} / "
-            f"気温 {attraction_temperature:.1f} C / 降水量 {attraction_rain:.1f}mm"
-        )
-        attraction_feedback_error = get_feedback_error(prediction_history, selected_attraction)
-        st.metric('このアトラクションの予測補正', round(attraction_feedback_error, 1))
-
         try:
-            pred_all_df = predict_wait_times_for_date(
-                history_df,
-                settings,
-                attraction_target_date,
-                attraction_temperature,
-                attraction_rain,
-                prediction_history,
-                ticket_price,
-                valid_all_df if attraction_target_date == datetime.now(JST).date() else None,
-                all_attractions=attraction_list,
+            pred_df, attraction_temperature, attraction_rain, attraction_weather_source = attraction_forecast(
+                selected_attraction, attraction_target_date, attraction_list,
             )
         except Exception as exc:
-            pred_all_df = pd.DataFrame()
+            pred_df = pd.DataFrame()
             st.warning(f"予測データを作成できませんでした: {exc}")
-
-        pred_df = (
-            pred_all_df[pred_all_df["Attraction"] == selected_attraction].copy()
-            if len(pred_all_df) > 0 and "Attraction" in pred_all_df.columns
-            else pd.DataFrame()
-        )
 
         if len(pred_df) == 0 or "Predicted Wait" not in pred_df.columns:
             st.info('このアトラクションの予測データがまだ不足しています。')
         else:
+            observed = (
+                get_actual_wait_series_for_today(history_df, attraction=selected_attraction)
+                if attraction_target_date == datetime.now(JST).date() else None
+            )
+            render_wait_chart(pred_df, selected_attraction, attraction_target_date, park, observed, show_actual=True)
+            st.caption(
+                f"{attraction_target_date} の天気情報: "
+                f"{safe_display_text(attraction_weather_source, '取得できませんでした')} / "
+                f"気温 {attraction_temperature:.1f} C / 降水量 {attraction_rain:.1f}mm"
+            )
+            st.metric('このアトラクションの予測補正', round(get_feedback_error(prediction_history, selected_attraction), 1))
             reason_col = '理由' if '理由' in pred_df.columns else None
-            from measured_views import parallel as actual_parallel
-            actual_parallel(st,pred_df,park,'Predicted Wait',target=attraction_target_date)
             used_fallback = bool(
                 pred_df[reason_col].astype(str).str.contains('補完', na=False).any()
             ) if reason_col else False
@@ -1688,42 +1761,6 @@ elif display_mode == 'アトラクション別予測':
                 st.info('大きな注意点はまだありません。')
 
             st.caption(pred_df.get('Interval Status',pd.Series(['予測区間は未検証'])).iloc[0])
-            fig, ax = plt.subplots(figsize=(10, 5))
-            x_values = pred_df["TimeLabel"] if "TimeLabel" in pred_df.columns else pred_df.get("Hour", pd.Series(range(len(pred_df))))
-            ax.plot(x_values, pred_df["Predicted Wait"], linewidth=2.4, label='予測')
-
-            actual_attraction_df = pd.DataFrame()
-            if attraction_target_date == datetime.now(JST).date():
-                actual_attraction_df = get_actual_wait_series_for_today(history_df, attraction=selected_attraction)
-                if len(actual_attraction_df) > 0 and {"TimeLabel", "Actual Wait"}.issubset(actual_attraction_df.columns):
-                    ax.plot(
-                        actual_attraction_df["TimeLabel"],
-                        actual_attraction_df["Actual Wait"],
-                        linewidth=2.2,
-                        linestyle="--",
-                        marker="o",
-                        label='実測',
-                    )
-                else:
-                    st.caption('今日の実測データはまだありません。')
-
-            if "TimeLabel" in pred_df.columns and "Minute" in pred_df.columns:
-                tick_df = pred_df[pred_df["Minute"].fillna(0).astype(int) == 0]
-                if len(tick_df) > 0:
-                    ax.set_xticks(tick_df["TimeLabel"].tolist())
-                    ax.tick_params(axis="x", rotation=45)
-
-            y_values = pd.to_numeric(pred_df["Predicted Wait"], errors="coerce").dropna().tolist()
-            if len(actual_attraction_df) > 0 and "Actual Wait" in actual_attraction_df.columns:
-                y_values += pd.to_numeric(actual_attraction_df["Actual Wait"], errors="coerce").dropna().tolist()
-            ax.set_ylim(0, graph_ylim(y_values))
-            ax.set_ylabel("Wait Time")
-            ax.set_title(f"{selected_attraction} Prediction {attraction_target_date}")
-            ax.legend()
-            plt.tight_layout()
-            st.pyplot(fig)
-            plt.close(fig)
-
             best_row = pred_df.sort_values("Predicted Wait").iloc[0]
             peak_row = pred_df.sort_values("Predicted Wait", ascending=False).iloc[0]
             compact_card_grid([
@@ -1731,18 +1768,6 @@ elif display_mode == 'アトラクション別予測':
                 ('ピーク予測', f"{peak_row.get('TimeLabel', peak_row.get('Hour'))} 約{peak_row['Predicted Wait']:.0f}分"),
             ])
 
-            st.subheader('このアトラクションの予測誤差履歴')
-            if len(prediction_history) > 0 and {"attraction", "error"}.issubset(prediction_history.columns):
-                one_pred_history = prediction_history[
-                    (prediction_history["attraction"] == selected_attraction)
-                    & (prediction_history["error"].notna())
-                ].copy()
-                if len(one_pred_history) > 0:
-                    st.dataframe(clean_dataframe(one_pred_history.tail(30)), width="stretch")
-                else:
-                    st.info('このアトラクションの予測誤差データはまだありません。')
-            else:
-                st.info('このアトラクションの予測誤差データはまだありません。')
 
 
 elif display_mode == "回り方プランナー":
@@ -1975,68 +2000,12 @@ elif display_mode == "日付指定予測":
     st.subheader("📆 日付・天気から予測")
     st.caption("手入力の条件で試算します。天気予報の期間外・30日先は未検証の参考値です。")
 
-    target_date = st.date_input(
-        "予測する日付",
-        value=datetime.now(JST).date(),
-        min_value=datetime.now(JST).date(),
-        max_value=datetime.now(JST).date() + timedelta(days=30)
-    )
-
-    input_weather = st.selectbox(
-        "天気",
-        ["晴れ", "くもり", "雨"]
-    )
-
-    c1, c2 = st.columns(2)
-
-    with c1:
-        input_temperature = st.number_input(
-            "気温",
-            min_value=-5.0,
-            max_value=40.0,
-            value=float(temperature) if np.isfinite(temperature) else 20.0,
-            step=0.5
-        )
-
-    with c2:
-        input_rain = st.number_input(
-            "降水量(mm)",
-            min_value=0.0,
-            max_value=80.0,
-            value=1.0 if input_weather == "雨" else 0.0,
-            step=0.5
-        )
-
-    target_ticket_price, target_ticket_source = get_ticket_price_from_castel(
-        target_date,
-        ticket_price_map
-    )
-
-    target_crowd, target_wait_df, target_reasons = predict_crowd_index_for_date(
-        history_df,
-        settings,
-        target_date,
-        input_temperature,
-        input_rain,
-        prediction_history,
-        daily_prediction_history,
-        target_ticket_price,
-        valid_all_df if target_date == datetime.now(JST).date() else None,
-        event_signals,
-        park_hours_df,
-        park
+    target_date, input_temperature, input_rain = date_conditions(park, datetime.now(JST).date(), temperature)
+    target_crowd, target_wait_df, target_reasons, target_ticket_price, target_ticket_source, target_confidence = date_forecast(
+        target_date, input_temperature, input_rain,
     )
 
     level, color = get_level(target_crowd)
-    target_confidence = get_prediction_confidence(
-        history_df,
-        prediction_history,
-        dpa_sellout_history,
-        settings,
-        target_date,
-        "手入力/日付指定"
-    )
-
     target_stats = get_prediction_crowd_stats(target_wait_df)
     target_major_df = target_wait_df[target_wait_df["Attraction"].isin(settings["rides"])] if len(target_wait_df) > 0 else pd.DataFrame()
     target_major_avg = target_major_df["Predicted Wait"].mean() if len(target_major_df) > 0 else np.nan
@@ -2060,56 +2029,21 @@ elif display_mode == "日付指定予測":
     st.write("主な理由:", " / ".join(target_reasons))
 
 
-    st.subheader("🧭 この日のおすすめ行動プラン")
-    from measured_views import parallel as actual_parallel
-    actual_parallel(st,target_wait_df,park,'Predicted Wait',target=target_date)
-    st.dataframe(
-        get_guest_action_plan(
-            target_wait_df,
-            target_crowd,
-            target_ticket_price
-        ),
-        width="stretch"
-    )
-
-    st.subheader("🩺 この日の予測リスク診断")
-    st.dataframe(
-        get_prediction_risk_diagnosis(
-            history_df,
-            prediction_history,
-            valid_target_df if target_date == datetime.now(JST).date() else pd.DataFrame(),
-            settings,
-            target_ticket_price,
-            "手入力/日付指定"
-        ),
-        width="stretch"
-    )
-    st.subheader("予測データの健全性")
-    st.dataframe(
-        get_data_quality_report(
-            history_df,
-            prediction_history,
-            dpa_sellout_history,
-            settings
-        ),
-        width="stretch"
-    )
-
     st.subheader("時間帯別・アトラクション別待ち時間予測")
-
-    st.dataframe(
-        target_wait_df,
-        width="stretch"
+    if target_wait_df.empty or not {"Attraction", "Predicted Wait"}.issubset(target_wait_df):
+        st.info("この日付・気象条件の予測に必要な待ち時間履歴が不足しています。")
+        conn.close()
+        st.stop()
+    predicted_names = sorted(target_wait_df["Attraction"].dropna().unique())
+    if not predicted_names:
+        st.info("選択したパークで利用できる施設予測がありません。")
+        conn.close()
+        st.stop()
+    selected = retained_input(
+        st.selectbox, "アトラクション", f"date_forecast_ride_{park}",
+        options=predicted_names, format_func=reliable.japanese_name,
     )
-
-    st.subheader("予測の注意点")
-    st.dataframe(
-        get_prediction_alerts(
-            target_wait_df,
-            target_confidence
-        ),
-        width="stretch"
-    )
+    render_wait_chart(target_wait_df.loc[target_wait_df["Attraction"].eq(selected)], selected, target_date, park)
 
     dpa_rows = []
 
@@ -2135,11 +2069,8 @@ elif display_mode == "日付指定予測":
         width="stretch"
     )
 
-elif display_mode == "データ管理":
-    from measured_ui import moderation as moderate_measurements
-    moderate_measurements(st,is_admin)
-
-    st.subheader("🗂 データ管理")
+elif is_system:
+    st.subheader("データ・システム管理")
     st.caption(storage_status)
     st.dataframe(pd.DataFrame([reliable.diagnostics(conn)]), width="stretch")
     from data_quality import coverage
@@ -2422,33 +2353,6 @@ elif display_mode == "データ管理":
         except Exception as exc:
             st.warning(f"人気主要アトラクション予測表を作成できませんでした: {exc}")
 
-        st.markdown("#### 1週間混雑指数予測")
-        try:
-            management_week_df = build_week_forecast(
-                history_df,
-                settings,
-                datetime.now(JST).date(),
-                temperature,
-                rain_mm,
-                prediction_history,
-                daily_prediction_history,
-                ticket_price_map,
-                valid_target_df,
-                event_signals,
-                park_hours_df,
-                park,
-                daily_weather,
-                cursor=cursor,
-                conn=conn,
-                use_live_current_data=False
-            )
-            if len(management_week_df) > 0:
-                st.dataframe(management_week_df, width="stretch")
-            else:
-                st.info("1週間予測データがまだありません。")
-        except Exception as exc:
-            st.warning(f"1週間予測表を作成できませんでした: {exc}")
-
         st.markdown("#### 営業時間データ")
         if len(park_hours_df) > 0:
             st.dataframe(
@@ -2627,7 +2531,7 @@ elif display_mode == "データ管理":
             width="stretch"
         )
 
-if display_mode == "データ管理":
+if is_system:
     with st.expander("システム情報", expanded=False):
         st.write("選択中:", park)
         st.write("表示モード:", display_mode)
@@ -2639,7 +2543,4 @@ if display_mode == "データ管理":
             datetime.now(JST).strftime("%Y-%m-%d %H:%M:%S") + "（日本時間）"
         )
 
-st.caption('必要なときだけ手動更新できます。過去データ取り込みやOCRはボタンを押した時だけ実行します。')
-
-if st.button('取得方法別の件数', key="manual_refresh_bottom", width="stretch"):
-    st.rerun()
+    st.caption('過去データ取り込みやOCRはボタンを押した時だけ実行します。')

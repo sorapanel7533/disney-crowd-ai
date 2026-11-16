@@ -1,6 +1,5 @@
 """All views use isolated DBs; no test mutations reach production or seed DBs."""
 import json
-import shutil
 from pathlib import Path
 import pandas as pd
 import pytest
@@ -8,8 +7,7 @@ from streamlit.testing.v1 import AppTest
 import utils
 import reliability as r
 
-VIEWS=['ダッシュボード','全アトラクション','アトラクション別予測','DPA/PP予測','日付指定予測','回り方プランナー','データ管理','アルコール情報']
-VIEWS.append('実測待ち時間')
+VIEWS=['ダッシュボード','全アトラクション','アトラクション別予測','DPA/PP予測','日付指定予測','回り方プランナー','アルコール情報','実測待ち時間','管理者画面']
 ROOT=Path(__file__).resolve().parents[1]
 
 
@@ -42,17 +40,75 @@ def test_all_views(tmp_path,monkeypatch,park,scenario):
     # Cache isolation across scenarios.
     import streamlit as st
     st.cache_data.clear()
+    plot_titles = []
+    pyplot = st.pyplot
+
+    def record_figure(figure=None, **kwargs):
+        if figure is not None:
+            plot_titles.extend(axis.get_title() for axis in figure.axes)
+        return pyplot(figure, **kwargs)
+
+    monkeypatch.setattr(st, "pyplot", record_figure)
     at=AppTest.from_file(str(ROOT/'app.py'),default_timeout=35)
-    at.session_state['park']=park
+    at.secrets['ADMIN_VIEW_PIN'] = '2468'
+    if park == "DisneySea":
+        at.session_state["park"] = park
     at.run()
+    assert at.session_state["park"] == park
+    assert list(at.button_group(key="park_segmented").options) == ["Disneyland", "DisneySea"]
+    assert list(at.button_group(key="display_mode_segmented").options) == VIEWS
     assert not at.exception, [(e.message,e.stack_trace) for e in at.exception]
     for view in VIEWS:
+        plot_titles.clear()
         at.button_group(key='display_mode_segmented').set_value(view).run()
         assert not at.exception, (park,scenario,view,[(e.message,e.stack_trace) for e in at.exception])
+        if view == "ダッシュボード":
+            assert not any("投稿用 X文面" in header.value for header in at.subheader)
+            assert not any("Crowd Index" in frame.value.columns and "予測種別" in frame.value.columns for frame in at.dataframe)
+            assert f"{park} 1 Week Crowd Forecast" in plot_titles
+        if view == "全アトラクション":
+            assert not any("保存履歴" in header.value for header in at.subheader)
+        if view == "アトラクション別予測":
+            assert not any("予測誤差履歴" in header.value for header in at.subheader)
+            if plot_titles:
+                assert not any("予測表示待ち時間（分）" in frame.value.columns for frame in at.dataframe)
+        if view == "日付指定予測":
+            headings = [item.value for item in at.subheader]
+            assert "時間帯別・アトラクション別待ち時間予測" in headings
+            assert not any(word in heading for word in ("おすすめ行動プラン", "リスク診断", "健全性", "注意点") for heading in headings)
+            if scenario == "open":
+                assert plot_titles
+                ride = at.selectbox(key=f"_date_forecast_ride_{park}")
+                assert len(ride.options) > 1
+                plot_titles.clear()
+                ride.select_index(1).run()
+                assert plot_titles and not at.exception
+                at.selectbox(key=f"_date_forecast_{park}_weather").select("雨").run()
+                assert at.number_input(key=f"_date_forecast_{park}_rain").value == 1
+                plot_titles.clear()
+                at.number_input(key=f"_date_forecast_{park}_rain").set_value(4.5).run()
+                assert plot_titles and not at.exception
+        if view == "アルコール情報":
+            assert any("メンテナンス中" in item.value for item in at.info)
+            assert not at.selectbox
         if view=='回り方プランナー':
             [b for b in at.button if b.label=='プランを作成'][0].click().run()
             assert not at.exception, [(e.message,e.stack_trace) for e in at.exception]
-        if view=='データ管理':
+        if view=='管理者画面':
+            assert not at.selectbox
+            at.text_input[0].set_value("2468")
+            next(b for b in at.button if b.label == "管理者画面を開く").click().run()
+            assert any("投稿用 X文面" in item.value for item in at.subheader)
+            assert any(item.label == "1週間予測の詳細" for item in at.expander)
+            for section in ("全アトラクション", "アトラクション別予測", "日付指定予測", "アルコール情報", "実測待ち時間", "データ・システム管理"):
+                at.selectbox(key="_admin_section").set_value(section).run()
+                assert not at.exception, (section, [(e.message,e.stack_trace) for e in at.exception])
+                assert not any("詳細を読み込めませんでした" in w.value or "保存履歴を読み込めませんでした" in w.value for w in at.warning), section
+                if section == "日付指定予測":
+                    for table in ("この日のおすすめ行動プラン", "時間帯別・アトラクション別待ち時間予測の詳細", "この日の予測リスク診断", "予測データの健全性", "予測の注意点"):
+                        assert any(item.label == table for item in at.expander)
+                    if scenario == "open":
+                        assert at.number_input(key=f"_date_forecast_{park}_rain").value == 4.5
             assert [b for b in at.button if b.label=='過去データを取り込む'][0].disabled
         if view=='DPA/PP予測':
             assert [b for b in at.button if b.label=='DPA売切れ履歴を全削除'][0].disabled

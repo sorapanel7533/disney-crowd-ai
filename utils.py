@@ -3530,6 +3530,7 @@ def make_week_forecast(
     cursor=None,
     conn=None,
     use_live_current_data=False,
+    persist_missing=True,
 ):
     rows = []
 
@@ -3576,8 +3577,9 @@ def make_week_forecast(
                 park_hours_df,
                 park,
             )
-            save_locked_daily_prediction(cursor, conn, d, crowd_index)
-            prediction_source = "新規固定保存" if conn is not None else "一時予測"
+            if persist_missing:
+                save_locked_daily_prediction(cursor, conn, d, crowd_index)
+            prediction_source = "新規固定保存" if persist_missing and conn is not None else "一時予測"
 
         rows.append({
             "Date": d.strftime("%m/%d"),
