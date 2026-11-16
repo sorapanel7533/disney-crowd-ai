@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+from functools import lru_cache
 import re
 import os
 import threading
@@ -780,10 +782,12 @@ def load_history(conn):
     return reliable.load_history(conn)
 
 
-def load_prediction_history(conn):
+def load_prediction_history(conn, evaluated_only=False):
+    where = "target_at_utc IS NOT NULL"
+    if evaluated_only:
+        where += " AND error IS NOT NULL"
     prediction_df = pd.read_sql_query(
-        "SELECT * FROM predictions WHERE target_at_utc IS NOT NULL",
-        conn
+        "SELECT * FROM predictions WHERE " + where, conn,
     )
 
     if len(prediction_df) > 0:
@@ -3008,6 +3012,45 @@ def get_attraction_prediction_confidence(history_df, prediction_history, attract
         "mae": mae,
     }
 
+@dataclass(frozen=True)
+class ForecastModelHistory:
+    cutoff: datetime
+    row_count: int
+    history_last: str
+    area_slots: pd.Series
+    area_hours: pd.Series
+    time_all: pd.Series
+    hour_all: pd.Series
+    attraction_all: pd.Series
+    attraction_time: pd.Series
+    attraction_hour: pd.Series
+    weekdays: pd.Series
+    months: pd.Series
+    overall: float
+
+
+def prepare_forecast_model(history, park):
+    frame = prepare_prediction_history(history, park)
+    cutoff = datetime.now(JST).replace(tzinfo=None)
+    if not frame.empty:
+        frame = frame.loc[frame["datetime"] < cutoff].drop_duplicates(["datetime", "attraction"]).copy()
+    if frame.empty:
+        return ForecastModelHistory(cutoff, 0, "", *(pd.Series(dtype=float) for _ in range(9)), 45)
+    frame["area"] = frame["attraction"].map(lambda name: classify_attraction_area(name, park))
+
+    def median(*columns):
+        return frame.groupby(list(columns))["wait_time"].median()
+
+    return ForecastModelHistory(
+        cutoff, len(frame), str(frame.datetime.max()),
+        median("area", "time_slot"), median("area", "hour"),
+        median("time_slot"), median("hour"), median("attraction"),
+        median("attraction", "time_slot"), median("attraction", "hour"),
+        median("weekday", "attraction", "time_slot"), median("month", "attraction", "hour"),
+        frame["wait_time"].median(),
+    )
+
+
 def predict_wait_times_for_date(
     history_df,
     settings,
@@ -3019,6 +3062,7 @@ def predict_wait_times_for_date(
     current_target_df=None,
     attraction_list=None,
     all_attractions=None,
+    prepared_model=None,
 ):
     target_date = target_date.date() if isinstance(target_date, datetime) else target_date
     park_name = settings.get("park") or ("DisneySea" if "sea" in str(settings.get("db", "")).lower() else "Disneyland")
@@ -3029,45 +3073,16 @@ def predict_wait_times_for_date(
             attractions = _prediction_attractions(history_df, settings, current_target_df)
     else:
         attractions = [str(a) for a in attraction_list if str(a).strip()]
-    model_df = prepare_prediction_history(history_df, park_name)
-    cutoff = datetime.now(JST).replace(tzinfo=None)
-    if len(model_df):
-        model_df = model_df[model_df['datetime'] < cutoff].copy()
-        model_df = model_df.drop_duplicates(['datetime','attraction'])
-        model_df['area'] = model_df['attraction'].map(lambda a: classify_attraction_area(a, park_name))
-        area_slots = model_df.groupby(['area','time_slot'])['wait_time'].median()
-        area_hours = model_df.groupby(['area','hour'])['wait_time'].median()
-    else:
-        area_slots = area_hours = pd.Series(dtype=float)
+    model = prepared_model if prepared_model is not None else prepare_forecast_model(history_df, park_name)
     columns = ['Time','TimeLabel','Hour','Minute','Attraction','Predicted Wait','理由']
-    if model_df.empty:
+    if not model.row_count:
         return pd.DataFrame(columns=columns)
     today = datetime.now(JST).date()
     now = datetime.now(JST)
     target_bonus, target_reasons = get_calendar_bonus(target_date, ticket_price)
+    weekday = target_date.weekday()
+    month = target_date.month
     rows = []
-
-    if len(model_df) > 0:
-        time_all = model_df.groupby("time_slot")["wait_time"].median()
-        hour_all = model_df.groupby("hour")["wait_time"].median()
-        attraction_all = model_df.groupby("attraction")["wait_time"].median()
-        attraction_time = model_df.groupby(["attraction", "time_slot"])["wait_time"].median()
-        attraction_hour = model_df.groupby(["attraction", "hour"])["wait_time"].median()
-        same_weekday = model_df[model_df["weekday"] == target_date.weekday()]
-        same_month = model_df[model_df["month"] == target_date.month]
-        overall = model_df["wait_time"].median()
-    else:
-        time_all = pd.Series(dtype=float)
-        hour_all = pd.Series(dtype=float)
-        attraction_all = pd.Series(dtype=float)
-        attraction_time = pd.Series(dtype=float)
-        attraction_hour = pd.Series(dtype=float)
-        same_weekday = pd.DataFrame()
-        same_month = pd.DataFrame()
-        overall = 45
-
-    weekday_medians = same_weekday.groupby(['attraction','time_slot'])['wait_time'].median() if len(same_weekday) else pd.Series(dtype=float)
-    month_medians = same_month.groupby(['attraction','hour'])['wait_time'].median() if len(same_month) else pd.Series(dtype=float)
     current_map = {}
     if current_target_df is not None and len(current_target_df) > 0:
         current_map = dict(zip(current_target_df["Attraction"], current_target_df["Wait"]))
@@ -3075,7 +3090,8 @@ def predict_wait_times_for_date(
     slots = build_time_slots(OPEN_HOUR, CROWD_END_HOUR, 15)
     for attraction in attractions:
         attraction_feedback = get_attraction_feedback_error(prediction_history, attraction)
-        ride_base = attraction_all.get(attraction, None) if len(attraction_all) > 0 else None
+        ride_base = model.attraction_all.get(attraction, None)
+        area = classify_attraction_area(attraction, park_name)
         raw_predictions = []
         used_fallback = False
 
@@ -3083,16 +3099,15 @@ def predict_wait_times_for_date(
             hour = int(slot["Hour"])
             minute = int(slot["Minute"])
             time_value = float(slot["Time"])
-            specific = attraction_time.get((attraction, time_value), None) if len(attraction_time) > 0 else None
-            hour_specific = attraction_hour.get((attraction, hour), None) if len(attraction_hour) > 0 else None
-            hour_base = hour_all.get(hour, None) if len(hour_all) > 0 else None
-            time_base = time_all.get(time_value, None) if len(time_all) > 0 else None
-            area = classify_attraction_area(attraction, park_name)
-            area_base = area_slots.get((area,time_value), area_hours.get((area,hour), None)) if area != 'その他' else None
+            specific = model.attraction_time.get((attraction, time_value), None)
+            hour_specific = model.attraction_hour.get((attraction, hour), None)
+            hour_base = model.hour_all.get(hour, None)
+            time_base = model.time_all.get(time_value, None)
+            area_base = model.area_slots.get((area,time_value), model.area_hours.get((area,hour), None)) if area != 'その他' else None
             park_base = time_base if time_base is not None else hour_base
 
-            weekday_value = weekday_medians.get((attraction,time_value), None)
-            month_value = month_medians.get((attraction,hour), None)
+            weekday_value = model.weekdays.get((weekday,attraction,time_value), None)
+            month_value = model.months.get((month,attraction,hour), None)
 
             profile_value = None
             if ride_base is not None and not pd.isna(ride_base):
@@ -3109,7 +3124,7 @@ def predict_wait_times_for_date(
                 (time_base, 0.03),
                 (hour_base, 0.02),
                 (park_base, 0.02),
-                (overall, 0.02),
+                (model.overall, 0.02),
             ])
             if specific is None and hour_specific is None:
                 used_fallback = True
@@ -3176,10 +3191,10 @@ def predict_wait_times_for_date(
                 result.loc[mask,'Upper Wait'] = (result.loc[mask,'Predicted Wait']+high).clip(0,300)
                 result.loc[mask,'Interval Status'] = '過去誤差10〜90百分位による参考範囲（将来の被覆率は未検証）'
     result.attrs.update(target_date=str(target_date), park=park_name,
-                        model_version=reliable.MODEL_VERSION, feature_cutoff_utc=reliable.iso(cutoff),
+                        model_version=reliable.MODEL_VERSION, feature_cutoff_utc=reliable.iso(model.cutoff),
                         features={'temperature': reliable.finite(temperature), 'rain': reliable.finite(rain_mm),
-                                  'ticket_price':ticket_price, 'history_rows':len(model_df),
-                                  'history_last':str(model_df.datetime.max())})
+                                  'ticket_price':ticket_price, 'history_rows':model.row_count,
+                                  'history_last':model.history_last})
     return result
 
 def make_major_average_prediction(wait_prediction_df, major_rides=None):
@@ -3461,6 +3476,7 @@ def predict_crowd_index_for_date(
     park_hours_df=None,
     park=None,
     daily_weather=None,
+    prepared_model=None,
 ):
     wait_df = predict_wait_times_for_date(
         history_df,
@@ -3471,6 +3487,7 @@ def predict_crowd_index_for_date(
         prediction_history,
         ticket_price,
         current_target_df,
+        prepared_model=prepared_model,
     )
 
     if wait_df.empty:
@@ -3531,12 +3548,20 @@ def make_week_forecast(
     conn=None,
     use_live_current_data=False,
     persist_missing=True,
+    prepared_model=None,
+    summary_only=False,
 ):
     rows = []
+    if prepared_model is None:
+        park_name = settings.get("park") or ("DisneySea" if "sea" in str(settings.get("db", "")).lower() else "Disneyland")
+        prepared_model = prepare_forecast_model(history_df, park_name)
 
     for i in range(7):
         d = start_date + timedelta(days=i)
         locked_value = get_locked_daily_prediction(conn, d) if conn is not None else None
+        if summary_only and locked_value is not None:
+            rows.append({"Date": d.strftime("%m/%d"), "Crowd Index": round(float(locked_value), 1)})
+            continue
         ticket_price, ticket_source = get_ticket_price_from_castel(d, ticket_price_map)
         forecast_temperature, forecast_rain, weather_source = get_forecast_weather_for_date(
             daily_weather,
@@ -3559,6 +3584,7 @@ def make_week_forecast(
                 prediction_history,
                 ticket_price,
                 None,
+                prepared_model=prepared_model,
             )
             reasons = ["保存済みの日別固定予測を使用"]
             prediction_source = "保存済み"
@@ -3576,10 +3602,15 @@ def make_week_forecast(
                 event_signals,
                 park_hours_df,
                 park,
+                prepared_model=prepared_model,
             )
             if persist_missing:
                 save_locked_daily_prediction(cursor, conn, d, crowd_index)
             prediction_source = "新規固定保存" if persist_missing and conn is not None else "一時予測"
+
+        if summary_only:
+            rows.append({"Date": d.strftime("%m/%d"), "Crowd Index": round(float(crowd_index), 1)})
+            continue
 
         rows.append({
             "Date": d.strftime("%m/%d"),
@@ -4054,6 +4085,7 @@ DISNEYLAND_AREA_RULES = {
 }
 
 
+@lru_cache(maxsize=512)
 def classify_attraction_area(attraction, park):
     rules = DISNEYSEA_AREA_RULES if park == "DisneySea" else DISNEYLAND_AREA_RULES
     for area, keywords in rules.items():

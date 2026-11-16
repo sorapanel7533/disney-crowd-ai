@@ -1,13 +1,15 @@
 """Shared display controls and graphs for the existing wait forecasts."""
 from datetime import timedelta
+from io import BytesIO
 from textwrap import fill
 
-import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 import numpy as np
 import pandas as pd
 import streamlit as st
 
 from reliability import JST, japanese_name, load_catalog
+from forecast_cache import frame_key
 
 
 def retained_input(widget, label, key, **kwargs):
@@ -74,35 +76,45 @@ def render_wait_chart(predictions, attraction, target, park, observed=None, show
         st.info("このアトラクションの予測データがまだ不足しています。")
         return False
 
-    fig, ax = plt.subplots(figsize=(5.25, 3.4), layout="constrained")
-    try:
-        ax.plot(series["chart_time"], predicted, label="予測待ち時間", color="#1471bd", linewidth=2.1, marker=".", markersize=3)
-        if observed is not None and {"TimeLabel", "Actual Wait"}.issubset(observed):
-            actual = pd.to_numeric(observed["Actual Wait"], errors="coerce").astype(float)
-            if actual.notna().any():
-                ax.plot(minutes(observed["TimeLabel"]), actual, "--o", label="表示待ち時間の観測", color="#aa4d13", markersize=3)
-        if show_actual and not approved.empty:
-            ride_id = next((int(key) for key, row in load_catalog().items()
-                            if row["park"] == park and row["name"] == attraction), None)
-            actual_rows = approved.loc[approved["park"].eq(park) & approved["ride_id"].eq(ride_id) & approved["date"].eq(target)]
-            if not actual_rows.empty:
-                started = pd.to_datetime(actual_rows["started_at"], utc=True).dt.tz_convert(JST)
-                ax.scatter(started.dt.hour * 60 + started.dt.minute, actual_rows["actual_wait"],
-                           label="承認済みの実測", color="#282828", zorder=4)
-        estimate = pd.to_numeric(series["推定実測（分）"], errors="coerce").astype(float)
-        if estimate.notna().any():
-            ax.plot(series["chart_time"], estimate, "--o", label="推定実測（参考）", color="#15724c", markersize=3)
-
-        left, right = ax.get_xlim()
-        ticks = [int(x) for x in range(0, 1440, 120) if left <= x <= right]
-        if not ticks:
-            ticks = [int(series["chart_time"].iloc[0])]
-        ax.set_xticks(ticks, [f"{t // 60:02d}:{t % 60:02d}" for t in ticks])
-        ax.set_ylim(bottom=0)
-        ax.set(xlabel="時刻（日本時間）", ylabel="待ち時間（分）", title=fill(f"{japanese_name(attraction)}  {target:%m/%d}", width=26))
-        ax.grid(axis="y", alpha=0.2)
-        ax.legend(fontsize=10)
-        st.pyplot(fig)
-    finally:
-        plt.close(fig)
+    keys = frame_key(series), frame_key(observed), frame_key(approved) if show_actual else None
+    image = wait_chart_png(keys, attraction, target, park, show_actual, series, observed, approved)
+    st.image(image, width="stretch")
     return True
+
+
+@st.cache_data(max_entries=36, show_spinner=False)
+def wait_chart_png(keys, attraction, target, park, show_actual, _series, _observed, _approved):
+    series, observed, approved = _series, _observed, _approved
+    predicted = pd.to_numeric(series["Predicted Wait"], errors="coerce").astype(float)
+    predicted = predicted.where(np.isfinite(predicted))
+    fig = Figure(figsize=(5.25, 3.4), layout="constrained")
+    ax = fig.subplots()
+    ax.plot(series["chart_time"], predicted, label="予測待ち時間", color="#1471bd", linewidth=2.1, marker=".", markersize=3)
+    if observed is not None and {"TimeLabel", "Actual Wait"}.issubset(observed):
+        actual = pd.to_numeric(observed["Actual Wait"], errors="coerce").astype(float)
+        if actual.notna().any():
+            ax.plot(minutes(observed["TimeLabel"]), actual, "--o", label="表示待ち時間の観測", color="#aa4d13", markersize=3)
+    if show_actual and not approved.empty:
+        ride_id = next((int(key) for key, row in load_catalog().items()
+                        if row["park"] == park and row["name"] == attraction), None)
+        actual_rows = approved.loc[approved["park"].eq(park) & approved["ride_id"].eq(ride_id) & approved["date"].eq(target)]
+        if not actual_rows.empty:
+            started = pd.to_datetime(actual_rows["started_at"], utc=True).dt.tz_convert(JST)
+            ax.scatter(started.dt.hour * 60 + started.dt.minute, actual_rows["actual_wait"],
+                       label="承認済みの実測", color="#282828", zorder=4)
+    estimate = pd.to_numeric(series["推定実測（分）"], errors="coerce").astype(float)
+    if estimate.notna().any():
+        ax.plot(series["chart_time"], estimate, "--o", label="推定実測（参考）", color="#15724c", markersize=3)
+
+    left, right = ax.get_xlim()
+    ticks = [int(x) for x in range(0, 1440, 120) if left <= x <= right]
+    if not ticks:
+        ticks = [int(series["chart_time"].iloc[0])]
+    ax.set_xticks(ticks, [f"{t // 60:02d}:{t % 60:02d}" for t in ticks])
+    ax.set_ylim(bottom=0)
+    ax.set(xlabel="時刻（日本時間）", ylabel="待ち時間（分）", title=fill(f"{japanese_name(attraction)}  {target:%m/%d}", width=26))
+    ax.grid(axis="y", alpha=0.2)
+    ax.legend(fontsize=10)
+    with BytesIO() as output:
+        fig.savefig(output, format="png", dpi=170)
+        return output.getvalue()
