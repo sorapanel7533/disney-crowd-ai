@@ -1,4 +1,5 @@
 """Forecast caches keyed by data, local time, all inputs and model version."""
+from dataclasses import fields
 from datetime import datetime
 from hashlib import sha256
 
@@ -24,11 +25,14 @@ def issue_slot():
 
 @st.cache_data(max_entries=16, show_spinner=False, ttl=900)
 def _model(data_key, park, slot, model, _history):
-    return utils.prepare_forecast_model(_history, park)
+    model_history = utils.prepare_forecast_model(_history, park)
+    # Cache plain data so the saved value survives Streamlit's module reload.
+    return tuple(getattr(model_history, field.name) for field in fields(model_history))
 
 
 def model(data_key, park, history):
-    return _model(data_key, park, issue_slot(), reliability.MODEL_VERSION, history)
+    values = _model(data_key, park, issue_slot(), reliability.MODEL_VERSION, history)
+    return utils.ForecastModelHistory(*values)
 
 
 @st.cache_data(max_entries=60, show_spinner=False, ttl=900)

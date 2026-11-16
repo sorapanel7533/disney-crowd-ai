@@ -169,3 +169,14 @@ def test_week_summary_reads_fixed_index_without_recomputing_locked_days(tmp_path
             {}, conn=db, summary_only=True,
         )
         assert list(result["Crowd Index"]) == [4 + i / 10 for i in range(7)]
+
+
+
+def test_model_cache_does_not_serialize_the_application_class():
+    import pickle
+    import forecast_cache
+
+    empty = pd.DataFrame()
+    prepared = forecast_cache._model("empty-for-model-test", "Disneyland", "test", r.MODEL_VERSION, empty)
+    assert isinstance(prepared, tuple) and pickle.loads(pickle.dumps(prepared))[1] == 0
+    assert forecast_cache.model("empty-for-model-test", "Disneyland", empty).row_count == 0
