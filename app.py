@@ -396,6 +396,7 @@ hr { border-color: rgba(60,60,67,0.12) !important; }
     .hero-crowd-index { font-size: 42px; }
     .ios-list-row { align-items: flex-start; flex-wrap: wrap; padding: 12px; gap: 7px 12px; }
     .ios-list-title, .ios-list-value { font-size: 16px; white-space: normal; }
+    .ios-list-detail, .hero-crowd-label { font-size: 15px; line-height: 1.4; }
     .ios-list-value { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
     .ios-status-open, .ios-status-closed { white-space: normal; }
     .st-key-display_mode_segmented [role="radiogroup"],
@@ -408,7 +409,9 @@ hr { border-color: rgba(60,60,67,0.12) !important; }
         width: 100%;
     }
     [role="radiogroup"] > button[role="radio"],
-    .st-key-mw_mode [role="radiogroup"] > label {
+    .st-key-mw_mode [role="radiogroup"] label,
+    .st-key-display_mode_radio [role="radiogroup"] label,
+    .st-key-park_radio [role="radiogroup"] label {
         min-height: 44px;
     }
     .st-key-display_mode_segmented [role="radiogroup"] > button,
@@ -424,7 +427,8 @@ hr { border-color: rgba(60,60,67,0.12) !important; }
     .st-key-display_mode_segmented [role="radiogroup"] > :last-child,
     .st-key-display_mode_radio [role="radiogroup"] > :last-child { grid-column: 1 / -1; }
     .st-key-mw_mode [role="radiogroup"] { flex-direction: column; align-items: stretch; gap: 4px; }
-    .st-key-mw_mode [role="radiogroup"] > label { align-items: center; }
+    .st-key-mw_mode [role="radiogroup"] > div { width: 100%; }
+    .st-key-mw_mode [role="radiogroup"] label { align-items: center; width: 100%; }
     [data-testid="stDateInput"] input, [data-testid="stNumberInput"] input,
     [data-testid="stTimeInput"] input, [data-testid="stTextInput"] input,
     [data-testid="stSelectbox"] input, [data-testid="stMultiSelect"] input,
