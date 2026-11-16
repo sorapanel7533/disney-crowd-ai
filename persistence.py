@@ -22,13 +22,13 @@ def snapshot(conn, destination):
 def merge_snapshot(conn, path):
     """Insert rows by semantic keys; preserve local observations and manual history."""
     source=sqlite3.connect(f'file:{Path(path).as_posix()}?mode=ro',uri=True)
-    if source.execute('PRAGMA integrity_check').fetchone()[0]!='ok':
-        source.close(); raise ValueError('Snapshot integrity check failed')
-    source.row_factory=sqlite3.Row
-    tables={row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    incoming={row[0] for row in source.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     saved=0
     try:
+        if source.execute('PRAGMA integrity_check').fetchone()[0]!='ok':
+            raise ValueError('Snapshot integrity check failed')
+        source.row_factory=sqlite3.Row
+        tables={row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        incoming={row[0] for row in source.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         with conn:
             conn.execute('BEGIN IMMEDIATE')
             for table in sorted(tables & incoming):
@@ -80,35 +80,72 @@ def merge_snapshot(conn, path):
     return saved
 
 
-def sync_public_snapshot(conn, db_name, directory, ttl=900):
-    if os.environ.get('DISNEY_DISABLE_REMOTE_SYNC')=='1':
-        return '同期無効（テスト/収集環境）'
-    directory=Path(directory); directory.mkdir(parents=True,exist_ok=True)
-    marker=directory/(Path(db_name).stem+'-sync.json')
-    if marker.exists():
-        try:
-            state=json.loads(marker.read_text(encoding='utf-8'))
-        except (OSError,ValueError):
-            state={}
-        retry_ttl=ttl if state.get('status')=='success' else min(ttl,60)
-        if time.time()-state.get('checked',0)<retry_ttl:
-            return state['message']
+def snapshot_status(db_name, directory, ttl=900):
+    path = Path(directory) / Path(db_name).name
+    marker = path.with_name(path.stem + "-sync.json")
     try:
-        # Data branch contains public park observations only, never secrets/config.
-        response=requests.get(BASE+Path(db_name).name,timeout=(3,12))
-        response.raise_for_status()
-        if len(response.content)>100*1024*1024:
-            raise ValueError('Snapshot exceeds 100 MiB; partition storage before continuing')
-        with tempfile.TemporaryDirectory(dir=directory) as tmp:
-            path=Path(tmp)/'incoming.db'; path.write_bytes(response.content)
-            count=merge_snapshot(conn,path)
-        message=f'永続スナップショット同期成功: {count}行を追加'
-        status='success'
-    except (requests.RequestException,ValueError,sqlite3.Error,OSError) as exc:
-        message=f'永続保存先の同期失敗。ローカル履歴を保持: {exc}'
-        status='failed'
-    with tempfile.NamedTemporaryFile(mode='w',encoding='utf-8',dir=directory,delete=False) as status_file:
-        json.dump({'checked':time.time(),'message':message,'status':status},status_file,ensure_ascii=False)
-        status_path=status_file.name
-    os.replace(status_path,marker)
+        state = json.loads(marker.read_text(encoding="utf-8"))
+        if not isinstance(state, dict) or not path.exists():
+            return {}
+        stat = path.stat()
+        identity = state.get("identity")
+        if identity is not None and identity != [stat.st_dev, stat.st_ino]:
+            return {}
+        if state.get("status") == "success":
+            state.setdefault("last_success", state["checked"])
+        state["retry_at"] = float(state["checked"]) + (ttl if state["status"] == "success" else min(ttl, 60))
+        return state
+    except (OSError, ValueError, TypeError, KeyError):
+        return {}
+
+
+def sync_public_snapshot(conn, db_name, directory, ttl=900):
+    if os.environ.get('DISNEY_DISABLE_REMOTE_SYNC') == '1':
+        return '同期無効（テスト/収集環境）'
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / Path(db_name).name
+    marker = path.with_name(path.stem + "-sync.json")
+    state = snapshot_status(db_name, directory, ttl)
+    if time.time() < state.get("retry_at", 0):
+        return state["message"]
+
+    etag = state.get("etag")
+    last_success = state.get("last_success")
+    headers = {"If-None-Match": etag} if etag else {}
+    limit = 100 * 1024 * 1024
+    try:
+        with requests.get(BASE + path.name, headers=headers, timeout=(3, 12), stream=True) as response:
+            if response.status_code == 304 and etag and last_success:
+                message = "永続スナップショットは更新されていません。"
+            else:
+                response.raise_for_status()
+                if response.status_code != 200:
+                    raise ValueError(f"Unexpected snapshot response: {response.status_code}")
+                with tempfile.TemporaryDirectory(dir=directory) as tmp:
+                    incoming = Path(tmp) / "incoming.db"
+                    size = 0
+                    with incoming.open("wb") as file:
+                        for chunk in response.iter_content(chunk_size=256 * 1024):
+                            size += len(chunk)
+                            if size > limit:
+                                raise ValueError("Snapshot exceeds 100 MiB")
+                            file.write(chunk)
+                    count = merge_snapshot(conn, incoming)
+                etag = response.headers.get("ETag")
+                message = f"永続スナップショット同期成功: {count}行を追加"
+        status = "success"
+        last_success = time.time()
+    except (requests.RequestException, ValueError, sqlite3.Error, OSError) as exc:
+        message = f"永続保存先の同期失敗。ローカル履歴を保持: {exc}"
+        status = "failed"
+
+    stat = path.stat()
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=directory, delete=False) as status_file:
+        json.dump({
+            "checked": time.time(), "status": status, "message": message, "etag": etag,
+            "last_success": last_success, "identity": [stat.st_dev, stat.st_ino],
+        }, status_file, ensure_ascii=False)
+        temp_name = status_file.name
+    os.replace(temp_name, marker)
     return message

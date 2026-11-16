@@ -7,6 +7,8 @@ import hashlib
 import os
 import sqlite3
 import time
+from threading import Lock
+from collections import OrderedDict
 import requests
 import measured as m
 
@@ -14,6 +16,11 @@ REPO='sorapanel7533/disney-crowd-ai'
 BRANCH='measured-data'
 FILE='measured.db'
 API='https://api.github.com/repos/'+REPO
+
+_VIEW_LOCK = Lock()
+_VIEW_CACHE = OrderedDict()
+_VIEW_TTL_SECONDS = 12
+
 
 class Unavailable(RuntimeError):pass
 class Conflict(Unavailable):pass
@@ -45,6 +52,27 @@ class GitHubStore:
             db.execute('SELECT id,payload FROM measurements LIMIT 1')
         except (ValueError,sqlite3.Error,KeyError):raise Unavailable('外部DBの整合性を確認できません。保存未完了です。') from None
         return db,head,tree
+    def load_for_view(self):
+        """Use a short in-process read cache; every viewer gets its own SQLite connection."""
+        key = hashlib.sha256(self.token.encode()).digest()
+        with _VIEW_LOCK:
+            entry = _VIEW_CACHE.get(key)
+            if entry is None or time.monotonic() >= entry[0]:
+                db, head, tree = self.load()
+                try:
+                    raw = db.serialize()
+                finally:
+                    db.close()
+                entry = (time.monotonic() + _VIEW_TTL_SECONDS, raw, head, tree)
+                _VIEW_CACHE[key] = entry
+                _VIEW_CACHE.move_to_end(key)
+                while len(_VIEW_CACHE) > 4:
+                    _VIEW_CACHE.popitem(last=False)
+            _, raw, head, tree = entry
+        db = m.connect()
+        db.deserialize(raw)
+        return db, head, tree
+
     def commit(self,db,head,tree):
         raw=db.serialize()
         if len(raw)>10*1024*1024:raise Unavailable('保存容量の確認が必要です。保存未完了です。')
@@ -78,6 +106,8 @@ class GitHubStore:
             try:
                 result=operation(db)
                 commit=self.commit(db,head,tree)
+                with _VIEW_LOCK:
+                    _VIEW_CACHE.clear()
             except Conflict:
                 time.sleep(.2*(attempt+1));continue
             finally:db.close()

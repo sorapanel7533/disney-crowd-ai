@@ -42,13 +42,20 @@ def test_all_views(tmp_path,monkeypatch,park,scenario):
     st.cache_data.clear()
     plot_titles = []
     pyplot = st.pyplot
+    image = st.image
 
     def record_figure(figure=None, **kwargs):
         if figure is not None:
             plot_titles.extend(axis.get_title() for axis in figure.axes)
         return pyplot(figure, **kwargs)
 
+    def record_image(data, **kwargs):
+        if isinstance(data, bytes):
+            plot_titles.append("wait graph")
+        return image(data, **kwargs)
+
     monkeypatch.setattr(st, "pyplot", record_figure)
+    monkeypatch.setattr(st, "image", record_image)
     at=AppTest.from_file(str(ROOT/'app.py'),default_timeout=35)
     at.secrets['ADMIN_VIEW_PIN'] = '2468'
     if park == "DisneySea":

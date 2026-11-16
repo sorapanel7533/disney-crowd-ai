@@ -12,21 +12,23 @@ import measured as m
 import reliability as r
 from measured_store import configured,Unavailable
 
-def history_for(park):
+def history_for(park, ride_id=None):
     # Existing snapshot synchronization never writes the new measured database.
-    import utils
-    from persistence import sync_public_snapshot
+    from runtime_data import open_database, refresh_status
     name='disneyland.db' if park=='Disneyland' else 'disneysea.db'
-    db,_=utils.connect_db(name)
+    db,_=open_database(name)
     try:
-        sync_public_snapshot(db,name,os.environ.get('DISNEY_DB_DIR','.runtime'))
-        return pd.read_sql_query('SELECT * FROM wait_times WHERE park=?',db,params=(park,))
+        refresh_status(name)
+        clause = " AND ride_id=?" if ride_id is not None else ""
+        params = (park, int(ride_id)) if ride_id is not None else (park,)
+        return pd.read_sql_query("SELECT * FROM wait_times WHERE park=?" + clause, db, params=params)
     finally:db.close()
 
-def shared(st):
+def shared(st, *, fresh=False):
     if os.environ.get('DISNEY_DISABLE_REMOTE_SYNC')=='1':return m.connect(),'isolated-test-environment'
     try:
-        db,head,_=configured(st).load()
+        backend = configured(st)
+        db, head, _ = backend.load() if fresh else backend.load_for_view()
         return db,head
     except Unavailable:
         st.warning('実測記録を読み込めません。時間をおいて開き直してください。')
@@ -271,7 +273,7 @@ def render(st, park, is_admin=False):
 def moderation(st,is_admin):
     st.subheader('実測投稿の審査・修正')
     if not is_admin:st.info('投稿は「実測待ち時間」から全員が利用できます。審査・修正だけ管理者認証が必要です。');return
-    db,head=shared(st)
+    db,head=shared(st,fresh=True)
     if db is None:return
     try:
         st.write('外部DBの確認コミット: '+str(head or '初回投稿前'))

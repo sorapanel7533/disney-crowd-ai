@@ -9,7 +9,7 @@ from measured_store import configured,Unavailable
 def training(st):
     if os.environ.get('DISNEY_DISABLE_REMOTE_SYNC')=='1':return pd.DataFrame()
     try:
-        db,_,_=configured(st).load()
+        db,_,_=configured(st).load_for_view()
         try:return m.frame(db,as_of=r.iso())
         finally:db.close()
     except Unavailable:
@@ -57,7 +57,7 @@ def parallel(st,source,park,value_column='Wait',target=None,current=False):
 
 def timeline(st,db,park,ride,actuals):
     from measured_ui import history_for
-    h=history_for(park)
+    h=history_for(park, ride)
     options=['表示履歴','実測（点）','推定実測','将来の表示予測','将来の推定実測']
     chosen=st.multiselect('時間推移に表示する系列',options,default=options,key='mw_series')
     fig,ax=plt.subplots(figsize=(10,4));name=m.attraction(park,ride)['name']
