@@ -29,14 +29,14 @@ def table(title, frame, key, park, source, timestamp=None, empty="該当する�
             st.info(empty)
             return
         latest = frame[timestamp].max() if timestamp and timestamp in frame else None
-        st.caption(f"{len(frame):,}件 ／ 保存元・計算元 {source}" + (f" ／ 最新記録 {latest}" if pd.notna(latest) else ""))
+        st.write(f"{len(frame):,}件 ／ 保存元・計算元 {source}" + (f" ／ 最新記録 {latest}" if pd.notna(latest) else ""))
         display = frame.copy()
         for column in ("Attraction", "attraction"):
             if column in display:
                 display[column] = display[column].map(japanese_name)
         display = display.rename(columns=JAPANESE_COLUMNS)
         if len(display) > 2000:
-            st.caption("画面には最大2,000件を表示します。CSVには絞り込み後の全件が含まれます。")
+            st.write("画面には最大2,000件を表示します。CSVには絞り込み後の全件が含まれます。")
         st.dataframe(display.head(2000), height=360, width="stretch", hide_index=True)
         st.download_button(
             "CSVをダウンロード", display.to_csv(index=False).encode("utf-8-sig"),

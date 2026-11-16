@@ -11,8 +11,8 @@ from persistence import sync_public_snapshot
 def render(st,is_admin=False):
     st.markdown('<style>[data-testid="stCaptionContainer"] {opacity:1 !important;} [data-testid="stCaptionContainer"] p {color:#566173 !important;}</style>',unsafe_allow_html=True)
     st.subheader('アルコール情報')
-    st.caption('東京ディズニーリゾートの非公式情報サイトです。20歳未満の飲酒は禁止されています。')
-    st.caption('公式に掲載された販売情報を整理しています。当日の在庫・営業・提供を保証しません。')
+    st.markdown('東京ディズニーリゾートの非公式情報サイトです。20歳未満の飲酒は禁止されています。')
+    st.markdown('公式に掲載された販売情報を整理しています。当日の在庫・営業・提供を保証しません。')
     directory=Path(os.environ.get('DISNEY_DB_DIR','.runtime'))
     conn=None
     try:
@@ -30,16 +30,16 @@ def render(st,is_admin=False):
         chosen=[x for x in rows if not parks or x['park'] in parks]
         local=lambda value:r.utc(value).tz_convert(r.JST).strftime('%Y/%m/%d %H:%M JST') if value else '未確認'
         st.write(f"最終成功: {local(freshness['last_success_utc'])}")
-        st.caption(f"次回更新予定: {local(freshness['next_scheduled_jst'])}（毎週月曜6時・起動の遅れがあり得ます）")
+        st.markdown(f"次回更新予定: {local(freshness['next_scheduled_jst'])}（毎週月曜6時・起動の遅れがあり得ます）")
         if freshness['level']=='warning': st.error('14日以上、更新に成功していません。公式ページで最新情報を確認してください。')
         elif freshness['level']=='attention': st.warning('8日以上、更新に成功していません。')
         elif freshness['level']=='unavailable': st.warning('確認済みの商品はまだ登録されていません。')
-        else: st.caption(f"情報の鮮度: {freshness['age_days']:.1f}日前の確認")
+        else: st.markdown(f"情報の鮮度: {freshness['age_days']:.1f}日前の確認")
         latest=freshness['latest_run']
         if latest and latest['status']=='failed': st.warning('直近の更新は失敗しました。前回の確認データを表示しています。')
         if latest and latest['status']=='partial': st.warning('直近の更新は一部未確認です。失敗した店舗は前回データを保持しています。')
         if freshness.get('catch_up_scheduled_jst'):
-            st.caption('未更新・失敗した週の再確認予定: '+local(freshness['catch_up_scheduled_jst'])+'（完了した週は再取得しません）')
+            st.markdown('未更新・失敗した週の再確認予定: '+local(freshness['catch_up_scheduled_jst'])+'（完了した週は再取得しません）')
         st.write(f"掲載商品数: {len({x['product_id'] for x in chosen})}件（将来・期間終了を含む）")
         with st.expander('調査範囲と確認状況'):
             good=a.last_success(conn)
@@ -48,8 +48,8 @@ def render(st,is_admin=False):
                 st.write(f"商品詳細未確認: {good['unconfirmed_stores']}店舗。公式の提供店舗区分と、具体的な商品の確認を区別します。")
                 if good.get('source'):
                     source=good['source']
-                    st.caption(f"公式情報の確認: {source['requests']}要求 / 通信失敗{source['failed_requests']}件。robotsと利用条件を確認して取得しています。")
-            st.caption(sync)
+                    st.markdown(f"公式情報の確認: {source['requests']}要求 / 通信失敗{source['failed_requests']}件。robotsと利用条件を確認して取得しています。")
+            st.markdown(sync)
             for store in a.records(conn,'alcohol_stores').values():
                 if not any(x['store_id']==store['store_id'] for x in rows):
                     st.markdown(f"[{store['name']}]({store['url']})：提供店舗・商品詳細未確認")
@@ -84,7 +84,7 @@ def render(st,is_admin=False):
         filtered=a.filter_catalog(rows,query,parks,areas,stores,kinds,max_price,limited,within,new,exclude_beer)
         grouped={}
         for row in filtered: grouped.setdefault(row['product_id'],[]).append(row)
-        st.caption(f'検索結果: {len(grouped)}商品 / {len(filtered)}店舗別の掲載')
+        st.markdown(f'検索結果: {len(grouped)}商品 / {len(filtered)}店舗別の掲載')
         if not grouped:
             st.info('条件に合う商品がありません。未確認の内容は公式店舗ページでご確認ください。')
         items=sorted(grouped.items(),key=lambda pair:pair[1][0]['name'])
@@ -98,25 +98,25 @@ def render(st,is_admin=False):
                 labels=[first['kind']]
                 if first['new']: labels.append('新規確認')
                 if first['limited']: labels.append('期間限定')
-                st.caption(' · '.join(labels))
+                st.markdown(' · '.join(labels))
                 for sale in sales:
                     price=sale['price_text'] or '価格未確認'
                     tax='（税込）' if sale.get('tax_included') and sale['price_text'] else ''
                     st.write(f"{price}{tax} · {'ランド' if sale['park']=='Disneyland' else 'シー'} / {sale['area']}")
                     st.markdown(f"[{sale['store_name']}]({sale['store_url']})")
-                    st.caption(f"{sale['state']} · {sale['start'] or '開始日未確認'} ～ {sale['end'] or '終了日未確認'}")
-                    for pause in sale.get('suspensions',[]): st.caption(f"公式掲載の販売休止: {pause['start']} ～ {pause['end']}")
-                    if sale['admin_note']: st.caption('管理者による補足（公式情報とは別）: '+sale['admin_note'])
+                    st.markdown(f"{sale['state']} · {sale['start'] or '開始日未確認'} ～ {sale['end'] or '終了日未確認'}")
+                    for pause in sale.get('suspensions',[]): st.markdown(f"公式掲載の販売休止: {pause['start']} ～ {pause['end']}")
+                    if sale['admin_note']: st.markdown('管理者による補足（公式情報とは別）: '+sale['admin_note'])
                 st.markdown(f"[公式の商品・メニューページ]({first['url']})")
                 all_sales=[x for x in rows if x['product_id']==pid]
                 if len(all_sales)>len(sales):
                     with st.expander(f'この商品の全掲載店舗（{len(all_sales)}件）'):
                         for sale in all_sales: st.markdown(f"[{sale['store_name']}]({sale['store_url']}) · {sale['state']}")
-                st.caption('確認: '+local(first['checked_at_utc']))
+                st.markdown('確認: '+local(first['checked_at_utc']))
         if is_admin:
             with st.expander('管理者の補足・安全な手動更新'):
                 st.markdown('[GitHubで週次調査を手動実行](https://github.com/sorapanel7533/disney-crowd-ai/actions/workflows/alcohol.yml)')
-                st.caption('編集は週次データと別の補足として保持します。永続保存はJSONを手動実行のadmin_noteへ貼り付け、保存先からの受領を確認してください。')
+                st.markdown('編集は週次データと別の補足として保持します。永続保存はJSONを手動実行のadmin_noteへ貼り付け、保存先からの受領を確認してください。')
                 if rows:
                     keys={x['sale_key']:x for x in rows}
                     key=st.selectbox('補足する商品・店舗',list(keys),format_func=lambda key:keys[key]['name']+' / '+keys[key]['store_name'])
@@ -128,6 +128,6 @@ def render(st,is_admin=False):
                         st.download_button('永続保存用JSONをダウンロード',json.dumps(st.session_state['alcohol_note_export'],ensure_ascii=False),file_name='alcohol-admin-note.json',mime='application/json')
     except Exception as exc:
         st.warning('アルコール情報を読み込めません。ほかの画面は引き続き利用できます。')
-        st.caption('詳細: '+type(exc).__name__)
+        st.markdown('詳細: '+type(exc).__name__)
     finally:
         if conn is not None: conn.close()
