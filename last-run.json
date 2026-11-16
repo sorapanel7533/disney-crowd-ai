@@ -1,8 +1,8 @@
 {
-  "sample": 12,
-  "started_at_utc": "2026-11-16T05:37:00.000219+00:00",
-  "finished_at_utc": "2026-11-16T05:38:21.239725+00:00",
-  "due_slot_utc": "2026-11-16T05:37:00+00:00",
+  "sample": 13,
+  "started_at_utc": "2026-11-16T05:52:00.000221+00:00",
+  "finished_at_utc": "2026-11-16T05:53:21.346741+00:00",
+  "due_slot_utc": "2026-11-16T05:52:00+00:00",
   "event": "schedule",
   "github_run_id": "43793612676",
   "results": [
@@ -11,7 +11,7 @@
       "status": "success",
       "received": 33,
       "inserted": 33,
-      "observed_at": "2026-11-16T05:36:03+00:00",
+      "observed_at": "2026-11-16T05:46:08+00:00",
       "open_positive": 24,
       "open_zero": 2,
       "closed": 7,
@@ -19,12 +19,12 @@
       "evaluated_predictions": 10,
       "shadow_evaluated": 0,
       "shadow_issued": 0,
-      "duration_seconds": 37.478,
+      "duration_seconds": 37.53,
       "journal": {
-        "path": "journal/2026-11/43793612676-1-s012-DisneySea.jsonl.gz",
+        "path": "journal/2026-11/43793612676-1-s013-DisneySea.jsonl.gz",
         "changes": 47,
-        "compressed_bytes": 2395,
-        "sha256": "057cd624e427d098a1443b68380b85e634f5ef2ef38ff625706adaea6fa4351c"
+        "compressed_bytes": 2389,
+        "sha256": "73ad01e1fc24f82a6ac6ec525bfd7cbdc41f18ba7548038dd0362a1a263dc8d6"
       }
     },
     {
@@ -32,20 +32,20 @@
       "status": "success",
       "received": 37,
       "inserted": 37,
-      "observed_at": "2026-11-16T05:36:03+00:00",
-      "open_positive": 32,
+      "observed_at": "2026-11-16T05:51:02+00:00",
+      "open_positive": 31,
       "open_zero": 2,
-      "closed": 3,
+      "closed": 4,
       "source_stale": 0,
       "evaluated_predictions": 10,
       "shadow_evaluated": 0,
       "shadow_issued": 0,
-      "duration_seconds": 38.535,
+      "duration_seconds": 38.544,
       "journal": {
-        "path": "journal/2026-11/43793612676-1-s012-Disneyland.jsonl.gz",
+        "path": "journal/2026-11/43793612676-1-s013-Disneyland.jsonl.gz",
         "changes": 51,
-        "compressed_bytes": 2504,
-        "sha256": "6e0d02ed80d550017c191e8f272e2573dc72445dcdc4aeba196edbae48ae789e"
+        "compressed_bytes": 2493,
+        "sha256": "7a9840ac66c9b33141607355c157c30c85410644f1966d373cb5a189c0d26a68"
       }
     }
   ]
