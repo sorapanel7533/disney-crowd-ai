@@ -28,7 +28,10 @@ st.session_state["display_mode_value"] = display_mode
 
 import logging
 import os
+import importlib
 import reliability as reliable
+if not all(hasattr(reliable, name) for name in ("jst_date", "locked_daily_record", "locked_week")):
+    reliable = importlib.reload(reliable)
 import forecast_cache
 import runtime_data
 from admin import render_access
@@ -59,6 +62,10 @@ def get_pyplot():
                 break
         _PYPLOT = pyplot
     return _PYPLOT
+
+import utils as _utils
+if not hasattr(_utils, "get_live_crowd_index"):
+    importlib.reload(_utils)
 
 from utils import (
     GLOBAL_PREDICTION_NAME,
