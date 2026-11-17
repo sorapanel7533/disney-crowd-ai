@@ -231,9 +231,18 @@ def test_scheduled_week_forecasts_survive_rerun_and_evening_issue(db,monkeypatch
     assert db.execute('SELECT count(*) FROM predictions WHERE target_at_utc IS NOT NULL').fetchone()[0]>0
     persist_forecasts(db,history,utils.PARK_SETTINGS['Disneyland'],'Disneyland',weather,now+pd.Timedelta(minutes=15))
     assert db.execute('SELECT * FROM daily_crowd_predictions').fetchall()==before
+    tomorrow=(now+pd.Timedelta(days=1)).date()
+    morning_value=r.locked_daily(db,tomorrow)
     persist_forecasts(db,history,utils.PARK_SETTINGS['Disneyland'],'Disneyland',weather,now+pd.Timedelta(hours=13))
+    release=db.execute("SELECT predicted_crowd_index FROM daily_crowd_predictions WHERE target_date=? AND forecast_kind='21:00'",(str(tomorrow),)).fetchone()
+    assert release is not None
+    assert r.locked_daily(db,tomorrow)==release[0]
     assert db.execute("SELECT count(*) FROM daily_crowd_predictions WHERE forecast_kind='21:00'").fetchone()[0]==1
     assert db.execute("SELECT * FROM daily_crowd_predictions WHERE forecast_kind='fixed'").fetchall()==before
+    persist_forecasts(db,history,utils.PARK_SETTINGS['Disneyland'],'Disneyland',weather,now+pd.Timedelta(hours=13,minutes=15))
+    assert db.execute("SELECT count(*) FROM daily_crowd_predictions WHERE forecast_kind='21:00'").fetchone()[0]==1
+    assert r.locked_daily(db,tomorrow)==release[0]
+    assert morning_value is not None
 
 
 def test_unobserved_forecast_expires_without_fabricated_actual(db):
