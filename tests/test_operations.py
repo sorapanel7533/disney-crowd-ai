@@ -302,7 +302,7 @@ def test_admin_ui_authorizes_save_and_restart_retains_outbox(tmp_path,monkeypatc
     monkeypatch.setattr(utils,'fetch_wait_times',lambda settings:(_ for _ in ()).throw(RuntimeError('isolated outage')))
     st.cache_data.clear()
     app=AppTest.from_file(str(Path(__file__).parents[1]/'app.py'),default_timeout=45).run()
-    app.button_group(key='display_mode_segmented').set_value('DPA/PP予測').run()
+    app.radio(key='display_mode_radio').set_value('DPA/PP予測').run()
     app.text_input(key='admin_password').set_value('wrong').run()
     assert [b for b in app.button if b.label=='保存'][0].disabled
     app.text_input(key='admin_password').set_value('isolated-test-password').run()
@@ -315,7 +315,7 @@ def test_admin_ui_authorizes_save_and_restart_retains_outbox(tmp_path,monkeypatc
     con.close()
     restarted=AppTest.from_file(str(Path(__file__).parents[1]/'app.py'),default_timeout=45).run()
     restarted.secrets["ADMIN_VIEW_PIN"] = "2468"
-    restarted.button_group(key="display_mode_segmented").set_value("管理者画面").run()
+    restarted.radio(key="display_mode_radio").set_value("管理者画面").run()
     restarted.text_input[0].set_value("2468")
     next(b for b in restarted.button if b.label == "管理者画面を開く").click().run()
     restarted.selectbox(key="_admin_section").set_value("データ・システム管理").run()
