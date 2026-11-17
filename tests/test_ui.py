@@ -74,7 +74,8 @@ def test_all_views(tmp_path,monkeypatch,park,scenario):
         if view == "ダッシュボード":
             assert not any("投稿用 X文面" in header.value for header in at.subheader)
             assert not any("Crowd Index" in frame.value.columns and "予測種別" in frame.value.columns for frame in at.dataframe)
-            assert f"{park} 1 Week Crowd Forecast" in plot_titles
+            park_name = "ランド" if park == "Disneyland" else "シー"
+            assert f"{park_name} 1週間の混雑予測" in plot_titles
         if view == "全アトラクション":
             assert not any("保存履歴" in header.value for header in at.subheader)
         if view == "アトラクション別予測":

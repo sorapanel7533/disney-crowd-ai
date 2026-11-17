@@ -78,6 +78,20 @@ def render_wait_chart(predictions, attraction, target, park, observed=None, show
     keys = frame_key(series), frame_key(observed), frame_key(approved) if show_actual else None
     image = wait_chart_png(keys, attraction, target, park, show_actual, series, observed, approved)
     st.image(image, width="stretch")
+    if show_actual and observed is not None:
+        expected = observed.attrs.get("expected_slots", len(observed))
+        valid = observed.attrs.get("valid_slots", int(pd.to_numeric(observed.get("Actual Wait"), errors="coerce").notna().sum()))
+        closed = observed.attrs.get("closed_slots", 0)
+        invalid = observed.attrs.get("invalid_slots", 0)
+        missing = max(0, expected - valid - closed - invalid)
+        last = observed.attrs.get("last_observed")
+        last_text = "最終観測時刻はありません"
+        if last is not None and not pd.isna(last):
+            last_text = f"最終観測 {pd.Timestamp(last).strftime('%H:%M')} JST"
+        st.info(
+            f"表示待ち時間の観測：{valid}/{expected}枠 · 休止 {closed}・値不正 {invalid}・未記録 {missing}枠 · "
+            f"{last_text}。欠測や休止中の値は補っていません。"
+        )
     return True
 
 
@@ -88,7 +102,7 @@ def wait_chart_png(keys, attraction, target, park, show_actual, _series, _observ
     series, observed, approved = _series, _observed, _approved
     predicted = pd.to_numeric(series["Predicted Wait"], errors="coerce").astype(float)
     predicted = predicted.where(np.isfinite(predicted))
-    fig = Figure(figsize=(5.25, 3.4), layout="constrained")
+    fig = Figure(figsize=(7.2, 4.4), layout="constrained")
     ax = fig.subplots()
     ax.plot(series["chart_time"], predicted, label="予測待ち時間", color="#1471bd", linewidth=2.1, marker=".", markersize=3)
     if observed is not None and {"TimeLabel", "Actual Wait"}.issubset(observed):
@@ -107,15 +121,17 @@ def wait_chart_png(keys, attraction, target, park, show_actual, _series, _observ
     if estimate.notna().any():
         ax.plot(series["chart_time"], estimate, "--o", label="推定実測（参考）", color="#15724c", markersize=3)
 
-    left, right = ax.get_xlim()
-    ticks = [int(x) for x in range(0, 1440, 120) if left <= x <= right]
-    if not ticks:
-        ticks = [int(series["chart_time"].iloc[0])]
+    ticks = list(range(9 * 60, 21 * 60 + 1, 120))
+    ax.set_xlim(9 * 60, 21 * 60)
     ax.set_xticks(ticks, [f"{t // 60:02d}:{t % 60:02d}" for t in ticks])
     ax.set_ylim(bottom=0)
-    ax.set(xlabel="時刻（日本時間）", ylabel="待ち時間（分）", title=fill(f"{japanese_name(attraction)}  {target:%m/%d}", width=26))
+    ax.set(xlabel="時刻（日本時間）", ylabel="待ち時間（分）", title=fill(f"{japanese_name(attraction)} {target:%m/%d}", width=26))
+    ax.xaxis.label.set_size(14)
+    ax.yaxis.label.set_size(14)
+    ax.title.set_size(15)
+    ax.tick_params(axis="both", labelsize=13)
     ax.grid(axis="y", alpha=0.2)
-    ax.legend(fontsize=10)
+    ax.legend(fontsize=12)
     with BytesIO() as output:
         fig.savefig(output, format="png", dpi=170)
         return output.getvalue()
