@@ -234,6 +234,9 @@ def test_actual_series_keeps_zero_and_latest_closed_state_as_gap():
 def test_dark_theme_css_and_mobile_text_sizes_are_explicit():
     source = open("app.py", encoding="utf-8").read()
     assert '[data-theme="dark"]' in source
+    assert '[data-theme="dark"] .stApp' in source
+    assert "--ios-bg: var(--background-color" in source
+    assert "--ios-text: var(--text-color" in source
     assert "--ios-control-text: #f3f4f6" in source
     assert "@media (max-width: 760px)" in source
     assert "font-size:13px" not in source and "font-size: 13px" not in source
