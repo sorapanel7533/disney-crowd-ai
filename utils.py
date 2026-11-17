@@ -3452,7 +3452,8 @@ def get_actual_wait_series_for_today(history_df, attraction=None, major_rides=No
     actual = valid.groupby('TimeLabel')['wait_time'].mean()
     counts = valid.groupby('TimeLabel')['attraction'].nunique()
     last_observed = valid.groupby('TimeLabel')['datetime'].max()
-    closed = latest[~latest['is_open'].eq(1)].groupby('TimeLabel')['attraction'].nunique()
+    # An unknown operation state is missing data, not proof that the ride was closed.
+    closed = latest[latest['is_open'].eq(0)].groupby('TimeLabel')['attraction'].nunique()
     invalid = latest[latest['is_open'].eq(1) & ~latest['valid']].groupby('TimeLabel')['attraction'].nunique()
     grid['Actual Wait'] = grid.TimeLabel.map(actual)
     grid['Observation Count'] = grid.TimeLabel.map(counts).fillna(0).astype(int)

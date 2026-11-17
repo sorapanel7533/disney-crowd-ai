@@ -206,6 +206,7 @@ def test_actual_series_keeps_zero_and_latest_closed_state_as_gap():
         ("closed", 9, 1, 50, 1),
         ("closed", 9, 14, 0, 0),
         ("ride", 9, 30, 35, 1),
+        ("unknown", 10, 0, None, None),
     ]
     history = pd.DataFrame([
         {"datetime": today + pd.Timedelta(hours=hour, minutes=minute),
@@ -226,6 +227,8 @@ def test_actual_series_keeps_zero_and_latest_closed_state_as_gap():
     closed = utils.get_actual_wait_series_for_today(history, attraction="closed").set_index("TimeLabel")
     assert pd.isna(closed.loc["09:00", "Actual Wait"])
     assert closed.loc["09:00", "Observation Status"] == "休止・閉園"
+    unknown = utils.get_actual_wait_series_for_today(history, attraction="unknown").set_index("TimeLabel")
+    assert unknown.loc["10:00", "Observation Status"] == "欠測"
 
 
 def test_dark_theme_css_and_mobile_text_sizes_are_explicit():
