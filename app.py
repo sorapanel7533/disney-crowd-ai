@@ -176,65 +176,36 @@ CUSTOM_CSS = """
 <style>
 :root {
     color-scheme: light dark;
-    --ios-bg: var(--background-color, #f2f2f7);
-    --ios-card: var(--secondary-background-color, rgba(255, 255, 255, 0.96));
-    --ios-card-solid: var(--secondary-background-color, #ffffff);
-    --ios-text: var(--text-color, #1d1d1f);
-    --ios-subtext: var(--text-color, #595960);
-    --ios-blue: var(--primary-color, #006edb);
-    --ios-control-bg: var(--secondary-background-color, #ffffff);
-    --ios-control-text: var(--text-color, #1d1d1f);
-    --ios-control-border: var(--border-color, rgba(60, 60, 67, 0.22));
-    --ios-segment-bg: var(--secondary-background-color, rgba(118, 118, 128, 0.13));
-    --ios-success-text: var(--text-color, #146c2e);
-    --ios-muted-text: var(--text-color, #595960);
-    --ios-green: #34c759;
-    --ios-yellow: #ffcc00;
-    --ios-orange: #ff9500;
-    --ios-red: #ff3b30;
-    --ios-border: rgba(60, 60, 67, 0.13);
-    --ios-shadow: 0 8px 26px rgba(0, 0, 0, 0.065);
 }
 html, body, [class*="css"] {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif !important;
 }
-.stApp, [data-testid="stAppViewContainer"] {
+.stApp {
+    --ios-bg: transparent;
+    --ios-card: color-mix(in srgb, currentColor 6%, transparent);
+    --ios-card-solid: color-mix(in srgb, currentColor 5%, transparent);
+    --ios-text: currentColor;
+    --ios-subtext: color-mix(in srgb, currentColor 78%, transparent);
+    --ios-blue: #006edb;
+    --ios-control-bg: color-mix(in srgb, currentColor 8%, transparent);
+    --ios-control-text: currentColor;
+    --ios-control-border: color-mix(in srgb, currentColor 24%, transparent);
+    --ios-segment-bg: color-mix(in srgb, currentColor 8%, transparent);
+    --ios-success-text: currentColor;
+    --ios-muted-text: currentColor;
+    --ios-green: #34c759;
+    --ios-yellow: #ffcc00;
+    --ios-orange: #ff9500;
+    --ios-red: #ff3b30;
+    --ios-border: color-mix(in srgb, currentColor 16%, transparent);
+    --ios-shadow: 0 8px 26px rgba(0, 0, 0, 0.065);
     color-scheme: light dark;
-    --ios-bg: var(--background-color, #f2f2f7);
-    --ios-card: var(--secondary-background-color, rgba(255, 255, 255, 0.96));
-    --ios-card-solid: var(--secondary-background-color, #ffffff);
-    --ios-text: var(--text-color, #1d1d1f);
-    --ios-subtext: var(--text-color, #595960);
-    --ios-blue: var(--primary-color, #006edb);
-    --ios-control-bg: var(--secondary-background-color, #ffffff);
-    --ios-control-text: var(--text-color, #1d1d1f);
-    --ios-control-border: var(--border-color, rgba(60, 60, 67, 0.22));
-    --ios-segment-bg: var(--secondary-background-color, rgba(118, 118, 128, 0.13));
-    --ios-success-text: var(--text-color, #146c2e);
-    --ios-muted-text: var(--text-color, #595960);
-    background: var(--ios-bg);
-    color: var(--ios-text);
+    background: transparent;
+    color: inherit;
 }
-[data-theme="dark"], html[data-theme="dark"],
-.stApp[data-theme="dark"], [data-testid="stAppViewContainer"][data-theme="dark"],
-[data-theme="dark"] .stApp, [data-theme="dark"] [data-testid="stAppViewContainer"] {
-    color-scheme: dark;
-    --ios-bg: #0e1117;
-    --ios-card: rgba(29, 35, 45, 0.98);
-    --ios-card-solid: #171c24;
-    --ios-text: #f3f4f6;
-    --ios-subtext: #c1c7d0;
-    --ios-blue: #58a6ff;
-    --ios-control-bg: #202733;
-    --ios-control-text: #f3f4f6;
-    --ios-control-border: rgba(220, 225, 235, 0.28);
-    --ios-segment-bg: #202733;
-    --ios-success-text: #79d492;
-    --ios-muted-text: #c1c7d0;
-    --ios-border: rgba(220, 225, 235, 0.2);
-    --ios-shadow: 0 8px 26px rgba(0, 0, 0, 0.24);
-    background: var(--ios-bg);
-    color: var(--ios-text);
+[data-testid="stAppViewContainer"] {
+    background: transparent;
+    color: inherit;
 }
 .block-container {
     max-width: 880px;
