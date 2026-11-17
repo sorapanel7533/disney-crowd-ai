@@ -62,12 +62,13 @@ def test_all_views(tmp_path,monkeypatch,park,scenario):
         at.session_state["park"] = park
     at.run()
     assert at.session_state["park"] == park
-    assert list(at.button_group(key="park_segmented").options) == ["Disneyland", "DisneySea"]
-    assert list(at.button_group(key="display_mode_segmented").options) == VIEWS
+    assert list(at.radio(key="park_radio").options) == ["Disneyland", "DisneySea"]
+    assert at.radio(key="park_radio").value == park
+    assert list(at.radio(key="display_mode_radio").options) == VIEWS
     assert not at.exception, [(e.message,e.stack_trace) for e in at.exception]
     for view in VIEWS:
         plot_titles.clear()
-        at.button_group(key='display_mode_segmented').set_value(view).run()
+        at.radio(key='display_mode_radio').set_value(view).run()
         assert not at.exception, (park,scenario,view,[(e.message,e.stack_trace) for e in at.exception])
         assert not at.caption, (park, scenario, view)
         if view == "ダッシュボード":
