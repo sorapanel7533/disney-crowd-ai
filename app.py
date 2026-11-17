@@ -6,10 +6,13 @@ park_options = ["Disneyland", "DisneySea"]
 if st.session_state.get("park") not in park_options:
     resume_park = st.query_params.get("measurement_park")
     st.session_state["park"] = resume_park if resume_park in park_options and st.query_params.get("measurement_key") else "Disneyland"
-if hasattr(st, "segmented_control"):
-    park = st.segmented_control("パーク", park_options, default=st.session_state["park"], key="park_segmented")
-else:
-    park = st.radio("パーク", park_options, index=park_options.index(st.session_state["park"]), horizontal=True, key="park_radio")
+park = st.radio(
+    "パーク",
+    park_options,
+    index=park_options.index(st.session_state["park"]),
+    horizontal=True,
+    key="park_radio",
+)
 if park is None:
     park = st.session_state["park"]
 st.session_state["park"] = park
@@ -18,10 +21,13 @@ if "display_mode_value" not in st.session_state:
     st.session_state["display_mode_value"] = "実測待ち時間" if st.query_params.get("measurement_key") else "ダッシュボード"
 if st.session_state["display_mode_value"] not in display_mode_options:
     st.session_state["display_mode_value"] = "ダッシュボード"
-if hasattr(st, "segmented_control"):
-    display_mode = st.segmented_control("🧭 表示モード", display_mode_options, default=st.session_state["display_mode_value"], key="display_mode_segmented")
-else:
-    display_mode = st.radio("🧭 表示モード", display_mode_options, index=display_mode_options.index(st.session_state["display_mode_value"]), horizontal=True, key="display_mode_radio")
+display_mode = st.radio(
+    "🧭 表示モード",
+    display_mode_options,
+    index=display_mode_options.index(st.session_state["display_mode_value"]),
+    horizontal=True,
+    key="display_mode_radio",
+)
 if display_mode is None:
     display_mode = st.session_state["display_mode_value"]
 st.session_state["display_mode_value"] = display_mode
