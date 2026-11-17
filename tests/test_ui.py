@@ -62,7 +62,7 @@ def test_all_views(tmp_path,monkeypatch,park,scenario):
         at.session_state["park"] = park
     at.run()
     assert at.session_state["park"] == park
-    assert list(at.radio(key="park_radio").options) == ["Disneyland", "DisneySea"]
+    assert list(at.radio(key="park_radio").options) == ["ランド", "シー"]
     assert at.radio(key="park_radio").value == park
     assert list(at.radio(key="display_mode_radio").options) == VIEWS
     assert not at.exception, [(e.message,e.stack_trace) for e in at.exception]
