@@ -3,7 +3,6 @@ from datetime import timedelta
 from io import BytesIO
 from textwrap import fill
 
-from matplotlib.figure import Figure
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -84,6 +83,8 @@ def render_wait_chart(predictions, attraction, target, park, observed=None, show
 
 @st.cache_data(max_entries=36, show_spinner=False)
 def wait_chart_png(keys, attraction, target, park, show_actual, _series, _observed, _approved):
+    from matplotlib.figure import Figure
+
     series, observed, approved = _series, _observed, _approved
     predicted = pd.to_numeric(series["Predicted Wait"], errors="coerce").astype(float)
     predicted = predicted.where(np.isfinite(predicted))

@@ -3,7 +3,7 @@
 Legacy tables/rows remain intact. UTC columns are authoritative for new rows;
 the original datetime column remains JST for compatibility with existing charts.
 """
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, time as datetime_time
 from zoneinfo import ZoneInfo
 import hashlib
 import json
@@ -310,13 +310,84 @@ def save_daily(conn, target_date, value, features=None, kind='fixed', generated_
     return c.rowcount == 1
 
 
-def locked_daily(conn, target_date):
+def jst_date(value=None):
+    stamp = pd.Timestamp(value if value is not None else datetime.now(JST))
+    if stamp.tzinfo is None:
+        stamp = stamp.tz_localize(JST)
+    else:
+        stamp = stamp.tz_convert(JST)
+    return stamp.date()
+
+
+def _night_issue_window(target):
+    start = datetime.combine(target - timedelta(days=1), datetime_time(21, 0), tzinfo=JST)
+    end = datetime.combine(target, datetime_time.min, tzinfo=JST)
+    return start.astimezone(UTC).isoformat(), end.astimezone(UTC).isoformat()
+
+
+def locked_week(conn, start_date, days=7):
+    """Read immutable daily forecasts; prefer the official prior-evening issue."""
+    start = pd.Timestamp(start_date).date()
+    count = max(0, min(31, int(days)))
+    targets = [start + timedelta(days=i) for i in range(count)]
+    if conn is None or not targets:
+        return [{"target_date": target.isoformat(), "predicted_crowd_index": None,
+                 "generated_at_utc": None, "model_version": None, "forecast_key": None,
+                 "features_json": None, "forecast_kind": None, "actual_crowd_index": None,
+                 "error": None, "evaluated_at_utc": None} for target in targets]
+
+    rows = conn.execute("""SELECT target_date,predicted_crowd_index,generated_at_utc,
+        model_version,forecast_key,features_json,forecast_kind,actual_crowd_index,error
+        FROM daily_crowd_predictions WHERE target_date>=? AND target_date<? AND model_version=?
+        AND forecast_kind IN ('fixed','21:00')""",
+        (targets[0].isoformat(), (targets[-1] + timedelta(days=1)).isoformat(), MODEL_VERSION)).fetchall()
+    columns = ("target_date", "predicted_crowd_index", "generated_at_utc", "model_version",
+               "forecast_key", "features_json", "forecast_kind", "actual_crowd_index", "error")
+    chosen = {}
+    for raw in rows:
+        record = dict(zip(columns, raw))
+        record["evaluated_at_utc"] = None
+        target = pd.Timestamp(record["target_date"]).date()
+        generated = record.get("generated_at_utc")
+        kind = record.get("forecast_kind")
+        if kind == "21:00":
+            lower, upper = _night_issue_window(target)
+            if not generated or not lower <= str(generated) < upper:
+                continue
+            priority = (0, str(generated))
+        elif kind == "fixed":
+            priority = (1, str(generated or ""))
+        else:
+            continue
+        existing = chosen.get(target)
+        if existing is None or priority < existing[0]:
+            chosen[target] = (priority, record)
+        elif priority[0] == 0 and priority[0] == existing[0] and priority[1] > existing[0][1]:
+            chosen[target] = (priority, record)
+
+    result = []
+    for target in targets:
+        selected = chosen.get(target)
+        if selected is None:
+            result.append({"target_date": target.isoformat(), "predicted_crowd_index": None,
+                           "generated_at_utc": None, "model_version": None, "forecast_key": None,
+                           "features_json": None, "forecast_kind": None, "actual_crowd_index": None,
+                           "error": None, "evaluated_at_utc": None})
+        else:
+            result.append(selected[1])
+    return result
+
+
+def locked_daily_record(conn, target_date):
     if conn is None:
         return None
-    row = conn.execute('''SELECT predicted_crowd_index FROM daily_crowd_predictions
-        WHERE target_date=? AND model_version=? AND forecast_kind='fixed' ORDER BY generated_at_utc LIMIT 1''',
-        (str(pd.Timestamp(target_date).date()),MODEL_VERSION)).fetchone()
-    return row[0] if row else None
+    record = locked_week(conn, target_date, 1)[0]
+    return record if finite(record.get("predicted_crowd_index")) is not None else None
+
+
+def locked_daily(conn, target_date):
+    record = locked_daily_record(conn, target_date)
+    return finite(record.get("predicted_crowd_index")) if record else None
 
 
 def diagnostics(conn):

@@ -51,6 +51,17 @@ def source_result(name, reader, ttl, *args, on_error=None):
     return future
 
 
+
+def immediate_result(future, default):
+    """Return a completed source value without ever waiting on an unfinished future."""
+    if future is None or not future.done():
+        return default, False
+    try:
+        return future.result()[0], True
+    except Exception:
+        logging.getLogger(__name__).exception("Background source failed")
+        return default, True
+
 def live_waits(park, reader):
     base = utils.PARK_SETTINGS[park]
 

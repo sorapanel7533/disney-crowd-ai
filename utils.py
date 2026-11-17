@@ -3409,6 +3409,51 @@ def get_crowd_index_from_major_attractions(
     }
     return (final_score, debug) if return_debug else final_score
 
+
+def get_live_crowd_index(park, live_df, major_attractions, now=None, park_open=True, minimum_count=3):
+    """Calculate a real-time index from fresh, open major-ride waits only."""
+    empty_debug = {
+        "park": park, "source": "Queue-Times live waits", "major_count": 0,
+        "final_crowd_index": np.nan, "warnings": [],
+    }
+    if not park_open:
+        empty_debug["warnings"].append("パークは閉園中です。現在指数は算出しません。")
+        return np.nan, empty_debug
+    if live_df is None or len(live_df) == 0 or not {"Attraction", "Wait"}.issubset(live_df.columns):
+        empty_debug["warnings"].append("現在の待ち時間データがありません。")
+        return np.nan, empty_debug
+
+    fresh = reliable.fresh_open(live_df, now)
+    names = {str(name) for name in (major_attractions or ())}
+    fresh = fresh[fresh["Attraction"].astype(str).isin(names)].copy()
+    fresh["Wait"] = pd.to_numeric(fresh["Wait"], errors="coerce")
+    fresh = fresh[fresh["Wait"].between(0, 300)]
+    dedupe = "RideID" if "RideID" in fresh.columns else "Attraction"
+    fresh = fresh.drop_duplicates(subset=[dedupe], keep="last")
+    if len(fresh) < max(1, int(minimum_count)):
+        empty_debug["major_count"] = int(len(fresh))
+        empty_debug["warnings"].append("有効な営業中の主要施設データが不足しています。")
+        return np.nan, empty_debug
+
+    waits = fresh["Wait"].astype(float)
+    baseline = MAJOR_CROWD_BASELINES.get(park, MAJOR_CROWD_BASELINES["DisneySea"])
+    avg_ratio = float(np.clip(waits.mean() / baseline["avg_wait_normal"], 0, 2.2))
+    max_ratio = float(np.clip(waits.max() / baseline["max_wait_normal"], 0, 2.0))
+    std_wait = float(waits.std()) if len(waits) > 1 and pd.notna(waits.std()) else 0.0
+    std_ratio = float(np.clip(std_wait / baseline["std_wait_normal"], 0, 2.0))
+    pressure = avg_ratio * 4.0 + max_ratio * 2.2 + std_ratio * 0.8
+    pressure_max = 4.0 * 2.2 + 2.2 * 2.0 + 0.8 * 2.0
+    score = round(1 + 9 * float(np.clip(pressure / pressure_max, 0, 1)), 1)
+    debug = {
+        "park": park, "source": "Queue-Times live waits", "major_count": int(len(waits)),
+        "major_avg_wait": round(float(waits.mean()), 2), "major_max_wait": round(float(waits.max()), 2),
+        "major_std_wait": round(std_wait, 2), "avg_ratio": round(avg_ratio, 3),
+        "max_ratio": round(max_ratio, 3), "std_ratio": round(std_ratio, 3),
+        "live_pressure": round(pressure, 3), "live_pressure_max": pressure_max, "final_crowd_index": score,
+        "excluded_closed_or_stale": True, "warnings": [],
+    }
+    return score, debug
+
 def get_prediction_crowd_stats(wait_prediction_df):
     if wait_prediction_df is None or len(wait_prediction_df) == 0 or "Predicted Wait" not in wait_prediction_df.columns:
         return {
