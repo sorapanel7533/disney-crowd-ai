@@ -97,8 +97,12 @@ def collect(destination, force=False, context=False):
                     utils.auto_fetch_dpa_if_needed(cursor,conn,settings,park)
                     latest=conn.execute("SELECT max(checked_at_utc) FROM source_checks WHERE park=? AND source='ticket_price'",(park,)).fetchone()[0]
                     if not latest or r.utc()-r.utc(latest)>pd.Timedelta(hours=6):
-                        prices,source=utils.fetch_ticket_prices()
-                        operations.source_check(conn,park,'ticket_price','success' if prices else 'empty',source,now.date(),utils.CASTEL_TICKET_URL if 'Castel' in source else utils.OFFICIAL_TICKET_URL)
+                        check=conn.execute("SELECT fetched_at,status,message,target_date FROM data_fetch_logs WHERE park=? AND source='ticket_price' ORDER BY fetched_at DESC LIMIT 1",(park,)).fetchone()
+                        if check:
+                            fetched_at=datetime.fromisoformat(str(check[0]))
+                            if fetched_at.tzinfo is None: fetched_at=fetched_at.replace(tzinfo=utils.JST)
+                            source_url=utils.OFFICIAL_TICKET_URL if '公式' in str(check[2]) else utils.CASTEL_TICKET_URL
+                            operations.source_check(conn,park,'ticket_price',check[1],check[2],check[3],source_url,observed_at=fetched_at.isoformat())
                 context_checks(conn,park)
                 persist_forecasts(conn,history,settings,park,weather,now)
                 result['shadow_evaluated']=evaluation.evaluate(conn,history)

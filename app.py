@@ -3,6 +3,7 @@ import streamlit as st
 st.set_page_config(page_title="ディズニー混雑AI", page_icon="🏰", layout="wide")
 st.markdown('<div class="ios-title-card"><h1>ディズニー混雑AI</h1></div>', unsafe_allow_html=True)
 park_options = ["Disneyland", "DisneySea"]
+park_display_names = {"Disneyland": "ランド", "DisneySea": "シー"}
 if st.session_state.get("park") not in park_options:
     resume_park = st.query_params.get("measurement_park")
     st.session_state["park"] = resume_park if resume_park in park_options and st.query_params.get("measurement_key") else "Disneyland"
@@ -12,6 +13,7 @@ park = st.radio(
     index=park_options.index(st.session_state["park"]),
     horizontal=True,
     key="park_radio",
+    format_func=lambda value: park_display_names.get(value, value),
 )
 if park is None:
     park = st.session_state["park"]
@@ -173,12 +175,19 @@ def cached_fetch_urtrip_dpa_sellouts(park_name):
 CUSTOM_CSS = """
 <style>
 :root {
+    color-scheme: light;
     --ios-bg: #f2f2f7;
     --ios-card: rgba(255, 255, 255, 0.96);
     --ios-card-solid: #ffffff;
     --ios-text: #1d1d1f;
-    --ios-subtext: #6e6e73;
-    --ios-blue: #007aff;
+    --ios-subtext: #595960;
+    --ios-blue: #006edb;
+    --ios-control-bg: #ffffff;
+    --ios-control-text: #1d1d1f;
+    --ios-control-border: rgba(60, 60, 67, 0.22);
+    --ios-segment-bg: rgba(118, 118, 128, 0.13);
+    --ios-success-text: #146c2e;
+    --ios-muted-text: #595960;
     --ios-green: #34c759;
     --ios-yellow: #ffcc00;
     --ios-orange: #ff9500;
@@ -186,10 +195,31 @@ CUSTOM_CSS = """
     --ios-border: rgba(60, 60, 67, 0.13);
     --ios-shadow: 0 8px 26px rgba(0, 0, 0, 0.065);
 }
+[data-theme="dark"], html[data-theme="dark"], [data-testid="stAppViewContainer"][data-theme="dark"] {
+    color-scheme: dark;
+    --ios-bg: #0e1117;
+    --ios-card: rgba(29, 35, 45, 0.98);
+    --ios-card-solid: #171c24;
+    --ios-text: #f3f4f6;
+    --ios-subtext: #c1c7d0;
+    --ios-blue: #58a6ff;
+    --ios-control-bg: #202733;
+    --ios-control-text: #f3f4f6;
+    --ios-control-border: rgba(220, 225, 235, 0.28);
+    --ios-segment-bg: #202733;
+    --ios-success-text: #79d492;
+    --ios-muted-text: #c1c7d0;
+    --ios-border: rgba(220, 225, 235, 0.2);
+    --ios-shadow: 0 8px 26px rgba(0, 0, 0, 0.24);
+}
 html, body, [class*="css"] {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif !important;
 }
 .stApp {
+    background: var(--ios-bg);
+    color: var(--ios-text);
+}
+[data-testid="stAppViewContainer"] {
     background: var(--ios-bg);
     color: var(--ios-text);
 }
@@ -208,11 +238,8 @@ h2, h3 {
     font-size: 22px !important;
     margin: 22px 0 10px !important;
 }
-p, label, span, div {
-    color: var(--ios-text);
-}
 .ios-title-card {
-    background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(255,255,255,0.92));
+    background: var(--ios-card-solid);
     border: 1px solid var(--ios-border);
     border-radius: 28px;
     box-shadow: var(--ios-shadow);
@@ -247,11 +274,11 @@ p, label, span, div {
     gap: 12px;
     min-height: 54px;
     padding: 12px 14px;
-    border-bottom: 1px solid rgba(60, 60, 67, 0.10);
+    border-bottom: 1px solid var(--ios-border);
 }
 .ios-list-row:last-child { border-bottom: none; }
 .ios-list-title { font-size: 14px; font-weight: 750; color: var(--ios-text) !important; }
-.ios-list-detail { font-size: 13px; color: var(--ios-subtext) !important; margin-top: 2px; }
+.ios-list-detail { font-size: 14px; color: var(--ios-subtext) !important; margin-top: 2px; }
 .ios-list-value { font-size: 15px; font-weight: 800; white-space: nowrap; color: var(--ios-text) !important; }
 .ios-card-grid, .compact-grid {
     display: grid;
@@ -301,12 +328,13 @@ p, label, span, div {
     line-height: 1;
     color: var(--ios-text) !important;
 }
+.hero-unit { color: var(--ios-subtext) !important; font-size: 18px; font-weight: 800; }
 .hero-crowd-label {
     display: inline-flex;
     margin-top: 8px;
     border-radius: 999px;
     padding: 6px 10px;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 800;
     background: rgba(0,122,255,0.10);
     color: var(--ios-blue) !important;
@@ -318,8 +346,8 @@ p, label, span, div {
     font-weight: 800;
     white-space: nowrap;
 }
-.ios-status-open { background: rgba(52,199,89,0.14); color: #168a38 !important; }
-.ios-status-closed { background: rgba(142,142,147,0.15); color: #636366 !important; }
+.ios-status-open { background: rgba(52,199,89,0.14); color: var(--ios-success-text) !important; }
+.ios-status-closed { background: rgba(142,142,147,0.15); color: var(--ios-muted-text) !important; }
 .ios-wait-badge {
     border-radius: 999px;
     padding: 6px 10px;
@@ -329,8 +357,8 @@ p, label, span, div {
     white-space: nowrap;
 }
 .ios-segment-shell {
-    background: rgba(118, 118, 128, 0.13);
-    border: 1px solid rgba(60,60,67,0.08);
+    background: var(--ios-segment-bg);
+    border: 1px solid var(--ios-border);
     border-radius: 999px;
     padding: 4px;
     margin: 8px 0 14px;
@@ -348,9 +376,9 @@ p, label, span, div {
     padding: 9px 10px;
     font-size: 14px;
     font-weight: 850;
-    background: #fff;
+    background: var(--ios-control-bg);
     color: var(--ios-text) !important;
-    border: 1px solid rgba(60,60,67,0.08);
+    border: 1px solid var(--ios-control-border);
 }
 .ios-segment-item.active {
     background: var(--ios-blue);
@@ -363,7 +391,7 @@ div[data-testid="stButton"] > button, .stButton > button {
     min-height: 46px;
     border-radius: 999px !important;
     font-weight: 800 !important;
-    border: 1px solid rgba(60,60,67,0.12) !important;
+    border: 1px solid var(--ios-control-border) !important;
     box-shadow: 0 5px 15px rgba(0,0,0,0.06) !important;
 }
 button[kind="primary"] {
@@ -371,20 +399,78 @@ button[kind="primary"] {
     color: #fff !important;
 }
 button[kind="secondary"] {
-    background: #fff !important;
-    color: var(--ios-text) !important;
+    background: var(--ios-control-bg) !important;
+    color: var(--ios-control-text) !important;
 }
 button[kind="primary"] p, button[kind="primary"] span { color: #fff !important; }
-button[kind="secondary"] p, button[kind="secondary"] span { color: var(--ios-text) !important; }
+button[kind="secondary"] p, button[kind="secondary"] span { color: var(--ios-control-text) !important; }
 div[data-baseweb="select"], input, textarea, [data-baseweb="input"] {
     border-radius: 18px !important;
 }
 div[data-baseweb="select"] {
-    background: #fff !important;
+    background: var(--ios-control-bg) !important;
     border: 1px solid var(--ios-border) !important;
     box-shadow: 0 5px 16px rgba(0,0,0,0.045);
     min-height: 46px;
 }
+[data-testid="stDateInput"] svg, [data-testid="stTimeInput"] svg,
+[data-testid="stDateInput"] button, [data-testid="stTimeInput"] button {
+    color: var(--ios-subtext) !important;
+}
+[data-testid="stRadio"] [role="radiogroup"] label,
+[data-testid="stCheckbox"] label,
+[data-testid="stToggle"] label,
+.st-key-display_mode_segmented [role="radio"],
+.st-key-park_segmented [role="radio"] {
+    color: var(--ios-control-text) !important;
+}
+[data-testid="stRadio"] [role="radio"],
+.st-key-display_mode_segmented [role="radio"],
+.st-key-park_segmented [role="radio"] {
+    background: var(--ios-control-bg) !important;
+    color: var(--ios-control-text) !important;
+    border: 1px solid var(--ios-control-border) !important;
+}
+[data-testid="stRadio"] [role="radio"][aria-checked="true"],
+.st-key-display_mode_segmented [role="radio"][aria-checked="true"],
+.st-key-park_segmented [role="radio"][aria-checked="true"] {
+    background: var(--ios-blue) !important;
+    color: #fff !important;
+    border-color: var(--ios-blue) !important;
+}
+[data-testid="stRadio"] [role="radio"]:focus-visible,
+.st-key-display_mode_segmented [role="radio"]:focus-visible,
+.st-key-park_segmented [role="radio"]:focus-visible,
+button:focus-visible {
+    outline: 3px solid var(--ios-blue) !important;
+    outline-offset: 2px !important;
+}
+[data-baseweb="popover"], [data-baseweb="menu"], [role="listbox"],
+[role="dialog"], [role="option"] {
+    background: var(--ios-card-solid) !important;
+    color: var(--ios-text) !important;
+}
+[role="option"]:hover, [role="option"][aria-selected="true"] {
+    background: var(--ios-segment-bg) !important;
+}
+[data-testid="stTabs"] button {
+    color: var(--ios-text) !important;
+}
+input, textarea, [data-baseweb="input"] input, [data-baseweb="select"] input {
+    background-color: var(--ios-control-bg) !important;
+    color: var(--ios-control-text) !important;
+    border-color: var(--ios-control-border) !important;
+}
+[data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] p {
+    color: var(--ios-text) !important;
+    font-size: 15px !important;
+}
+[data-testid="stCaptionContainer"] {
+    color: var(--ios-subtext) !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+}
+[data-testid="stCaptionContainer"] * { color: var(--ios-subtext) !important; font-size: inherit !important; }
 [data-testid="stMetric"] {
     background: var(--ios-card-solid);
     border: 1px solid var(--ios-border);
@@ -400,13 +486,18 @@ div[data-baseweb="select"] {
     overflow: hidden;
 }
 [data-testid="stDataFrame"], [data-testid="stTable"], [data-testid="stPyplot"] {
-    background: #fff;
+    background: var(--ios-card-solid);
     border: 1px solid var(--ios-border);
     box-shadow: 0 6px 20px rgba(0,0,0,0.05);
     padding: 8px;
 }
 thead tr th, tbody tr td { color: var(--ios-text) !important; }
-hr { border-color: rgba(60,60,67,0.12) !important; }
+header[data-testid="stHeader"], [data-testid="stToolbar"] {
+    background: var(--ios-bg) !important;
+    color: var(--ios-text) !important;
+}
+header[data-testid="stHeader"] svg, [data-testid="stToolbar"] svg { color: var(--ios-text) !important; fill: currentColor !important; }
+hr { border-color: var(--ios-border) !important; }
 @media (max-width: 760px) {
     .block-container { padding: 12px 10px 74px; }
     [data-testid="stHorizontalBlock"] { gap: 0.55rem !important; }
@@ -556,7 +647,7 @@ def render_crowd_hero(crowd_index, level_text, avg_wait, max_wait_value, confide
           <div class="hero-crowd-grid">
             <div>
               <div class="ios-label">現在の混雑指数</div>
-              <div class="hero-crowd-index">{escape(value)}<span style="font-size:18px;font-weight:800;color:#6e6e73;"> / 10</span></div>
+              <div class="hero-crowd-index">{escape(value)}<span class="hero-unit"> / 10</span></div>
               <div class="hero-crowd-label">{escape(str(level_text))}</div>
             </div>
             <div class="ios-card-grid" style="margin:0;">
@@ -712,8 +803,6 @@ if admin_section == "全アトラクション":
     except (SQLiteError, pd.errors.DatabaseError, OSError):
         st.warning("保存履歴を読み込めませんでした。パークを選び直すか、時間をおいてお試しください。")
     st.stop()
-
-st.markdown('[Powered by Queue-Times.com](https://queue-times.com/)')
 
 needs_forecast = display_mode in ("ダッシュボード", "アトラクション別予測", "日付指定予測", "回り方プランナー", "DPA/PP予測") or admin_section in (
     "ダッシュボード", "アトラクション別予測", "日付指定予測", "データ・システム管理",
@@ -924,7 +1013,7 @@ live_available = not fetch_error and park_open_now and len(valid_target_df) >= 3
 if not live_available:
     crowd_10 = np.nan
 state_text = '取得失敗' if fetch_error else ('待ち時間更新中' if wait_pending and len(valid_all_df) == 0 else ('閉園時間帯（営業時間の取得元: '+park_hours_source+'）' if not park_open_now else ('営業データあり' if len(valid_all_df) else '運休・欠測・古いデータ（営業状態は未確認）')))
-st.info(f'{park} / {state_text}')
+st.info(f'{park_display_names.get(park, park)} / {state_text}')
 
 relative_rows = []
 
@@ -1263,7 +1352,7 @@ if display_mode == "ダッシュボード":
 
     compact_card_grid([
         ("チケット価格", "取得不可" if ticket_price is None else f"{ticket_price}円"),
-        ("取得元", ticket_source),
+        ("対象日", f"{datetime.now(JST):%m月%d日}"),
         ("補正値", today_bonus),
     ])
 
@@ -1290,16 +1379,41 @@ if display_mode == "ダッシュボード":
             unsafe_allow_html=True
         )
 
-    st.subheader("🎭 今日のショー/パレード")
-    if len(today_show_schedules) > 0:
+    st.subheader("🎭 ショー・パレードの公演時刻")
+    park_schedules = schedules[schedules.get("park", pd.Series(index=schedules.index, dtype=str)).eq(park)].copy() if not schedules.empty else pd.DataFrame()
+    today = datetime.now(JST).date()
+    if not park_schedules.empty and "target_date" in park_schedules:
+        park_schedules["target_date"] = pd.to_datetime(park_schedules["target_date"], errors="coerce").dt.date
+        schedule_dates = sorted({day for day in park_schedules["target_date"].dropna() if day >= today})
+    else:
+        schedule_dates = []
+    if today not in schedule_dates:
+        schedule_dates.insert(0, today)
+    selected_show_date = st.selectbox(
+        "公演日",
+        schedule_dates,
+        index=schedule_dates.index(today) if today in schedule_dates else 0,
+        format_func=lambda day: f"{day.month}月{day.day}日（{['月','火','水','木','金','土','日'][day.weekday()]}）",
+        key=f"show_schedule_date_{park}",
+    )
+    selected_shows = park_schedules[park_schedules["target_date"].eq(selected_show_date)].copy() if not park_schedules.empty else pd.DataFrame()
+    if not selected_shows.empty:
+        selected_shows["公演時刻"] = selected_shows.apply(
+            lambda row: "休止" if row.get("status") == "suspended" else
+                        "未発表" if row.get("status") == "unannounced" else str(row.get("show_time", "")),
+            axis=1,
+        )
+        selected_shows["ショー・パレード"] = selected_shows["show_name"]
+        selected_shows["_sort"] = selected_shows["公演時刻"].replace({"休止": "99:00", "未発表": "99:01"})
         st.dataframe(
-            safe_sort_head(today_show_schedules, "show_time", 30, ascending=True)[
-                ["show_time", "show_name", "category", "note"]
-            ] if set(["show_time", "show_name", "category", "note"]).issubset(today_show_schedules.columns) else today_show_schedules,
-            width="stretch"
+            selected_shows.sort_values(["_sort", "ショー・パレード"], na_position="last")[
+                ["ショー・パレード", "公演時刻"]
+            ].drop_duplicates(),
+            width="stretch",
+            hide_index=True,
         )
     else:
-        st.info("公式ショー時刻を取得できませんでした。推定時刻や仮のショー名は表示しません。")
+        st.info("この日の公式公演情報はまだありません。未発表や取得できない時間を推定して表示しません。")
 
     st.subheader("🎯 ショー前後の待ち時間メモ")
     st.dataframe(
@@ -1423,9 +1537,11 @@ if display_mode == "ダッシュボード":
             graph_ylim(y_source)
         )
 
-        ax.set_ylabel("Predicted Wait")
-        ax.set_title(f"{park} Major Attractions Average Prediction")
-        ax.legend()
+        ax.set_ylabel("待ち時間（分）")
+        ax.set_xlabel("時刻（日本時間）")
+        ax.set_title(f"{park_display_names.get(park, park)} 人気主要アトラクションの平均待ち時間")
+        ax.tick_params(labelsize=12)
+        ax.legend(fontsize=12)
 
         st.pyplot(fig)
         get_pyplot().close(fig)
@@ -1485,9 +1601,9 @@ if display_mode == "ダッシュボード":
                 pass
         ax_week.set_ylim(0, 10)
         ax_week.set_ylabel("混雑指数")
-        ax_week.set_title(f"{park} 1 Week Crowd Forecast", fontsize=11)
+        ax_week.set_title(f"{park_display_names.get(park, park)} 1週間の混雑予測", fontsize=14)
         ax_week.grid(alpha=0.18)
-        ax_week.tick_params(labelsize=10)
+        ax_week.tick_params(labelsize=13)
         get_pyplot().tight_layout()
         st.pyplot(fig_week)
         get_pyplot().close(fig_week)
@@ -1559,9 +1675,9 @@ elif display_mode == "全アトラクション":
                     marker="o"
                 )
 
-                ax.set_xlabel("Time")
+                ax.set_xlabel("観測日時")
                 ax.set_title(
-                    f"{selected_history_attraction} Wait Time History"
+                    f"{selected_history_attraction} 待ち時間の履歴"
                 )
 
                 get_pyplot().xticks(
@@ -1589,9 +1705,9 @@ elif display_mode == "全アトラクション":
                     marker="o"
                 )
 
-                ax.set_xlabel("Date")
+                ax.set_xlabel("日付")
                 ax.set_title(
-                    f"{selected_history_attraction} Daily Average Wait"
+                    f"{selected_history_attraction} 日別平均待ち時間"
                 )
 
                 get_pyplot().xticks(
@@ -1620,15 +1736,16 @@ elif display_mode == "全アトラクション":
                 )
 
                 ax.set_xticks(range(OPEN_HOUR, CROWD_END_HOUR, 2))
-                ax.set_xlabel("Hour")
+                ax.set_xlabel("時刻（日本時間）")
                 ax.set_title(
-                    f"{selected_history_attraction} Average Wait by Hour"
+                    f"{selected_history_attraction} 時間帯別の平均待ち時間"
                 )
 
                 y_values = hourly_avg["wait_time"].tolist()
 
             ax.set_ylim(0, graph_ylim(y_values))
-            ax.set_ylabel("Wait Time")
+            ax.set_ylabel("待ち時間（分）")
+            ax.tick_params(labelsize=12)
 
             get_pyplot().tight_layout()
 
@@ -1996,7 +2113,6 @@ elif display_mode == "日付指定予測":
         unsafe_allow_html=True
     )
 
-    st.write("価格取得元:", target_ticket_source)
     st.write("主な理由:", " / ".join(target_reasons))
 
 

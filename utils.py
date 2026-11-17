@@ -88,7 +88,7 @@ PARK_SETTINGS = {
 }
 
 CASTEL_TICKET_URL = "https://castel.jp/p/7339"
-OFFICIAL_TICKET_URL = "https://www.tokyodisneyresort.co.jp/en/ticket/index.html"
+OFFICIAL_TICKET_URL = "https://www.tokyodisneyresort.jp/ticket/index.html"
 OFFICIAL_CALENDAR_URL = "https://www.tokyodisneyresort.jp/en/tdr/calendar.html"
 GLOBAL_PREDICTION_NAME = "__ALL__"
 MAJOR_AVERAGE_NAME = "__MAJOR_5_AVERAGE__"
@@ -328,9 +328,14 @@ def _initialize_db(db_name):
         show_time TEXT,
         category TEXT,
         source TEXT,
-        note TEXT
+        note TEXT,
+        status TEXT
     )
     """)
+
+    show_columns = {row[1] for row in cursor.execute("PRAGMA table_info(show_schedules)")}
+    if "status" not in show_columns:
+        cursor.execute("ALTER TABLE show_schedules ADD COLUMN status TEXT")
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS show_wait_context (
@@ -530,86 +535,172 @@ def fetch_castel_ticket_prices():
         return {}, "取得失敗"
 
 
-def fetch_official_ticket_prices():
+def _parse_official_ticket_calendar(page_html):
+    """Extract dated 1-Day Passport adult prices from the official calendar tables."""
+    from lxml import html as lxml_html
+
+    root = lxml_html.fromstring(page_html)
+    month_pattern = re.compile(r"(20\d{2})\s*年\s*(\d{1,2})\s*月")
+    amount_pattern = re.compile(r"(?<!\d)(\d{1,2}(?:,\d{3})|\d{4,5})(?!\d)")
+    day_pattern = re.compile(r"^\s*(\d{1,2})(?!\d)")
+    prices = {}
+
+    def text_of(node):
+        return re.sub(r"\s+", " ", unescape(" ".join(node.itertext()))).strip()
+
+    def month_for_table(table):
+        previous = table.xpath("preceding::*")
+        for item in reversed(previous):
+            match = month_pattern.search(text_of(item))
+            if match:
+                return int(match.group(1)), int(match.group(2))
+        for item in reversed(previous):
+            match = re.fullmatch(r"\s*(\d{1,2})\s*月\s*", text_of(item))
+            if match and 1 <= int(match.group(1)) <= 12:
+                month = int(match.group(1))
+                now = datetime.now(JST)
+                year = now.year + (1 if month < now.month and now.month - month > 6 else 0)
+                return year, month
+        return None
+
+    def cell_day(cell):
+        for key in ("datetime", "data-date", "data-day", "aria-label"):
+            value = cell.get(key, "")
+            match = re.search(r"(20\d{2})[-年](\d{1,2})[-月](\d{1,2})", str(value))
+            if match:
+                return int(match.group(1)), int(match.group(2)), int(match.group(3))
+        return None
+
+    for table in root.xpath("//table"):
+        context = month_for_table(table)
+        if not context:
+            continue
+        table_year, table_month = context
+        active_year, active_month, last_day = table_year, table_month, None
+        all_cells = [cell for row in table.xpath(".//tr") for cell in row.xpath("./th | ./td")]
+        first_calendar_day = None
+        for cell in all_cells:
+            match = day_pattern.match(text_of(cell))
+            if match:
+                first_calendar_day = int(match.group(1))
+                break
+        if first_calendar_day is not None and first_calendar_day >= 22:
+            active_month -= 1
+            if active_month == 0:
+                active_month, active_year = 12, active_year - 1
+        for row in table.xpath(".//tr"):
+            cells = row.xpath("./th | ./td")
+            for cell in cells:
+                text = text_of(cell)
+                explicit = cell_day(cell)
+                day_match = day_pattern.match(text)
+                if explicit:
+                    try:
+                        price_date = date(*explicit)
+                    except ValueError:
+                        continue
+                    day = explicit[2]
+                    active_year, active_month = explicit[0], explicit[1]
+                elif day_match:
+                    day = int(day_match.group(1))
+                    if not 1 <= day <= 31:
+                        continue
+                    if last_day is not None and last_day >= 21 and day <= 10:
+                        active_month += 1
+                        if active_month == 13:
+                            active_month, active_year = 1, active_year + 1
+                    try:
+                        price_date = date(active_year, active_month, day)
+                    except ValueError:
+                        last_day = day
+                        continue
+                else:
+                    continue
+                last_day = day
+                amounts = [match for match in amount_pattern.finditer(text)
+                           if 5_000 <= int(match.group(1).replace(",", "")) <= 30_000]
+                if not amounts:
+                    continue
+                prices[price_date] = int(amounts[0].group(1).replace(",", ""))
+    return prices
+
+
+def _ticket_calendar_month_urls(page_html, target_date=None):
+    from urllib.parse import urljoin
+    from lxml import html as lxml_html
+
+    target_date = target_date or datetime.now(JST).date()
+    if isinstance(target_date, datetime):
+        target_date = target_date.date()
+    end_date = target_date + timedelta(days=30)
+    needed = {(target_date.year, target_date.month), (end_date.year, end_date.month)}
+    root = lxml_html.fromstring(page_html)
+    found = {}
+    for href in root.xpath("//a[@href]/@href"):
+        absolute = urljoin(OFFICIAL_TICKET_URL, href)
+        match = re.search(r"/ticket/index/(20\d{2})(\d{2})/?(?:[?#].*)?$", absolute)
+        if not match:
+            continue
+        year, month = int(match.group(1)), int(match.group(2))
+        if 1 <= month <= 12:
+            found[(year, month)] = absolute
+    return {key: found[key] for key in sorted(needed) if key in found}
+
+
+def fetch_official_ticket_prices(target_date=None):
+    target_date = target_date or datetime.now(JST).date()
+    if isinstance(target_date, datetime):
+        target_date = target_date.date()
     try:
         res = requests.get(
             OFFICIAL_TICKET_URL,
-            headers={"User-Agent": "Mozilla/5.0"},
-            timeout=4
+            headers={"User-Agent": "Mozilla/5.0 DisneyCrowdAI/1.0"},
+            timeout=(4, 12)
         )
+        if res.status_code in (401, 403, 429):
+            return {}, f"公式チケットページへのアクセス拒否（HTTP {res.status_code}）"
         res.raise_for_status()
-
-        plain = re.sub(r"<[^>]+>", "\n", res.text)
-        plain = unescape(plain)
-        lines = [x.strip() for x in plain.splitlines() if x.strip()]
-
-        month_map = {
-            "Jan": 1,
-            "Feb": 2,
-            "Mar": 3,
-            "Apr": 4,
-            "May": 5,
-            "Jun": 6,
-            "Jul": 7,
-            "Aug": 8,
-            "Sep": 9,
-            "Oct": 10,
-            "Nov": 11,
-            "Dec": 12,
-        }
-
-        prices = {}
-        current_year = None
-        month_queue = []
-        current_month = None
-        pending_day = None
-
-        for line in lines:
-            year_match = re.search(r"\b(20\d{2})\b", line)
-            month_hits = re.findall(
-                r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b",
-                line
-            )
-
-            if year_match and month_hits:
-                current_year = int(year_match.group(1))
-                month_queue = [month_map[x] for x in month_hits]
-                current_month = month_queue.pop(0)
-                pending_day = None
+        if not res.encoding or res.encoding.lower() in ("iso-8859-1", "ascii"):
+            res.encoding = res.apparent_encoding or "utf-8"
+        prices = _parse_official_ticket_calendar(res.text)
+        failed_pages = 0
+        request_count = 1
+        month_urls = _ticket_calendar_month_urls(res.text, target_date)
+        for (year, month), url in month_urls.items():
+            already_has_month = any(day.year == year and day.month == month for day in prices)
+            if (year, month) == (target_date.year, target_date.month) and already_has_month:
                 continue
+            time.sleep(2)
+            request_count += 1
+            try:
+                month_res = requests.get(
+                    url,
+                    headers={"User-Agent": "Mozilla/5.0 DisneyCrowdAI/1.0"},
+                    timeout=(4, 12),
+                )
+                if month_res.status_code in (401, 403, 429):
+                    failed_pages += 1
+                    break
+                month_res.raise_for_status()
+                if not month_res.encoding or month_res.encoding.lower() in ("iso-8859-1", "ascii"):
+                    month_res.encoding = month_res.apparent_encoding or "utf-8"
+                month_prices = _parse_official_ticket_calendar(month_res.text)
+            except requests.RequestException:
+                failed_pages += 1
+                break
+            if month_prices:
+                prices.update(month_prices)
+            else:
+                failed_pages += 1
+        if not prices:
+            return {}, "公式チケットページの価格表を解析できませんでした"
+        source = "東京ディズニーリゾート公式チケットページ"
+        if failed_pages:
+            source += f"（一部取得・{request_count - failed_pages}/{request_count}ページ）"
+        return prices, source
 
-            if "As of" in line:
-                if month_queue:
-                    current_month = month_queue.pop(0)
-                pending_day = None
-                continue
-
-            if current_year is None or current_month is None:
-                continue
-
-            if re.fullmatch(r"\d{1,2}", line):
-                day = int(line)
-                if 1 <= day <= 31:
-                    pending_day = day
-                continue
-
-            price_match = re.fullmatch(
-                r"(7,900|8,400|8,900|9,400|9,900|10,900|7900|8400|8900|9400|9900|10900)",
-                line
-            )
-
-            if price_match and pending_day is not None:
-                price = int(price_match.group(1).replace(",", ""))
-                try:
-                    prices[date(current_year, current_month, pending_day)] = price
-                except ValueError:
-                    pass
-                pending_day = None
-
-        return prices, "東京ディズニーリゾート公式サイト"
-
-    except Exception:
-        return {}, "公式サイト取得失敗"
+    except Exception as exc:
+        return {}, f"公式チケットページ取得失敗（{type(exc).__name__}）"
 
 
 def fetch_ticket_prices():
@@ -1622,6 +1713,29 @@ def should_fetch_data_today(fetch_logs, park, source, target_date=None):
     return len(today_logs) == 0
 
 
+def should_retry_daily_fetch(fetch_logs, park, source, target_date=None, retry_minutes=60):
+    """Retry incomplete external feeds periodically; successful daily snapshots stay cached."""
+    target_date = target_date or datetime.now(JST).date()
+    if fetch_logs is None or fetch_logs.empty or "target_date" not in fetch_logs:
+        return True
+    matching = fetch_logs[
+        (fetch_logs["target_date"] == target_date)
+        & (fetch_logs.get("park", "") == park)
+        & (fetch_logs.get("source", "") == source)
+    ]
+    if matching.empty:
+        return True
+    latest = matching.sort_values("fetched_at").iloc[-1]
+    if str(latest.get("status", "")).lower() in {"success", "estimated"}:
+        return False
+    fetched_at = pd.Timestamp(latest.get("fetched_at"))
+    if fetched_at.tzinfo is None:
+        fetched_at = fetched_at.tz_localize(JST)
+    else:
+        fetched_at = fetched_at.tz_convert(JST)
+    return datetime.now(JST) - fetched_at.to_pydatetime() >= timedelta(minutes=retry_minutes)
+
+
 def save_weather_snapshot(cursor, conn, park, temperature, rain_mm, weather_text, source="open-meteo"):
     now = datetime.now(JST)
     today_text = now.date().strftime("%Y-%m-%d")
@@ -2222,33 +2336,96 @@ def _known_show_schedule_fallback(park, target_date):
 
 
 def _show_name_from_url(url):
-    for key, value in SHOW_NAME_BY_ID.items():
-        if f"/{key}" in str(url):
-            return value
-    return ""
+    match = re.search(r"/show/schedule/(\d+)", str(url))
+    return SHOW_NAME_BY_ID.get(match.group(1), "") if match else ""
 
 
 def _parse_monthly_show_page(html, url, target_date):
     show_name = _show_name_from_url(url)
     if not show_name:
         return []
+    from lxml import html as lxml_html
+
+    reference = target_date or datetime.now(JST).date()
+    root = lxml_html.fromstring(html)
+    for node in root.xpath("//script | //style | //noscript"):
+        node.drop_tree()
+    month_pattern = re.compile(r"(20\d{2})\s*年\s*(\d{1,2})\s*月")
+    month_only_pattern = re.compile(r"(\d{1,2})\s*月")
+    day_pattern = re.compile(r"^\s*(\d{1,2})\s*[（(]([^）)]*)[）)]")
+    time_pattern = re.compile(r"(?<!\d)(\d{1,2}:\d{2})\s*(?:a\.m\.|p\.m\.|am|pm)?", re.I)
+    rows = []
+
+    def add_row(year, month, day_text, value_text):
+        date_match = day_pattern.match(day_text)
+        if not date_match:
+            return
+        day = int(date_match.group(1))
+        if not 1 <= day <= 31:
+            return
+        try:
+            scheduled_date = date(year, month, day)
+        except ValueError:
+            return
+        value = f"{day_text} {value_text}".strip()
+        lowered = value.casefold()
+        if any(word in value for word in ("休止", "休演", "休園")) or "rest" in lowered:
+            status, times = "suspended", []
+        elif any(word in value for word in ("未発表", "未定", "調整中", "??", "？")):
+            status, times = "unannounced", []
+        else:
+            status, times = "scheduled", time_pattern.findall(value_text)
+            if not times:
+                return
+        note = "公式月間スケジュールから取得"
+        if times:
+            for show_time in times:
+                rows.append({"target_date": scheduled_date, "show_name": show_name,
+                             "show_time": show_time, "category": "ショー/パレード",
+                             "source": url, "note": note, "status": status})
+        else:
+            rows.append({"target_date": scheduled_date, "show_name": show_name,
+                         "show_time": "", "category": "ショー/パレード",
+                         "source": url, "note": note, "status": status})
+
+    year, month = reference.year, reference.month
+    for element in root.iter():
+        tag = str(getattr(element, "tag", "")).lower()
+        if tag in {"h1", "h2", "h3", "h4", "h5", "h6"}:
+            heading = re.sub(r"\s+", " ", " ".join(element.itertext())).strip()
+            match = month_pattern.search(heading)
+            if match:
+                year, month = int(match.group(1)), int(match.group(2))
+            else:
+                match = month_only_pattern.search(heading)
+                if match:
+                    month = int(match.group(1))
+                    year = reference.year + (1 if month < reference.month and reference.month - month > 6 else 0)
+        if tag != "tr":
+            continue
+        cells = element.xpath("./th | ./td")
+        if not cells:
+            continue
+        cell_texts = [re.sub(r"\s+", " ", " ".join(cell.itertext())).strip() for cell in cells]
+        if day_pattern.match(cell_texts[0]):
+            add_row(year, month, cell_texts[0], " | ".join(cell_texts[1:]))
+
+    if rows:
+        return rows
+
     text = re.sub(r"<script.*?</script>", " ", html, flags=re.S | re.I)
     text = re.sub(r"<style.*?</style>", " ", text, flags=re.S | re.I)
     text = re.sub(r"<[^>]+>", "\n", text)
-    text = unescape(text).replace("\u00a0", " ")
-    lines = [re.sub(r"\s+", " ", line).strip() for line in text.splitlines() if line.strip()]
-    day_pattern = re.compile(rf"^{target_date.day}\s*\([^)]*\)\s*(?:\|| )\s*(.+)$")
-    rows = []
+    lines = [re.sub(r"\s+", " ", line).strip() for line in unescape(text).splitlines() if line.strip()]
+    year, month = reference.year, reference.month
     for line in lines:
-        match = day_pattern.search(line)
-        if not match:
+        heading = month_pattern.search(line)
+        if heading:
+            year, month = int(heading.group(1)), int(heading.group(2))
             continue
-        value = match.group(1)
-        if "??" in value or "Rest" in value:
-            continue
-        times = re.findall(r"\d{1,2}:\d{2}\s*(?:a\.m\.|p\.m\.|am|pm)?", value, re.I)
-        for show_time in times:
-            rows.append({"target_date": target_date, "show_name": show_name, "show_time": show_time.replace("a.m.", "am").replace("p.m.", "pm"), "category": 'ショー/パレード', "source": url, "note": '公式月間スケジュールから取得'})
+        match = re.match(r"^\s*(\d{1,2}\s*[（(][^）)]*[）)])\s*(?:\||\s)\s*(.*)$", line)
+        if match:
+            add_row(year, month, match.group(1), match.group(2))
     return rows
 
 
@@ -2292,67 +2469,81 @@ def _parse_daily_show_page(html, url, target_date):
 def fetch_official_show_schedule(settings, target_date=None):
     target_date = target_date or datetime.now(JST).date()
     urls = settings.get("show_urls") or [settings.get("show_url", "")]
-    urls = [url for url in urls if url]
+    urls = [url for url in urls if "/show/schedule/" in url]
     if not urls:
         return pd.DataFrame(), 'ショー/パレード取得URLが設定されていません'
     rows = []
     messages = []
     failed_count = 0
-    for url in urls:
+    blocked = False
+    for index, url in enumerate(urls):
+        if index:
+            time.sleep(2)
         try:
-            res = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=4)
+            res = requests.get(url, headers={"User-Agent": "Mozilla/5.0 DisneyCrowdAI/1.0"}, timeout=(4, 12))
+            if res.status_code in (401, 403, 429):
+                failed_count += 1
+                blocked = True
+                messages.append(f"公式ページへのアクセス拒否（HTTP {res.status_code}）")
+                break
             if not res.encoding or res.encoding.lower() in ("iso-8859-1", "ascii"):
                 res.encoding = res.apparent_encoding or "utf-8"
             res.raise_for_status()
         except Exception as exc:
             failed_count += 1
-            messages.append(f"{url}: {exc}")
+            messages.append(f"取得失敗（{type(exc).__name__}）")
             if failed_count >= 2 and not rows:
                 break
             continue
-        if "/show/schedule/" in url:
-            rows.extend(_parse_monthly_show_page(res.text, url, target_date))
-        else:
-            rows.extend(_parse_daily_show_page(res.text, url, target_date))
+        rows.extend(_parse_monthly_show_page(res.text, url, target_date))
     if not rows:
-        return pd.DataFrame(), '公式ショー時刻を取得できませんでした'
-    df = pd.DataFrame(rows).drop_duplicates(["show_name", "show_time"], keep="first")
+        empty = pd.DataFrame()
+        empty.attrs.update(fetch_status="blocked" if blocked else ("failed" if failed_count else "empty"),
+                           failed_count=failed_count, requested_count=min(len(urls), failed_count))
+        detail = "公式月間スケジュールを取得できませんでした"
+        if messages:
+            detail += f"（{messages[0]}）"
+        return empty, detail
+    df = pd.DataFrame(rows).drop_duplicates(["target_date", "show_name", "show_time", "status", "source"], keep="first")
     df = _sanitize_show_rows(df)
     df["_hour"] = df["show_time"].apply(_parse_show_time_to_hour)
-    df = df[df["_hour"].notna()].sort_values("_hour").drop(columns=["_hour"])
-    if len(df) == 0:
-        return pd.DataFrame(), '公式ショー時刻を取得できませんでした'
-    return df.reset_index(drop=True), f"ショー/パレードを{len(df)}件取得しました"
+    df = df.sort_values(["target_date", "_hour", "show_name"], na_position="last").drop(columns=["_hour"])
+    status = "partial" if failed_count else "success"
+    df.attrs.update(fetch_status=status, failed_count=failed_count, requested_count=len(urls), blocked=blocked)
+    detail = f"公式月間スケジュールを{df['target_date'].nunique()}日分・{len(df)}件取得"
+    if failed_count:
+        detail += f"（{failed_count}ページを確認できませんでした）"
+    return df.reset_index(drop=True), detail
 
 def save_show_schedule_rows(cursor, conn, park, show_df, target_date=None):
     if show_df is None or len(show_df) == 0:
         return 0
 
-    target_date = target_date or datetime.now(JST).date()
-    cursor.execute(
-        "DELETE FROM show_schedules WHERE target_date = ? AND park = ?",
-        (str(target_date), park)
-    )
-
     saved = 0
     observed_at = datetime.now(JST).isoformat()
     show_df = _sanitize_show_rows(show_df)
-    for _, row in show_df.iterrows():
-        cursor.execute("""
-        INSERT INTO show_schedules
-        (observed_at, target_date, park, show_name, show_time, category, source, note)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            observed_at,
-            str(row.get("target_date", target_date)),
-            park,
-            str(row.get("show_name", "")),
-            str(row.get("show_time", "")),
-            str(row.get("category", "ショー")),
-            str(row.get("source", "official")),
-            str(row.get("note", "")),
-        ))
-        saved += 1
+    if "status" not in show_df:
+        show_df["status"] = show_df.get("show_time", pd.Series(index=show_df.index, dtype=str)).apply(
+            lambda value: "scheduled" if _parse_show_time_to_hour(value) is not None else "unannounced"
+        )
+    show_df = show_df.copy()
+    show_df["_target_date"] = show_df["target_date"].map(_date_text)
+    for (day_text, name, source), group in show_df.groupby(["_target_date", "show_name", "source"], dropna=False):
+        cursor.execute(
+            "DELETE FROM show_schedules WHERE target_date = ? AND park = ? AND show_name = ? AND source = ?",
+            (str(day_text), park, str(name), str(source))
+        )
+        for _, row in group.iterrows():
+            cursor.execute("""
+            INSERT INTO show_schedules
+            (observed_at, target_date, park, show_name, show_time, category, source, note, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                observed_at, str(day_text), park, str(name), str(row.get("show_time", "")),
+                str(row.get("category", "ショー")), str(source), str(row.get("note", "")),
+                str(row.get("status", "scheduled")),
+            ))
+            saved += 1
 
     conn.commit()
     return saved
@@ -2493,27 +2684,36 @@ def auto_collect_prediction_context(cursor, conn, park):
     else:
         results.append("イベント/休暇シグナルは確認済み")
 
-    existing_show_df = load_show_schedules(conn)
-    has_today_shows = False
-    if len(existing_show_df) > 0 and "target_date" in existing_show_df.columns and "park" in existing_show_df.columns:
-        has_today_shows = len(existing_show_df[
-            (existing_show_df["target_date"] == str(today))
-            & (existing_show_df["park"] == park)
-        ]) > 0
+    if should_retry_daily_fetch(logs, park, "ticket_price", today):
+        try:
+            price_map, source = fetch_ticket_prices()
+            saved_count = save_ticket_price_snapshots(cursor, conn, park, price_map, source)
+            status = "partial" if saved_count and "一部取得" in source else ("success" if saved_count else "empty")
+            message = f"{source}; チケット価格を{saved_count}件保存"
+        except Exception as exc:
+            price_map, source, saved_count = {}, "公式チケットページ", 0
+            status, message = "failed", f"チケット価格取得失敗（{type(exc).__name__}）"
+        log_data_fetch(cursor, conn, park, "ticket_price", status, message, saved_count, today)
+        results.append(message)
+    else:
+        results.append("チケット価格は本日確認済み")
 
-    should_fetch_shows = should_fetch_data_today(logs, park, "show_schedules", today)
+    should_fetch_shows = should_retry_daily_fetch(logs, park, "show_schedules", today)
 
     if should_fetch_shows:
         show_settings = dict(PARK_SETTINGS.get(park, {}))
         show_settings["park"] = park
         show_df, show_message = fetch_official_show_schedule(show_settings, today)
+        fetch_status = show_df.attrs.get("fetch_status", "success" if len(show_df) else "empty")
         saved_count = save_show_schedule_rows(cursor, conn, park, show_df, today)
         log_data_fetch(
             cursor,
             conn,
             park,
             "show_schedules",
-            "success" if saved_count > 0 else "empty",
+            "success" if saved_count > 0 and fetch_status == "success" else (
+                "partial" if saved_count > 0 and fetch_status == "partial" else fetch_status
+            ),
             show_message,
             saved_count,
             today
@@ -3220,7 +3420,11 @@ def make_major_average_prediction(wait_prediction_df, major_rides=None):
 def get_actual_wait_series_for_today(history_df, attraction=None, major_rides=None):
     grid = pd.DataFrame(build_time_slots(OPEN_HOUR, CROWD_END_HOUR, 15))
     grid['Actual Wait'] = np.nan
+    grid['Observation Count'] = 0
+    grid['Last Observed'] = pd.NaT
+    grid['Observation Status'] = '欠測'
     if history_df is None or history_df.empty:
+        grid.attrs.update(expected_slots=len(grid), valid_slots=0, closed_slots=0, invalid_slots=0, last_observed=None)
         return grid
     df = history_df[history_df['date'] == datetime.now(JST).date()].copy()
     if attraction is not None:
@@ -3228,17 +3432,43 @@ def get_actual_wait_series_for_today(history_df, attraction=None, major_rides=No
     elif major_rides:
         df = df[df.attraction.isin(major_rides)]
     if df.empty:
+        grid.attrs.update(expected_slots=len(grid), valid_slots=0, closed_slots=0, invalid_slots=0, last_observed=None)
+        return grid
+    df['datetime'] = pd.to_datetime(df['datetime'], errors='coerce')
+    df['wait_time'] = pd.to_numeric(df['wait_time'], errors='coerce')
+    df = df.dropna(subset=['datetime'])
+    if df.empty:
+        grid.attrs.update(expected_slots=len(grid), valid_slots=0, closed_slots=0, invalid_slots=0, last_observed=None)
         return grid
     df['TimeLabel'] = df.datetime.dt.floor('15min').dt.strftime('%H:%M')
-    df['valid'] = df.is_open.eq(1) & df.wait_time.between(0,300)
-    # Any closure/missing reading makes that ride's slot a gap.
-    per_ride = df.groupby(['TimeLabel','attraction']).agg(wait=('wait_time','mean'), valid=('valid','all'))
-    per_ride.loc[~per_ride.valid, 'wait'] = np.nan
-    actual = per_ride.groupby('TimeLabel')['wait'].mean()
-    if major_rides:
-        counts = per_ride.groupby('TimeLabel')['wait'].count()
-        actual[counts < len(major_rides)] = np.nan
+    df['valid'] = df.is_open.eq(1) & df.wait_time.between(0, 300)
+    if 'quality' in df:
+        df['valid'] &= df['quality'].eq('valid')
+    # Keep each ride's latest state within a quarter-hour; an older duplicate
+    # must not erase a later open observation, while the latest closure remains a gap.
+    order = ['datetime'] + (['fetched_at_utc'] if 'fetched_at_utc' in df else [])
+    latest = df.sort_values(order).drop_duplicates(['TimeLabel', 'attraction'], keep='last')
+    valid = latest[latest['valid']].copy()
+    actual = valid.groupby('TimeLabel')['wait_time'].mean()
+    counts = valid.groupby('TimeLabel')['attraction'].nunique()
+    last_observed = valid.groupby('TimeLabel')['datetime'].max()
+    # An unknown operation state is missing data, not proof that the ride was closed.
+    closed = latest[latest['is_open'].eq(0)].groupby('TimeLabel')['attraction'].nunique()
+    invalid = latest[latest['is_open'].eq(1) & ~latest['valid']].groupby('TimeLabel')['attraction'].nunique()
     grid['Actual Wait'] = grid.TimeLabel.map(actual)
+    grid['Observation Count'] = grid.TimeLabel.map(counts).fillna(0).astype(int)
+    grid['Last Observed'] = grid.TimeLabel.map(last_observed.to_dict())
+    grid.loc[grid['Observation Count'].gt(0), 'Observation Status'] = '観測あり'
+    closed_slots = grid.TimeLabel.isin(closed.index)
+    invalid_slots = grid.TimeLabel.isin(invalid.index)
+    grid.loc[closed_slots & grid['Observation Count'].eq(0), 'Observation Status'] = '休止・閉園'
+    grid.loc[invalid_slots & grid['Observation Count'].eq(0), 'Observation Status'] = '値不正'
+    grid.attrs.update(
+        expected_slots=len(grid), valid_slots=int(grid['Actual Wait'].notna().sum()),
+        closed_slots=int((grid['Observation Status'] == '休止・閉園').sum()),
+        invalid_slots=int((grid['Observation Status'] == '値不正').sum()),
+        last_observed=valid['datetime'].max() if not valid.empty else None,
+    )
     return grid
 
 
