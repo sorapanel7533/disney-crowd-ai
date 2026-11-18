@@ -257,3 +257,36 @@ def test_daily_external_data_retry_keeps_success_but_retries_stale_failure():
 
     assert not utils.should_retry_daily_fetch(success, "Disneyland", "ticket_price", today)
     assert utils.should_retry_daily_fetch(failed, "Disneyland", "ticket_price", today)
+
+
+
+def test_calendar_capture_dates_coexist_with_full_timestamp_rows():
+    import sqlite3
+
+    with sqlite3.connect(":memory:") as conn:
+        conn.execute("CREATE TABLE park_hours (observed_at TEXT, target_date TEXT, park TEXT, open_hour REAL, close_hour REAL, ticket_price INTEGER, source TEXT, note TEXT)")
+        conn.executemany(
+            "INSERT INTO park_hours VALUES (?,?,?,?,?,?,?,?)",
+            [
+                ("2026-11-18T08:00:00+09:00", "2026-11-18", "Disneyland", 9, 21, 10900, "live", "before import"),
+                ("2026-11-18", "2026-11-19", "Disneyland", 9, 21, 10900, "official_calendar_archive_2026-11-18", "imported capture date"),
+            ],
+        )
+        conn.execute("CREATE TABLE ticket_price_snapshots (observed_at TEXT, target_date TEXT, park TEXT, price INTEGER, source TEXT)")
+        conn.executemany(
+            "INSERT INTO ticket_price_snapshots VALUES (?,?,?,?,?)",
+            [
+                ("2026-11-18T08:00:00+09:00", "2026-11-18", "Disneyland", 10900, "live"),
+                ("2026-11-18", "2026-11-19", "Disneyland", 10900, "official_calendar_archive_2026-11-18"),
+            ],
+        )
+
+        hours = utils.load_park_hours(conn)
+        prices = utils.load_ticket_price_snapshots(conn)
+
+    assert len(hours) == 2
+    assert hours["observed_at"].notna().all()
+    assert hours.loc[0, "observed_at"] == pd.Timestamp("2026-11-18 08:00:00")
+    assert hours.loc[1, "observed_at"] == pd.Timestamp("2026-11-18 00:00:00")
+    assert len(prices) == 2
+    assert prices["observed_at"].notna().all()
