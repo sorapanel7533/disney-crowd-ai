@@ -2077,7 +2077,6 @@ def _parse_mixed_local_datetimes(values):
 
     return pd.to_datetime(values.map(parse_one), errors="coerce")
 
-
 def load_park_hours(conn):
     try:
         df = pd.read_sql_query("SELECT * FROM park_hours", conn)
