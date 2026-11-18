@@ -1,0 +1,23 @@
+{
+  "checkpoint_created_at_utc": "2026-11-18T00:09:17+00:00",
+  "source_crowd_data_commit": "253149f6995afe43a55f99a2eced6942687b4634",
+  "databases": {
+    "disneyland.db": {
+      "park": "Disneyland",
+      "source_sha256": "e7a14eb70a9153c2f0ed630e3980dd27f5607a268082949f4b3dd2a05b30eb8f",
+      "backup_sha256": "2f9b294d65ca5c46115013f011c0acb50f1801994624e21bf9f558a1fb09a421",
+      "backup_file": "disneyland-pre-calendar-import.db",
+      "backup_size_bytes": 49274880,
+      "integrity": "ok"
+    },
+    "disneysea.db": {
+      "park": "DisneySea",
+      "source_sha256": "72c99846eb82325a43c50be3784d0296454fec649ea6acf152f6d0ae62cfa215",
+      "backup_sha256": "2bd2dc44a205af003dcf1b01615443ff0ee259e32990da0af0577a76a4bf1d7a",
+      "backup_file": "disneysea-pre-calendar-import.db",
+      "backup_size_bytes": 46166016,
+      "integrity": "ok"
+    }
+  },
+  "purpose": "Pre-import backup for the supplied calendar snapshot; no database has been changed yet."
+}
