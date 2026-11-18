@@ -74,6 +74,7 @@ def get_pyplot():
 import utils as _utils
 if not hasattr(_utils, "get_live_crowd_index"):
     importlib.reload(_utils)
+from calendar_store import load_ticket_catalog, merge_ticket_prices, show_status_label, ticket_source_date_label
 
 from utils import (
     GLOBAL_PREDICTION_NAME,
@@ -813,12 +814,18 @@ elif dashboard_fast_path:
 else:
     ticket_value, ticket_ready = ticket_load.result()[0], True
 ticket_price_map, ticket_map_source = ticket_value
+live_ticket_price_map = dict(ticket_price_map or {})
+saved_ticket_rows = load_ticket_catalog(conn, park)
+ticket_price_map, ticket_price_status_map, ticket_price_sources = merge_ticket_prices(
+    ticket_price_map, ticket_map_source, saved_ticket_rows
+)
 ticket_price, ticket_source = get_ticket_price_from_castel(
     datetime.now(JST),
     ticket_price_map
 )
-if ticket_price is not None:
-    ticket_source = ticket_map_source
+today_ticket_day = datetime.now(JST).date()
+if today_ticket_day in ticket_price_sources:
+    ticket_source = ticket_price_sources[today_ticket_day]
 
 today_bonus, today_reasons = get_calendar_bonus(
     datetime.now(JST),
@@ -836,7 +843,7 @@ is_system = admin_section == "データ・システム管理"
 auto_context_results = ['定期収集ジョブで関連情報を収集します。未取得の項目は管理者画面で確認できます。']
 if is_system and is_admin and st.button('関連情報を更新'):
     with st.spinner('営業時間・イベント・ショーを確認中'):
-        auto_context_results = auto_save_context_data(cursor,conn,park,ticket_price_map,ticket_map_source,temperature,rain_mm,weather_text)
+        auto_context_results = auto_save_context_data(cursor,conn,park,live_ticket_price_map,ticket_map_source,temperature,rain_mm,weather_text)
         auto_context_results.extend(auto_collect_prediction_context(cursor,conn,park))
 
 park_hours_df = load_park_hours(conn)
@@ -1273,7 +1280,7 @@ if display_mode == "ダッシュボード":
         ("人気主要アトラクション最大待ち時間", "閉園中 / 現在値なし" if not (park_open_now and live_available) else f"{current_target_max_wait:.1f}分"),
         ("全体最大待ち時間", "閉園中 / 現在値なし" if not (park_open_now and live_available) else f"{all_crowd_stats['max_wait']:.1f}分"),
         ("営業中アトラクション数", all_crowd_stats["open_count"]),
-        ("営業時間", f"{today_open_hour:.0f}:00〜{today_close_hour:.0f}:00"),
+        ("営業時間", f"{today_open_hour:.0f}:00〜{today_close_hour:.0f}:00（{park_hours_source}）"),
     ])
 
     with st.expander("データ充実度・補正理由を見る", expanded=False):
@@ -1335,7 +1342,18 @@ if display_mode == "ダッシュボード":
     st.subheader("📅 需要補正")
 
     compact_card_grid([
-        ("チケット価格", "取得不可" if ticket_price is None else f"{ticket_price}円"),
+        (
+            "チケット価格",
+            (
+                f"{int(ticket_price):,}円{ticket_source_date_label(today_ticket_day, ticket_price_sources)}"
+                if ticket_price is not None
+                else (
+                    f"価格未掲載{ticket_source_date_label(today_ticket_day, ticket_price_sources)}"
+                    if ticket_price_status_map.get(today_ticket_day) == "not_listed"
+                    else "取得不可"
+                )
+            ),
+        ),
         ("対象日", f"{datetime.now(JST):%m月%d日}"),
         ("補正値", today_bonus),
     ])
@@ -1382,9 +1400,15 @@ if display_mode == "ダッシュボード":
     )
     selected_shows = park_schedules[park_schedules["target_date"].eq(selected_show_date)].copy() if not park_schedules.empty else pd.DataFrame()
     if not selected_shows.empty:
+        if selected_shows.get("note", pd.Series(index=selected_shows.index, dtype=str)).fillna("").astype(str).str.startswith("Imported schedule snapshot;").any():
+            checked = selected_shows.loc[
+                selected_shows["note"].fillna("").astype(str).str.startswith("Imported schedule snapshot;"),
+                "observed_at",
+            ].astype(str).str[:10].dropna()
+            checked_label = f"{checked.iloc[0]}時点" if len(checked) else "保存時点"
+            st.info(f"ショー予定は{checked_label}の保存情報です。内容が変更される場合があります。")
         selected_shows["公演時刻"] = selected_shows.apply(
-            lambda row: "休止" if row.get("status") == "suspended" else
-                        "未発表" if row.get("status") == "unannounced" else str(row.get("show_time", "")),
+            lambda row: show_status_label(row.get("status"), row.get("show_time", "")),
             axis=1,
         )
         selected_shows["ショー・パレード"] = selected_shows["show_name"]
