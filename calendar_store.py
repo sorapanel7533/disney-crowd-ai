@@ -228,7 +228,7 @@ def read_and_validate_calendar(
 
 
 def load_ticket_catalog(conn: sqlite3.Connection, park: str) -> list[dict[str, object]]:
-    """Return saved ticket price/status rows for one park, newest batch keys first."""
+    """Return saved ticket rows, with a legacy park-hours fallback for older runtimes."""
     try:
         rows = conn.execute(
             """SELECT target_date, price, price_status, source_captured_jst, source_file
@@ -236,8 +236,38 @@ def load_ticket_catalog(conn: sqlite3.Connection, park: str) -> list[dict[str, o
             (park,),
         ).fetchall()
     except sqlite3.Error:
-        return []
-    return [dict(zip(("target_date", "price", "price_status", "source_captured_jst", "source_file"), row)) for row in rows]
+        rows = []
+    catalog = [dict(zip(("target_date", "price", "price_status", "source_captured_jst", "source_file"), row)) for row in rows]
+    known_days = {str(row["target_date"]) for row in catalog}
+
+    # A runtime may restore only the legacy tables from a snapshot before its
+    # normalized calendar schema is initialized. The legacy park_hours rows
+    # still carry the exact official price (or an explicit blank) and capture date.
+    try:
+        legacy_rows = conn.execute(
+            """SELECT target_date,ticket_price,source FROM park_hours
+               WHERE park=? AND source GLOB 'official_calendar_archive_*'
+               ORDER BY target_date""",
+            (park,),
+        ).fetchall()
+    except sqlite3.Error:
+        legacy_rows = []
+
+    prefix = "official_calendar_archive_"
+    for target_date, price, source in legacy_rows:
+        day = str(target_date)
+        if day in known_days:
+            continue
+        source_text = str(source)
+        catalog.append({
+            "target_date": day,
+            "price": int(price) if price is not None else None,
+            "price_status": "published" if price is not None else "not_listed",
+            "source_captured_jst": source_text.removeprefix(prefix),
+            "source_file": "legacy_park_hours_fallback",
+        })
+        known_days.add(day)
+    return sorted(catalog, key=lambda row: str(row["target_date"]))
 
 
 def merge_ticket_prices(
