@@ -2065,6 +2065,19 @@ def save_park_hours_rows(cursor, conn, park, hours_df):
     return saved_count
 
 
+def _parse_mixed_local_datetimes(values):
+    """Parse archived date-only and live timestamp values as local wall time."""
+    def parse_one(value):
+        parsed = pd.to_datetime(value, format="mixed", errors="coerce")
+        if pd.isna(parsed):
+            return pd.NaT
+        if parsed.tzinfo is not None:
+            return parsed.tz_localize(None)
+        return parsed
+
+    return pd.to_datetime(values.map(parse_one), errors="coerce")
+
+
 def load_park_hours(conn):
     try:
         df = pd.read_sql_query("SELECT * FROM park_hours", conn)
@@ -2072,7 +2085,7 @@ def load_park_hours(conn):
         return pd.DataFrame()
 
     if len(df) > 0:
-        df["observed_at"] = pd.to_datetime(df["observed_at"])
+        df["observed_at"] = _parse_mixed_local_datetimes(df["observed_at"])
         df["target_date"] = pd.to_datetime(df["target_date"]).dt.date
 
     return df
@@ -2820,7 +2833,7 @@ def load_ticket_price_snapshots(conn):
         return pd.DataFrame()
 
     if len(df) > 0:
-        df["observed_at"] = pd.to_datetime(df["observed_at"])
+        df["observed_at"] = _parse_mixed_local_datetimes(df["observed_at"])
         df["target_date"] = pd.to_datetime(df["target_date"]).dt.date
 
     return df
