@@ -191,3 +191,25 @@ def test_preimport_sqlite_backups_are_consistent_and_manifest_names_source_commi
         with sqlite3.connect(backup_path) as conn:
             assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
             assert conn.execute("SELECT value FROM retained WHERE id=1").fetchone()[0] == "before import"
+
+
+def test_ticket_catalog_falls_back_to_exact_legacy_official_hours_rows():
+    with sqlite3.connect(":memory:") as conn:
+        conn.execute("CREATE TABLE park_hours (observed_at TEXT,target_date TEXT,park TEXT,open_hour REAL,close_hour REAL,ticket_price INTEGER,source TEXT,note TEXT)")
+        conn.executemany(
+            "INSERT INTO park_hours VALUES (?,?,?,?,?,?,?,?)",
+            [
+                ("2026-11-18", "2026-11-18", "Disneyland", 9, 21, 10900, "official_calendar_archive_2026-11-18", "official snapshot"),
+                ("2026-11-18", "2026-11-19", "Disneyland", 9, 21, None, "official_calendar_archive_2026-11-18", "official snapshot"),
+                ("2026-11-18", "2026-11-20", "DisneySea", 9, 21, 10900, "official_calendar_archive_2026-11-18", "other park"),
+            ],
+        )
+
+        rows = load_ticket_catalog(conn, "Disneyland")
+
+    prices, statuses, sources = merge_ticket_prices({}, "unavailable", rows)
+    assert prices[date(2026, 11, 18)] == 10900
+    assert date(2026, 11, 19) not in prices
+    assert statuses[date(2026, 11, 19)] == "not_listed"
+    assert ticket_source_date_label(date(2026, 11, 18), sources) == "（11/18確認）"
+    assert len(rows) == 2
