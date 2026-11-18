@@ -1,0 +1,108 @@
+name: Import supplied official calendar snapshot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'data/calendar-import/ticket_prices_and_hours.csv'
+      - 'data/calendar-import/official_show_schedule.csv'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: crowd-data-collector
+  cancel-in-progress: false
+
+jobs:
+  import-calendar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate source data without writing
+        run: >-
+          python calendar_import.py validate
+          --ticket-csv data/calendar-import/ticket_prices_and_hours.csv
+          --show-csv data/calendar-import/official_show_schedule.csv
+
+      - name: Restore the current durable databases
+        shell: bash
+        run: |
+          git fetch origin crowd-data
+          git worktree add .data origin/crowd-data
+          test -s .data/disneyland.db
+          test -s .data/disneysea.db
+          echo "SOURCE_COMMIT=$(git -C .data rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Check for this exact snapshot before creating a backup
+        id: snapshot_status
+        run: >-
+          python calendar_import.py status
+          --db-dir .data
+          --ticket-csv data/calendar-import/ticket_prices_and_hours.csv
+          --show-csv data/calendar-import/official_show_schedule.csv
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Back up and checkpoint both park databases before import
+        if: steps.snapshot_status.outputs.already_imported != 'true'
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/calendar-backup" .data/calendar-import-checkpoints
+          python calendar_import.py backup \
+            --db-dir .data \
+            --backup-dir "$RUNNER_TEMP/calendar-backup" \
+            --manifest "$RUNNER_TEMP/calendar-backup/pre-import.json" \
+            --source-commit "$SOURCE_COMMIT"
+          cp "$RUNNER_TEMP/calendar-backup/pre-import.json" \
+            ".data/calendar-import-checkpoints/${GITHUB_RUN_ID}.json"
+          git -C .data config user.name 'github-actions[bot]'
+          git -C .data config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C .data add "calendar-import-checkpoints/${GITHUB_RUN_ID}.json"
+          git -C .data commit -m "Checkpoint databases before calendar snapshot import"
+          git -C .data push origin HEAD:crowd-data
+
+      - name: Import rows and verify both databases
+        if: steps.snapshot_status.outputs.already_imported != 'true'
+        shell: bash
+        run: |
+          python calendar_import.py import \
+            --db-dir .data \
+            --ticket-csv data/calendar-import/ticket_prices_and_hours.csv \
+            --show-csv data/calendar-import/official_show_schedule.csv
+          git -C .data diff --check
+          git -C .data add disneyland.db disneysea.db
+          git -C .data commit -m "Import verified ticket, park hours and show schedule snapshot"
+          git -C .data push origin HEAD:crowd-data
+          git fetch origin crowd-data
+          LOCAL_HEAD=$(git -C .data rev-parse HEAD)
+          REMOTE_HEAD=$(git rev-parse origin/crowd-data)
+          test "$LOCAL_HEAD" = "$REMOTE_HEAD"
+          python - <<'PY'
+          import json, sqlite3
+          for park, name, ticket_count, show_count in (
+              ('Disneyland', 'disneyland.db', 137, 440),
+              ('DisneySea', 'disneysea.db', 137, 396),
+          ):
+              with sqlite3.connect(f'.data/{name}') as db:
+                  assert db.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
+                  assert db.execute('SELECT COUNT(*) FROM official_calendar_ticket_prices WHERE park=?', (park,)).fetchone()[0] == ticket_count
+                  assert db.execute('SELECT COUNT(*) FROM official_calendar_shows WHERE park=?', (park,)).fetchone()[0] == show_count
+                  print(json.dumps({'park': park, 'integrity': 'ok', 'ticket_calendar_rows': ticket_count, 'show_schedule_rows': show_count}, ensure_ascii=False))
+          PY
+
+      - name: Retain verified pre-import backups
+        if: always() && steps.snapshot_status.outputs.already_imported != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: calendar-pre-import-db-backup-${{ github.run_id }}
+          path: ${{ runner.temp }}/calendar-backup/
+          retention-days: 90

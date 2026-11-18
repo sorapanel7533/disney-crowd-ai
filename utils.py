@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 import requests
+from calendar_store import ensure_calendar_tables
 
 try:
     import jpholiday
@@ -194,6 +195,7 @@ def _initialize_db(db_name):
     conn.execute('PRAGMA journal_mode=WAL')
     conn.execute('PRAGMA busy_timeout=10000')
     cursor = conn.cursor()
+    ensure_calendar_tables(conn)
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS wait_times (
@@ -2096,11 +2098,30 @@ def get_today_park_hours(park_hours_df, park, target_date):
         return 9.0, 21.0, "推定営業時間"
 
     if "observed_at" in rows.columns:
-        rows = rows.sort_values("observed_at", ascending=False)
+        rows = _sort_park_hours_quality(rows)
     row = rows.iloc[0]
     open_hour = float(row.get("open_hour", 9.0) or 9.0)
     close_hour = float(row.get("close_hour", 21.0) or 21.0)
-    return open_hour, close_hour, ("公式営業時間" if str(row.get('source','')).startswith('official') else "推定営業時間（公式未確認）")
+    source = str(row.get("source", ""))
+    if source.startswith("official"):
+        observed_at = str(row.get("observed_at", ""))[:10]
+        checked = f"（{observed_at}確認）" if observed_at else ""
+        return open_hour, close_hour, f"公式営業時間{checked}"
+    return open_hour, close_hour, "推定営業時間（公式未確認）"
+
+
+def _sort_park_hours_quality(rows):
+    """Use a saved official calendar over a newer estimate; newest official wins."""
+    result = rows.copy()
+    source = result.get("source", pd.Series(index=result.index, dtype=str)).fillna("").astype(str)
+    result["_official_priority"] = source.str.startswith("official").astype(int)
+    result["_observed_sort"] = pd.to_datetime(
+        result.get("observed_at", pd.Series(index=result.index, dtype=str)), errors="coerce"
+    )
+    result = result.sort_values(
+        ["_official_priority", "_observed_sort"], ascending=[False, False], na_position="last"
+    )
+    return result.drop(columns=["_official_priority", "_observed_sort"])
 
 
 def is_park_open_now(park_hours_df, park, now):
@@ -2119,7 +2140,7 @@ def get_park_hours_bonus(park_hours_df, target_date):
     if len(day_rows) == 0:
         return 0, []
 
-    row = day_rows.sort_values("observed_at", ascending=False).iloc[0]
+    row = _sort_park_hours_quality(day_rows).iloc[0]
     close_hour = float(row.get("close_hour", 21.0) or 21.0)
     open_hour = float(row.get("open_hour", 9.0) or 9.0)
     duration = close_hour - open_hour
