@@ -1,8 +1,8 @@
 {
-  "sample": 0,
-  "started_at_utc": "2026-11-20T12:45:05.244576+00:00",
-  "finished_at_utc": "2026-11-20T12:50:20.180181+00:00",
-  "due_slot_utc": "2026-11-20T12:37:00+00:00",
+  "sample": 1,
+  "started_at_utc": "2026-11-20T12:52:00.000230+00:00",
+  "finished_at_utc": "2026-11-20T12:52:22.451186+00:00",
+  "due_slot_utc": "2026-11-20T12:52:00+00:00",
   "event": "schedule",
   "github_run_id": "44738182103",
   "results": [
@@ -11,42 +11,26 @@
       "status": "success",
       "received": 33,
       "inserted": 33,
-      "observed_at": "2026-11-20T12:41:04+00:00",
+      "observed_at": "2026-11-20T12:51:02+00:00",
       "open_positive": 0,
       "open_zero": 0,
       "closed": 33,
       "source_stale": 0,
-      "evaluated_predictions": 10,
+      "evaluated_predictions": 0,
       "shadow_evaluated": 0,
-      "shadow_issued": 1920,
-      "duration_seconds": 141.656,
+      "shadow_issued": 0,
+      "duration_seconds": 20.27,
       "journal": {
-        "path": "journal/2026-11/44738182103-1-s000-DisneySea.jsonl.gz",
-        "changes": 2864,
-        "compressed_bytes": 132265,
-        "sha256": "4db8c2fb33ac8de898acdb50b8cd957f6351c92e9bb7f0deabcf181cf94ba56d"
+        "path": "journal/2026-11/44738182103-1-s001-DisneySea.jsonl.gz",
+        "changes": 37,
+        "compressed_bytes": 1686,
+        "sha256": "9d0d477d1359286cc9bdfc6982855160e5dfab067ecf9cf2e69c75196d0774d8"
       }
     },
     {
       "park": "Disneyland",
-      "status": "success",
-      "received": 37,
-      "inserted": 37,
-      "observed_at": "2026-11-20T12:46:04+00:00",
-      "open_positive": 0,
-      "open_zero": 0,
-      "closed": 37,
-      "source_stale": 0,
-      "evaluated_predictions": 10,
-      "shadow_evaluated": 0,
-      "shadow_issued": 2100,
-      "duration_seconds": 168.731,
-      "journal": {
-        "path": "journal/2026-11/44738182103-1-s000-Disneyland.jsonl.gz",
-        "changes": 3093,
-        "compressed_bytes": 142354,
-        "sha256": "71ab6da0d5564a00799e4963d1eec4d6ee8056e54e1e34cd834269961551297a"
-      }
+      "status": "skipped",
+      "reason": "A current collection was persisted less than five minutes ago; no duplicate API request"
     }
   ]
 }
