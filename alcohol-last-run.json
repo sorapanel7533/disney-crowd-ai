@@ -1,7 +1,7 @@
 {
-  "run_id": "weekly:2026-W47:20261120T022415084682",
+  "run_id": "weekly:2026-W47:20261121T022629020089",
   "status": "failed",
-  "finished_at_utc": "2026-11-20T02:24:45.169270+00:00",
+  "finished_at_utc": "2026-11-21T02:26:59.216270+00:00",
   "reason": "official_source_timeout: /robots.txt",
   "source": {
     "user_agent": "DisneyCrowdAI/3.1",
@@ -11,17 +11,17 @@
     "request_log": [
       {
         "path": "/robots.txt",
-        "started_at_utc": "2026-11-20T02:24:15.085004+00:00",
+        "started_at_utc": "2026-11-21T02:26:29.020504+00:00",
         "error": "timeout",
-        "finished_at_utc": "2026-11-20T02:24:30.140096+00:00",
-        "seconds": 15.055
+        "finished_at_utc": "2026-11-21T02:26:44.167190+00:00",
+        "seconds": 15.147
       },
       {
         "path": "/robots.txt",
-        "started_at_utc": "2026-11-20T02:24:30.140243+00:00",
+        "started_at_utc": "2026-11-21T02:26:44.167340+00:00",
         "error": "timeout",
-        "finished_at_utc": "2026-11-20T02:24:45.169201+00:00",
-        "seconds": 15.029
+        "finished_at_utc": "2026-11-21T02:26:59.216211+00:00",
+        "seconds": 15.049
       }
     ]
   },
@@ -29,9 +29,9 @@
   "source_requests_this_attempt": 2,
   "execution_environment": "github_actions",
   "journal": {
-    "path": "journal/2026-11/alcohol-44660350770-1-Alcohol.jsonl.gz",
+    "path": "journal/2026-11/alcohol-44855747091-1-Alcohol.jsonl.gz",
     "changes": 1,
-    "compressed_bytes": 499,
-    "sha256": "d5b169461a6902aa9259df59bf22f92c656526ee2a2785473c639e5f0880dea5"
+    "compressed_bytes": 500,
+    "sha256": "197a3a0de0ebfdb41266786b26e93d2c640a7cd6c03230e2da3f5e4ab963dbd8"
   }
 }
