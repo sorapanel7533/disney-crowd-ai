@@ -1,8 +1,8 @@
 {
-  "sample": 0,
-  "started_at_utc": "2026-11-22T03:00:03.830953+00:00",
-  "finished_at_utc": "2026-11-22T03:04:55.881285+00:00",
-  "due_slot_utc": "2026-11-22T02:52:00+00:00",
+  "sample": 1,
+  "started_at_utc": "2026-11-22T03:07:00.000213+00:00",
+  "finished_at_utc": "2026-11-22T03:07:18.684890+00:00",
+  "due_slot_utc": "2026-11-22T03:07:00+00:00",
   "event": "schedule",
   "github_run_id": "44978512389",
   "results": [
@@ -11,42 +11,26 @@
       "status": "success",
       "received": 33,
       "inserted": 33,
-      "observed_at": "2026-11-22T02:56:02+00:00",
-      "open_positive": 26,
-      "open_zero": 2,
-      "closed": 5,
-      "source_stale": 0,
-      "evaluated_predictions": 10,
-      "shadow_evaluated": 0,
-      "shadow_issued": 320,
-      "duration_seconds": 133.726,
-      "journal": {
-        "path": "journal/2026-11/44978512389-1-s000-DisneySea.jsonl.gz",
-        "changes": 1357,
-        "compressed_bytes": 55561,
-        "sha256": "5f5499bf6d61822dba36e121eefefba9d67807f776e75cf5f06f59a39c9bb653"
-      }
-    },
-    {
-      "park": "Disneyland",
-      "status": "success",
-      "received": 37,
-      "inserted": 37,
-      "observed_at": "2026-11-22T03:01:08+00:00",
-      "open_positive": 31,
+      "observed_at": "2026-11-22T03:06:06+00:00",
+      "open_positive": 27,
       "open_zero": 2,
       "closed": 4,
       "source_stale": 0,
       "evaluated_predictions": 0,
       "shadow_evaluated": 0,
-      "shadow_issued": 350,
-      "duration_seconds": 153.857,
+      "shadow_issued": 0,
+      "duration_seconds": 16.43,
       "journal": {
-        "path": "journal/2026-11/44978512389-1-s000-Disneyland.jsonl.gz",
-        "changes": 1420,
-        "compressed_bytes": 58216,
-        "sha256": "51ee7da707ce73dec1a6d5e07cd892b725a4627df4d796ebea60409979a278d7"
+        "path": "journal/2026-11/44978512389-1-s001-DisneySea.jsonl.gz",
+        "changes": 37,
+        "compressed_bytes": 1787,
+        "sha256": "39b3332f3f28b9138ef6da1cb86b16ea50d053be4e02e12ecba17c7954c999fb"
       }
+    },
+    {
+      "park": "Disneyland",
+      "status": "skipped",
+      "reason": "A current collection was persisted less than five minutes ago; no duplicate API request"
     }
   ]
 }
