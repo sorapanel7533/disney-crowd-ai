@@ -1,5 +1,5 @@
 {
-  "as_of_utc": "2026-11-22T13:07:02.538021+00:00",
+  "as_of_utc": "2026-11-22T18:29:21.954279+00:00",
   "parks": {
     "DisneySea": {
       "integrity": "ok",
@@ -7,7 +7,7 @@
       "quality": {
         "summary": {
           "park": "DisneySea",
-          "as_of_utc": "2026-11-22T13:07:02.538021+00:00",
+          "as_of_utc": "2026-11-22T18:29:21.954279+00:00",
           "rows": 25202,
           "verified_rows": 24208,
           "valid_open_rows": 17256,
@@ -24,7 +24,7 @@
           "days_with_open_observations": 24,
           "eligible_evaluation_days": 0,
           "latest_observed_utc": "2026-11-22T12:46:15+00:00",
-          "freshness_minutes": 20.79230035,
+          "freshness_minutes": 343.11590465,
           "denominator": "Assumed 09:00–21:00 JST, 15-minute slots; not verified official hours",
           "ready_rule": "Completed day; each major ride >= 75% of full-day slots and >= 8 hours"
         },
@@ -96463,15 +96463,6 @@
         "provisional_80_percent": false,
         "daily": [
           {
-            "date": "2026-11-19",
-            "expected_slots": 56,
-            "observed_slots": 23,
-            "missing_slots": 33,
-            "rate": 0.4107142857142857,
-            "complete_day": true,
-            "facility_denominator": 36
-          },
-          {
             "date": "2026-11-20",
             "expected_slots": 56,
             "observed_slots": 25,
@@ -96496,6 +96487,15 @@
             "missing_slots": 25,
             "rate": 0.5535714285714286,
             "complete_day": true,
+            "facility_denominator": 36
+          },
+          {
+            "date": "2026-11-23",
+            "expected_slots": 0,
+            "observed_slots": 0,
+            "missing_slots": 0,
+            "rate": null,
+            "complete_day": false,
             "facility_denominator": 36
           }
         ],
@@ -96921,7 +96921,7 @@
       "quality": {
         "summary": {
           "park": "Disneyland",
-          "as_of_utc": "2026-11-22T13:07:02.538021+00:00",
+          "as_of_utc": "2026-11-22T18:29:21.954279+00:00",
           "rows": 26975,
           "verified_rows": 26751,
           "valid_open_rows": 20410,
@@ -96937,7 +96937,7 @@
           "days_with_open_observations": 24,
           "eligible_evaluation_days": 1,
           "latest_observed_utc": "2026-11-22T12:51:12+00:00",
-          "freshness_minutes": 15.842300349999999,
+          "freshness_minutes": 338.16590465,
           "denominator": "Assumed 09:00–21:00 JST, 15-minute slots; not verified official hours",
           "ready_rule": "Completed day; each major ride >= 75% of full-day slots and >= 8 hours"
         },
@@ -196049,15 +196049,6 @@
         "provisional_80_percent": false,
         "daily": [
           {
-            "date": "2026-11-19",
-            "expected_slots": 56,
-            "observed_slots": 23,
-            "missing_slots": 33,
-            "rate": 0.4107142857142857,
-            "complete_day": true,
-            "facility_denominator": 37
-          },
-          {
             "date": "2026-11-20",
             "expected_slots": 56,
             "observed_slots": 24,
@@ -196082,6 +196073,15 @@
             "missing_slots": 26,
             "rate": 0.5357142857142857,
             "complete_day": true,
+            "facility_denominator": 37
+          },
+          {
+            "date": "2026-11-23",
+            "expected_slots": 0,
+            "observed_slots": 0,
+            "missing_slots": 0,
+            "rate": null,
+            "complete_day": false,
             "facility_denominator": 37
           }
         ],
@@ -196513,7 +196513,7 @@
     "partition_required": true,
     "partition_warning_threshold_bytes": 20971520,
     "retention_policy": "No destructive prune. Immutable row journals plus original DB and retained Git snapshots. Plan monthly partitions before threshold.",
-    "git_object_statistics": "count: 88\nsize: 232052\nin-pack: 8535\npacks: 2\nsize-pack: 135597\nprune-packable: 0\ngarbage: 1\nsize-garbage: 4",
+    "git_object_statistics": "count: 4\nsize: 156\nin-pack: 8626\npacks: 2\nsize-pack: 138029\nprune-packable: 0\ngarbage: 1\nsize-garbage: 4",
     "db_commit_history": [
       "1d16e2353b4f6dbe309fca5d1f8fe51506225459 2026-11-22T12:53:25Z",
       "83bc4a95c40c305713bf7ad41b5ab7c9eb3d4ae3 2026-11-22T12:38:25Z",
@@ -196664,7 +196664,7 @@
     "bytes": 1142784,
     "freshness": {
       "last_success_utc": "2026-10-30T16:50:22.372097+00:00",
-      "age_days": 22.844909327824077,
+      "age_days": 23.068745164143518,
       "level": "warning",
       "next_scheduled_jst": "2026-11-23T06:00:00+09:00",
       "latest_run": {
@@ -196703,227 +196703,17 @@
     }
   },
   "schedule": {
-    "start_utc": "2026-11-16T02:40:39+00:00",
-    "end_utc": "2026-11-22T13:07:02.538021+00:00",
+    "start_utc": "2026-11-16T10:12:02+00:00",
+    "end_utc": "2026-11-22T18:29:21.954279+00:00",
     "grace_minutes": 30,
-    "expected_slots": 377,
+    "expected_slots": 347,
     "observed_scheduled_runs": 17,
-    "not_observed_slots": 365,
+    "not_observed_slots": 337,
     "completed_jobs": 18,
     "failed_jobs": 0,
     "failure_rate_of_executed_jobs": 0.0,
     "note": "Missing slots may be delayed/dropped/not dispatched. They are not HTTP failures. Delay attribution is inferred.",
     "slots": [
-      {
-        "due_utc": "2026-11-16T02:52:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T03:07:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T03:22:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T03:37:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T03:52:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T04:07:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T04:22:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T04:37:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T04:52:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T05:07:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T05:22:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T05:37:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T05:52:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T06:07:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T06:22:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T06:37:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T06:52:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T07:07:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T07:22:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T07:37:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T07:52:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T08:07:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T08:22:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T08:37:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T08:52:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T09:07:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T09:22:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T09:37:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T09:52:00+00:00",
-        "status": "not_observed",
-        "run_id": null,
-        "inferred_delay_minutes": null,
-        "attribution": "absence_of_run_is_not_a_failed_job"
-      },
-      {
-        "due_utc": "2026-11-16T10:07:00+00:00",
-        "status": "success",
-        "run_id": 43846672362,
-        "inferred_delay_minutes": 5.03,
-        "attribution": "inferred_previous_slot"
-      },
       {
         "due_utc": "2026-11-16T10:22:00+00:00",
         "status": "not_observed",
@@ -199292,7 +199082,7 @@
       },
       {
         "due_utc": "2026-11-22T10:52:00+00:00",
-        "status": "in_progress",
+        "status": "success",
         "run_id": 45015559725,
         "inferred_delay_minutes": 13.13,
         "attribution": "inferred_previous_slot"
@@ -199348,28 +199138,38 @@
       },
       {
         "due_utc": "2026-11-22T12:52:00+00:00",
-        "status": "within_grace",
+        "status": "not_observed",
         "run_id": null,
         "inferred_delay_minutes": null,
         "attribution": "absence_of_run_is_not_a_failed_job"
       }
     ],
     "unmatched_runs": [
-      43793612676,
+      43846672362,
       43951008741,
       44101255515,
       44311221522,
       44814381200,
-      44942459892
+      44942459892,
+      45055163847
     ],
     "executed_runs": [
+      {
+        "id": 45055163847,
+        "event": "schedule",
+        "created_at": "2026-11-22T18:27:13Z",
+        "updated_at": "2026-11-22T18:27:16Z",
+        "status": "in_progress",
+        "conclusion": null,
+        "html_url": "https://github.com/sorapanel7533/disney-crowd-ai/actions/runs/45055163847"
+      },
       {
         "id": 45015559725,
         "event": "schedule",
         "created_at": "2026-11-22T11:05:08Z",
-        "updated_at": "2026-11-22T11:05:11Z",
-        "status": "in_progress",
-        "conclusion": null,
+        "updated_at": "2026-11-22T13:07:15Z",
+        "status": "completed",
+        "conclusion": "success",
         "html_url": "https://github.com/sorapanel7533/disney-crowd-ai/actions/runs/45015559725"
       },
       {
@@ -199524,18 +199324,10 @@
         "status": "completed",
         "conclusion": "success",
         "html_url": "https://github.com/sorapanel7533/disney-crowd-ai/actions/runs/43846672362"
-      },
-      {
-        "id": 43793612676,
-        "event": "schedule",
-        "created_at": "2026-11-16T02:40:39Z",
-        "updated_at": "2026-11-16T08:13:03Z",
-        "status": "completed",
-        "conclusion": "success",
-        "html_url": "https://github.com/sorapanel7533/disney-crowd-ai/actions/runs/43793612676"
       }
     ],
     "wall_seconds": [
+      7327.0,
       19441.0,
       121.0,
       2278.0,
@@ -199552,8 +199344,7 @@
       165.0,
       19339.0,
       107.0,
-      10511.0,
-      19944.0
+      10511.0
     ]
   }
 }
