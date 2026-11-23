@@ -1,8 +1,8 @@
 {
-  "sample": 11,
-  "started_at_utc": "2026-11-23T06:22:00.000184+00:00",
-  "finished_at_utc": "2026-11-23T06:22:37.854821+00:00",
-  "due_slot_utc": "2026-11-23T06:22:00+00:00",
+  "sample": 12,
+  "started_at_utc": "2026-11-23T06:37:00.000200+00:00",
+  "finished_at_utc": "2026-11-23T06:37:37.296128+00:00",
+  "due_slot_utc": "2026-11-23T06:37:00+00:00",
   "event": "schedule",
   "github_run_id": "45107366968",
   "results": [
@@ -11,7 +11,7 @@
       "status": "success",
       "received": 33,
       "inserted": 33,
-      "observed_at": "2026-11-23T06:21:08+00:00",
+      "observed_at": "2026-11-23T06:31:01+00:00",
       "open_positive": 23,
       "open_zero": 3,
       "closed": 7,
@@ -19,12 +19,12 @@
       "evaluated_predictions": 10,
       "shadow_evaluated": 0,
       "shadow_issued": 0,
-      "duration_seconds": 16.223,
+      "duration_seconds": 16.045,
       "journal": {
-        "path": "journal/2026-11/45107366968-1-s011-DisneySea.jsonl.gz",
+        "path": "journal/2026-11/45107366968-1-s012-DisneySea.jsonl.gz",
         "changes": 49,
-        "compressed_bytes": 2561,
-        "sha256": "f3aeb55e394d3abd26de8f6e074d7b61752eb0ae5df91d672356015028bb4773"
+        "compressed_bytes": 2597,
+        "sha256": "e0cc99aa940b24866c9f29f0af9355ec592cc9c254313517751b3fb6fb9965e5"
       }
     },
     {
@@ -32,20 +32,20 @@
       "status": "success",
       "received": 37,
       "inserted": 37,
-      "observed_at": "2026-11-23T06:21:08+00:00",
-      "open_positive": 31,
-      "open_zero": 2,
-      "closed": 4,
+      "observed_at": "2026-11-23T06:36:01+00:00",
+      "open_positive": 29,
+      "open_zero": 3,
+      "closed": 5,
       "source_stale": 0,
       "evaluated_predictions": 10,
       "shadow_evaluated": 0,
       "shadow_issued": 0,
-      "duration_seconds": 17.292,
+      "duration_seconds": 16.986,
       "journal": {
-        "path": "journal/2026-11/45107366968-1-s011-Disneyland.jsonl.gz",
+        "path": "journal/2026-11/45107366968-1-s012-Disneyland.jsonl.gz",
         "changes": 51,
-        "compressed_bytes": 2508,
-        "sha256": "d0c703bd0675247e28341d6875ad79653592670fe5071745b7d66d874ac1afdd"
+        "compressed_bytes": 2498,
+        "sha256": "c079d57918ed2d909096cf71c36966c6d182dee73b06fa66633825643833b4af"
       }
     }
   ]
