@@ -1,52 +1,14 @@
 {
-  "sample": 22,
-  "started_at_utc": "2026-11-26T10:22:00.000203+00:00",
-  "finished_at_utc": "2026-11-26T10:22:58.791755+00:00",
-  "due_slot_utc": "2026-11-26T10:22:00+00:00",
+  "sample": 0,
+  "started_at_utc": "2026-11-26T15:01:12.388149+00:00",
+  "finished_at_utc": "2026-11-26T15:01:12.389167+00:00",
+  "due_slot_utc": "2026-11-26T14:52:00+00:00",
   "event": "schedule",
-  "github_run_id": "45758211148",
+  "github_run_id": "45844382649",
   "results": [
     {
-      "park": "DisneySea",
-      "status": "success",
-      "received": 33,
-      "inserted": 33,
-      "observed_at": "2026-11-26T10:21:08+00:00",
-      "open_positive": 22,
-      "open_zero": 3,
-      "closed": 8,
-      "source_stale": 0,
-      "evaluated_predictions": 5,
-      "shadow_evaluated": 0,
-      "shadow_issued": 0,
-      "duration_seconds": 25.534,
-      "journal": {
-        "path": "journal/2026-11/45758211148-1-s022-DisneySea.jsonl.gz",
-        "changes": 47,
-        "compressed_bytes": 2389,
-        "sha256": "dfea8dd992466105f0f17b00bf803fae4b7638b5382201eb9855cbf8b2713804"
-      }
-    },
-    {
-      "park": "Disneyland",
-      "status": "success",
-      "received": 37,
-      "inserted": 37,
-      "observed_at": "2026-11-26T10:21:08+00:00",
-      "open_positive": 29,
-      "open_zero": 2,
-      "closed": 6,
-      "source_stale": 0,
-      "evaluated_predictions": 5,
-      "shadow_evaluated": 0,
-      "shadow_issued": 0,
-      "duration_seconds": 26.723,
-      "journal": {
-        "path": "journal/2026-11/45758211148-1-s022-Disneyland.jsonl.gz",
-        "changes": 51,
-        "compressed_bytes": 2495,
-        "sha256": "8da3dd469ec561cd504ea5c3c3fa80fcd4f7dc47a4bb387c3a741c3f14cf74c5"
-      }
+      "status": "skipped",
+      "reason": "営業時間外（08:00〜22:00 JSTの収集窓）"
     }
   ]
 }
